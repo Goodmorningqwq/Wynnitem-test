@@ -570,6 +570,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const refreshBtn = document.getElementById('refreshEventBtn');
   const endBtn = document.getElementById('endEventBtn');
 
+  // Header elements
+  const headerLoginBtn = document.getElementById('headerLoginBtn');
+  const headerUserBtn = document.getElementById('headerUserBtn');
+
   // Auth elements
   const authSection = document.getElementById('authSection');
   const authTitle = document.getElementById('authTitle');
@@ -607,8 +611,9 @@ document.addEventListener('DOMContentLoaded', () => {
   window.showAuthSection = function() {
     authSection.classList.remove('hidden');
     userMenu.classList.add('hidden');
-    searchSection.classList.add('hidden');
     userDashboard.classList.add('hidden');
+    headerLoginBtn.classList.remove('hidden');
+    headerUserBtn.classList.add('hidden');
     isRegisterMode = false;
     updateAuthUI();
   };
@@ -616,8 +621,10 @@ document.addEventListener('DOMContentLoaded', () => {
   window.showLoggedInUI = function() {
     authSection.classList.add('hidden');
     userMenu.classList.remove('hidden');
-    searchSection.classList.remove('hidden');
     userDashboard.classList.remove('hidden');
+    headerLoginBtn.classList.add('hidden');
+    headerUserBtn.classList.remove('hidden');
+    headerUserBtn.textContent = currentUser;
     userDisplayName.textContent = currentUser;
     loadUserDashboard();
   };
@@ -734,6 +741,10 @@ document.addEventListener('DOMContentLoaded', () => {
   authSwitchBtn.addEventListener('click', () => {
     isRegisterMode = !isRegisterMode;
     updateAuthUI();
+  });
+
+  headerLoginBtn.addEventListener('click', () => {
+    window.showAuthSection();
   });
 
   logoutBtn.addEventListener('click', () => {

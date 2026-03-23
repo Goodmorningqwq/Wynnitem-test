@@ -104,17 +104,23 @@
       <nav class="flex items-center gap-4">
         <a href="/item" class="text-gray-400 hover:text-white transition-colors text-sm font-medium">Items</a>
         <a href="/guild" class="text-white font-semibold text-sm font-medium">Guilds</a>
+        <button id="headerLoginBtn" class="theme-btn px-4 py-2 rounded-lg text-sm">Login</button>
+        <button id="headerUserBtn" class="hidden theme-btn-primary px-4 py-2 rounded-lg text-sm"></button>
       </nav>
     </div>
   </header>
 
-  <!-- Login/Register Section -->
-  <div id="authSection" class="hidden container mx-auto px-4 py-8">
-    <div class="max-w-md mx-auto">
-      <div class="theme-panel p-8 rounded-xl">
-        <h2 class="hero-title mb-6 text-center" id="authTitle">Login</h2>
-        
-        <div class="space-y-4">
+  <!-- User Menu (when logged in) -->
+  <div id="userMenu" class="hidden bg-[rgba(22,22,22,0.98)] border-b border-[rgba(50,50,50,0.5)]">
+    <div class="container mx-auto px-4 py-2 flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <span class="text-white font-medium" id="userDisplayName"></span>
+        <span class="text-gray-500 text-sm">|</span>
+        <span class="text-gray-400 text-sm" id="trackedGuildDisplay"></span>
+      </div>
+      <button id="logoutBtn" class="text-gray-400 hover:text-white text-sm">Logout</button>
+    </div>
+  </div>
           <div>
             <label class="text-gray-400 text-sm mb-1 block">Username</label>
             <input type="text" id="authUsername" class="w-full bg-[rgba(26,12,40,0.95)] border border-[rgba(143,95,216,0.45)] rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-violet-500 focus:outline-none" placeholder="Username">
@@ -188,9 +194,8 @@
         </div>
       </div>
       
-      <!-- Guild Search (only when logged in) -->
-      <div id="searchSection" class="hidden theme-panel p-6 rounded-xl mb-6">
-      <div class="theme-panel p-6 rounded-xl mb-6">
+      <!-- Guild Search -->
+      <div id="searchSection" class="theme-panel p-6 rounded-xl mb-6">
         <h2 class="hero-title mb-3 text-center">Guild Tracker</h2>
         <p class="text-gray-400 text-center mb-6">Search for a guild and track their XP or war progress</p>
         
