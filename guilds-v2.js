@@ -6,6 +6,7 @@ let currentUser = null;
 let currentGuild = null;
 let activeEvent = null;
 let cooldownTimerId = null;
+const memberWarsCache = new Map();
 
 function getCurrentUser() {
   try {
@@ -72,8 +73,10 @@ function collectGuildMembers(guild) {
     if (!guild.members[rank]) continue;
     for (const [, member] of Object.entries(guild.members[rank])) {
       players.push({
+        uuid: member.uuid || null,
         username: member.username,
-        contributed: Number(member.contributed || 0)
+        contributed: Number(member.contributed || 0),
+        wars: memberWarsCache.get(member.uuid || '') ?? null
       });
     }
   }
@@ -83,7 +86,10 @@ function collectGuildMembers(guild) {
 function buildPlayerMap(players) {
   const map = {};
   for (const player of players) {
-    map[player.username] = Number(player.contributed || 0);
+    map[player.username] = {
+      xp: Number(player.contributed || 0),
+      wars: Number(player.wars || 0)
+    };
   }
   return map;
 }
@@ -99,6 +105,11 @@ function formatScope(scope) {
 
 function formatMetric(metric) {
   return metric === 'wars' ? 'Wars' : 'Guild XP';
+}
+
+function showMemberWarsEnabled() {
+  const toggle = document.getElementById('showMemberWarsToggle');
+  return Boolean(toggle?.checked);
 }
 
 function normalizeActiveEvent(rawEvent, fallbackTrackedPlayers = []) {
@@ -117,6 +128,10 @@ function normalizeActiveEvent(rawEvent, fallbackTrackedPlayers = []) {
   const trackedPlayers = Array.isArray(rawEvent.trackedPlayers)
     ? rawEvent.trackedPlayers
     : (Array.isArray(fallbackTrackedPlayers) ? fallbackTrackedPlayers : []);
+  const lastRefreshAt = Number(rawEvent.lastRefreshAt || latestUpdate?.time || startedAt);
+  const firstRefreshDone = rawEvent.firstRefreshDone === undefined
+    ? lastRefreshAt > startedAt
+    : Boolean(rawEvent.firstRefreshDone);
 
   return {
     guildName: rawEvent.guildName || null,
@@ -125,7 +140,8 @@ function normalizeActiveEvent(rawEvent, fallbackTrackedPlayers = []) {
     trackedPlayers,
     refreshCooldownMs: Number(rawEvent.refreshCooldownMs || REFRESH_COOLDOWN_MS),
     startedAt,
-    lastRefreshAt: Number(rawEvent.lastRefreshAt || latestUpdate?.time || startedAt),
+    lastRefreshAt,
+    firstRefreshDone,
     baseline: rawEvent.baseline || {
       metricValue: startValue,
       playerValues: {}
@@ -158,6 +174,7 @@ function displayGuild(guild) {
 
 function renderMembersList(players) {
   const listEl = document.getElementById('guildMembersList');
+  const showWars = showMemberWarsEnabled();
   if (!players.length) {
     listEl.innerHTML = '<p class="text-gray-500 text-sm">No members</p>';
     return;
@@ -165,13 +182,14 @@ function renderMembersList(players) {
   listEl.innerHTML = players.map((player) => `
     <div class="flex justify-between items-center bg-gray-800/30 px-3 py-2 rounded text-sm">
       <span class="text-white font-medium">${escapeHtml(player.username)}</span>
-      <span class="text-gray-400">${Number(player.contributed).toLocaleString()} XP</span>
+      <span class="text-gray-400">${Number(player.contributed).toLocaleString()} XP${showWars ? ` · ${player.wars == null ? '...' : Number(player.wars).toLocaleString()} Wars` : ''}</span>
     </div>
   `).join('');
 }
 
 function renderPlayerSelection(players) {
   const container = document.getElementById('playerCheckboxes');
+  const showWars = showMemberWarsEnabled();
   if (!players.length) {
     container.innerHTML = '<p class="text-gray-500 text-sm">No members available</p>';
     return;
@@ -180,9 +198,72 @@ function renderPlayerSelection(players) {
     <label class="flex items-center gap-2 p-2 hover:bg-gray-800/50 rounded cursor-pointer">
       <input type="checkbox" value="${escapeHtml(player.username)}" class="accent-purple-500">
       <span class="text-white text-sm">${escapeHtml(player.username)}</span>
-      <span class="text-gray-500 text-xs ml-auto">${Number(player.contributed).toLocaleString()} XP</span>
+      <span class="text-gray-500 text-xs ml-auto">${Number(player.contributed).toLocaleString()} XP${showWars ? ` · ${player.wars == null ? '...' : Number(player.wars).toLocaleString()} Wars` : ''}</span>
     </label>
   `).join('');
+}
+
+function hideAmbiguousGuildResults() {
+  const box = document.getElementById('guildAmbiguousResult');
+  if (box) box.classList.add('hidden');
+}
+
+function normalizeAmbiguousOptions(options) {
+  if (!options || typeof options !== 'object') return [];
+  return Object.entries(options).map(([key, value]) => {
+    if (value && typeof value === 'object') {
+      return {
+        key,
+        name: value.name || key,
+        prefix: value.prefix || key,
+        stats: value
+      };
+    }
+    return {
+      key,
+      name: String(value || key),
+      prefix: key,
+      stats: {}
+    };
+  });
+}
+
+function renderAmbiguousGuildResults(query, searchType, options) {
+  const box = document.getElementById('guildAmbiguousResult');
+  const list = document.getElementById('guildAmbiguousList');
+  const meta = document.getElementById('guildAmbiguousMeta');
+  if (!box || !list || !meta) return;
+
+  const normalized = normalizeAmbiguousOptions(options);
+  meta.textContent = `Query "${query}" matched ${normalized.length} guilds (${searchType})`;
+  if (!normalized.length) {
+    list.innerHTML = '<p class="text-sm text-gray-500">No options.</p>';
+    box.classList.remove('hidden');
+    return;
+  }
+
+  list.innerHTML = normalized.map((option) => {
+    const level = option.stats?.level != null ? `Lv.${option.stats.level}` : '';
+    const wars = option.stats?.wars != null ? `${option.stats.wars} wars` : '';
+    return `
+      <button class="w-full text-left bg-gray-800/50 hover:bg-gray-700/50 border border-gray-700 rounded p-3 transition-colors guild-ambiguous-option" data-prefix="${escapeHtml(option.prefix)}">
+        <div class="flex items-center justify-between">
+          <span class="text-white font-medium">${escapeHtml(option.name)}</span>
+          <span class="text-violet-300 text-sm">[${escapeHtml(option.prefix)}]</span>
+        </div>
+        <p class="text-xs text-gray-400 mt-1">${escapeHtml([level, wars].filter(Boolean).join(' · ') || 'Select this guild')}</p>
+      </button>
+    `;
+  }).join('');
+
+  list.querySelectorAll('.guild-ambiguous-option').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const prefix = btn.getAttribute('data-prefix') || '';
+      searchGuild(prefix, 'prefix');
+    });
+  });
+
+  box.classList.remove('hidden');
 }
 
 function getSelectedPlayers() {
@@ -196,13 +277,40 @@ function getSnapshot(metric, guild, trackedPlayers) {
   const selected = trackedPlayers.length ? trackedPlayers : players.map((p) => p.username);
   const snapshotPlayers = {};
   for (const username of selected) {
-    snapshotPlayers[username] = Number(playerMap[username] || 0);
+    const entry = playerMap[username] || { xp: 0, wars: 0 };
+    snapshotPlayers[username] = Number(metric === 'wars' ? entry.wars : entry.xp);
   }
   return {
     metricValue: metric === 'wars' ? Number(guild.wars || 0) : Number(guild.xpPercent || 0),
     playerValues: snapshotPlayers,
     capturedAt: Date.now()
   };
+}
+
+async function fetchMemberWars(uuid) {
+  if (!uuid) return null;
+  if (memberWarsCache.has(uuid)) return memberWarsCache.get(uuid);
+  try {
+    const response = await fetch(`https://api.wynncraft.com/v3/player/${encodeURIComponent(uuid)}`);
+    if (!response.ok) return null;
+    const data = await response.json();
+    const wars = Number(data?.globalData?.wars || 0);
+    memberWarsCache.set(uuid, wars);
+    return wars;
+  } catch {
+    return null;
+  }
+}
+
+async function hydrateVisibleMemberWars(guild) {
+  const members = collectGuildMembers(guild);
+  const targets = members.filter((member) => member.uuid && !memberWarsCache.has(member.uuid));
+  if (!targets.length) return;
+  const CONCURRENCY = 6;
+  for (let i = 0; i < targets.length; i += CONCURRENCY) {
+    const chunk = targets.slice(i, i + CONCURRENCY);
+    await Promise.all(chunk.map((member) => fetchMemberWars(member.uuid)));
+  }
 }
 
 function openLeaderboardPage() {
@@ -221,8 +329,11 @@ function updateCooldownText() {
   const dashboardRefreshBtn = document.getElementById('dashboardRefreshBtn');
   const eventCooldownText = document.getElementById('eventCooldownText');
   const dashboardCooldownText = document.getElementById('dashboardCooldownText');
+  const firstRefreshDone = Boolean(activeEvent.firstRefreshDone);
   const lastRefreshAt = Number(activeEvent.lastRefreshAt || activeEvent.startedAt || 0);
-  const remaining = Math.max(0, (lastRefreshAt + Number(activeEvent.refreshCooldownMs || REFRESH_COOLDOWN_MS)) - Date.now());
+  const remaining = firstRefreshDone
+    ? Math.max(0, (lastRefreshAt + Number(activeEvent.refreshCooldownMs || REFRESH_COOLDOWN_MS)) - Date.now())
+    : 0;
 
   if (remaining === 0) {
     refreshBtn.disabled = false;
@@ -299,16 +410,29 @@ function renderActiveEvent() {
   updateCooldownText();
 }
 
-async function searchGuild(name) {
+async function searchGuild(name, mode = 'auto') {
   const guildResult = document.getElementById('guildResult');
   const noResult = document.getElementById('noResult');
   if (!name || !name.trim()) return;
 
   guildResult.classList.add('hidden');
   noResult.classList.add('hidden');
+  hideAmbiguousGuildResults();
 
   try {
-    const response = await fetch(`${GUILD_API}?name=${encodeURIComponent(name)}`);
+    const response = await fetch(`${GUILD_API}?query=${encodeURIComponent(name)}&mode=${encodeURIComponent(mode)}`);
+    let data = null;
+    try {
+      data = await response.json();
+    } catch {
+      data = null;
+    }
+
+    if (response.status === 300 && data?.ambiguous) {
+      renderAmbiguousGuildResults(name, data.searchType || mode, data.options || {});
+      return;
+    }
+
     if (!response.ok) {
       if (response.status === 404) {
         noResult.classList.remove('hidden');
@@ -317,8 +441,12 @@ async function searchGuild(name) {
       }
       throw new Error(`API Error: ${response.status}`);
     }
-    currentGuild = await response.json();
+    currentGuild = data;
     displayGuild(currentGuild);
+    await hydrateVisibleMemberWars(currentGuild);
+    if (currentGuild?.name === data?.name) {
+      displayGuild(currentGuild);
+    }
   } catch (e) {
     console.error('Search error:', e);
     alert(`Error searching guild: ${e.message}`);
@@ -361,6 +489,7 @@ async function startEvent() {
     refreshCooldownMs: REFRESH_COOLDOWN_MS,
     startedAt: Date.now(),
     lastRefreshAt: Date.now(),
+    firstRefreshDone: false,
     baseline,
     current: baseline
   };
@@ -384,7 +513,7 @@ async function refreshEvent() {
   if (!activeEvent || !currentGuild?.name) return;
   const now = Date.now();
   const cooldownUntil = Number(activeEvent.lastRefreshAt || 0) + Number(activeEvent.refreshCooldownMs || REFRESH_COOLDOWN_MS);
-  if (now < cooldownUntil) {
+  if (activeEvent.firstRefreshDone && now < cooldownUntil) {
     updateCooldownText();
     return;
   }
@@ -392,6 +521,7 @@ async function refreshEvent() {
   const snapshot = getSnapshot(activeEvent.metric, currentGuild, activeEvent.trackedPlayers || []);
   activeEvent.current = snapshot;
   activeEvent.lastRefreshAt = Date.now();
+  activeEvent.firstRefreshDone = true;
   const saveResult = await updateUserData({ activeEvent });
   if (!saveResult.ok) {
     console.error('Failed to persist refreshed active event:', saveResult.error);
@@ -505,7 +635,7 @@ function updateTrackedGuildsList(name) {
   `;
   list.querySelector('button')?.addEventListener('click', () => {
     document.getElementById('guildSearchInput').value = name;
-    searchGuild(name);
+    searchGuild(name, 'name');
   });
 }
 
@@ -543,6 +673,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (e.key === 'Enter') {
       searchGuild(document.getElementById('guildSearchInput').value);
     }
+  });
+  document.getElementById('showMemberWarsToggle')?.addEventListener('change', () => {
+    if (!currentGuild) return;
+    const members = collectGuildMembers(currentGuild);
+    renderMembersList(members);
+    renderPlayerSelection(members);
   });
 
   document.getElementById('trackScopeSelect').addEventListener('change', updateScopeUI);

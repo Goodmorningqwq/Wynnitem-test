@@ -23,6 +23,7 @@ function sanitizeActiveEvent(value) {
   const refreshCooldownMs = Number(value.refreshCooldownMs || 15 * 60 * 1000);
   const startedAt = Number(value.startedAt || Date.now());
   const lastRefreshAt = Number(value.lastRefreshAt || startedAt);
+  const firstRefreshDone = Boolean(value.firstRefreshDone);
   const baseline = value.baseline && typeof value.baseline === 'object' ? value.baseline : null;
   const current = value.current && typeof value.current === 'object' ? value.current : baseline;
 
@@ -34,6 +35,7 @@ function sanitizeActiveEvent(value) {
     refreshCooldownMs,
     startedAt,
     lastRefreshAt,
+    firstRefreshDone,
     baseline,
     current
   };
@@ -102,13 +104,6 @@ module.exports = async (req, res) => {
 
       if (trackedPlayers !== undefined) {
         if (!Array.isArray(trackedPlayers)) {
-          // #region agent log
-          console.debug('[agent-debug]', {
-            hypothesisId: 'H3',
-            location: 'api/user/data.js:trackedPlayersValidation',
-            trackedPlayersType: typeof trackedPlayers
-          });
-          // #endregion
           return res.status(400).json({ error: 'trackedPlayers must be an array' });
         }
         if (trackedPlayers.length > 0 && userData.guildName && trackedPlayers[0]) {
@@ -139,26 +134,7 @@ module.exports = async (req, res) => {
 
       if (activeEvent !== undefined) {
         const sanitizedEvent = sanitizeActiveEvent(activeEvent);
-        if (sanitizedEvent && userData.activeEvent) {
-          // #region agent log
-          console.debug('[agent-debug]', {
-            hypothesisId: 'H1',
-            location: 'api/user/data.js:activeEventValidation',
-            incomingGuildName: sanitizedEvent.guildName,
-            existingHasActiveEvent: Boolean(userData.activeEvent)
-          });
-          // #endregion
-          return res.status(400).json({ error: 'Only one active event is allowed' });
-        }
         if (sanitizedEvent && userData.guildName && sanitizedEvent.guildName && sanitizedEvent.guildName !== userData.guildName) {
-          // #region agent log
-          console.debug('[agent-debug]', {
-            hypothesisId: 'H2',
-            location: 'api/user/data.js:guildValidation',
-            incomingGuildName: sanitizedEvent.guildName,
-            currentGuildName: userData.guildName
-          });
-          // #endregion
           return res.status(400).json({ error: 'Active event guild must match tracked guild' });
         }
         userData.activeEvent = sanitizedEvent;

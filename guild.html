@@ -184,18 +184,27 @@
       <!-- Guild Search -->
       <div id="searchSection" class="theme-panel p-6 rounded-xl mb-6">
         <h2 class="hero-title mb-3 text-center">Guild Tracker</h2>
-        <p class="text-gray-400 text-center mb-6">Search for a guild and track their XP or war progress</p>
+        <p class="text-gray-400 text-center mb-6">Search by guild name or prefix and track XP or war progress</p>
         
         <div class="flex gap-4">
           <input 
             type="text" 
             id="guildSearchInput" 
-            placeholder="Enter exact guild name..."
+            placeholder="Enter guild name or prefix..."
             class="flex-1 bg-[rgba(26,12,40,0.95)] border border-[rgba(143,95,216,0.45)] rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-violet-500 focus:outline-none"
           >
           <button id="guildSearchBtn" class="theme-btn-primary px-6 py-3 rounded-lg font-medium">
             Search
           </button>
+        </div>
+        <div id="guildAmbiguousResult" class="hidden mt-4 bg-gray-800/40 border border-gray-700 rounded-lg p-4">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-semibold text-white">Multiple matches found</h3>
+            <span id="guildAmbiguousMeta" class="text-xs text-gray-400">Select one guild</span>
+          </div>
+          <div id="guildAmbiguousList" class="space-y-2 max-h-56 overflow-y-auto">
+            <p class="text-sm text-gray-500">No options.</p>
+          </div>
         </div>
       </div>
 
@@ -240,7 +249,13 @@
 
         <!-- Members List -->
         <div class="border-t border-gray-700 pt-4 mt-4">
-          <h4 class="text-gray-400 uppercase text-xs tracking-widest font-semibold mb-3">Members</h4>
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="text-gray-400 uppercase text-xs tracking-widest font-semibold">Members</h4>
+            <label class="text-xs text-gray-400 flex items-center gap-2 cursor-pointer">
+              <input id="showMemberWarsToggle" type="checkbox" class="accent-purple-500" checked>
+              Show war count
+            </label>
+          </div>
           <div id="guildMembersList" class="max-h-48 overflow-y-auto space-y-1">
             <!-- Members will be listed here -->
           </div>
