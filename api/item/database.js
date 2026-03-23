@@ -13,20 +13,19 @@ module.exports = async function handler(req, res) {
   const page = parseInt(req.query.page) || 1;
   const cacheKey = `wynn_page_${page}`;
   
-  console.log(`[Vercel/database] Page: ${page}`);
+  console.log(`[Vercel/Redis] Page: ${page}, Key: ${cacheKey}`);
 
   try {
     const cachedData = await redis.get(cacheKey);
     if (cachedData) {
       res.setHeader('X-Cache', 'HIT');
-      console.log(`[Vercel/database] Cache HIT for page ${page}`);
+      console.log(`[Vercel/Redis] HIT for page ${page}`);
       return res.status(200).json(cachedData);
     }
+    console.log(`[Vercel/Redis] MISS for page ${page}, fetching from API`);
   } catch (e) {
-    console.error(`[Vercel/database] Redis GET error: ${e.message}`);
+    console.error(`[Vercel/Redis] GET error: ${e.message}`);
   }
-  
-  console.log(`[Vercel/database] Cache MISS, fetching page ${page} from Wynncraft API`);
 
   const url = `${WYNCRAFT_BASE}?page=${page}`;
 
@@ -40,7 +39,7 @@ module.exports = async function handler(req, res) {
       data = rawText;
     }
 
-    console.log(`[Vercel/database] Upstream status: ${upstreamRes.status}`);
+    console.log(`[Vercel/Redis] API status: ${upstreamRes.status}`);
 
     if (!upstreamRes.ok) {
       if (upstreamRes.status === 429) {
@@ -51,9 +50,9 @@ module.exports = async function handler(req, res) {
 
     try {
       await redis.setex(cacheKey, TTL, data);
-      console.log(`[Vercel/database] Cached page ${page} with TTL ${TTL}s`);
+      console.log(`[Vercel/Redis] SET page ${page}, TTL ${TTL}s`);
     } catch (e) {
-      console.error(`[Vercel/database] Redis SET error: ${e.message}`);
+      console.error(`[Vercel/Redis] SET error: ${e.message}`);
     }
     
     res.setHeader('X-Cache', 'MISS');
