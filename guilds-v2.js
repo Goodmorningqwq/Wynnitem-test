@@ -436,6 +436,40 @@ function renderTrackedPlayersInfo(players) {
   `).join('');
 }
 
+function renderEventPlayerBreakdown(event) {
+  const section = document.getElementById('eventPlayerBreakdownSection');
+  const meta = document.getElementById('eventPlayerBreakdownMeta');
+  const list = document.getElementById('eventPlayerBreakdownList');
+  if (!section || !meta || !list) return;
+
+  const baselinePlayers = event?.baseline?.playerValues || {};
+  const currentPlayers = event?.current?.playerValues || baselinePlayers;
+  const rows = Object.keys(currentPlayers).map((username) => {
+    const startValue = Number(baselinePlayers[username] || 0);
+    const currentValue = Number(currentPlayers[username] || startValue);
+    const deltaValue = currentValue - startValue;
+    return { username, startValue, currentValue, deltaValue };
+  }).sort((a, b) => b.deltaValue - a.deltaValue);
+
+  if (!rows.length) {
+    section.classList.add('hidden');
+    list.innerHTML = '<p class="text-sm text-gray-500">No player data yet.</p>';
+    return;
+  }
+
+  const metricLabel = event.metric === 'wars' ? 'Wars' : 'XP';
+  meta.textContent = `${rows.length} players · ${metricLabel}`;
+  list.innerHTML = rows.map((row, index) => `
+    <div class="grid grid-cols-12 gap-2 items-center text-xs bg-gray-800/40 rounded px-2 py-1">
+      <div class="col-span-4 text-white truncate" title="${escapeHtml(row.username)}">#${index + 1} ${escapeHtml(row.username)}</div>
+      <div class="col-span-3 text-gray-400 text-right">${row.startValue.toLocaleString()}</div>
+      <div class="col-span-3 text-gray-300 text-right">${row.currentValue.toLocaleString()}</div>
+      <div class="col-span-2 text-right ${row.deltaValue >= 0 ? 'text-green-400' : 'text-red-400'}">${formatDelta(row.deltaValue)}</div>
+    </div>
+  `).join('');
+  section.classList.remove('hidden');
+}
+
 function renderActiveEvent() {
   const hasEvent = Boolean(activeEvent);
   document.getElementById('activeEventSection').classList.toggle('hidden', !hasEvent);
@@ -477,6 +511,7 @@ function renderActiveEvent() {
   document.getElementById('eventCurrentValue').textContent = currentValue.toLocaleString();
   document.getElementById('eventDelta').textContent = formatDelta(delta);
   document.getElementById('dashboardEventDelta').textContent = formatDelta(delta);
+  renderEventPlayerBreakdown(activeEvent);
 
   updateCooldownText();
 }
