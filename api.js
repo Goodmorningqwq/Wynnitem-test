@@ -211,14 +211,17 @@ export async function fetchFilteredItems(options = {}, onProgress) {
   let page = 1;
   let hasMore = true;
   let cachedCount = 0;
+  const totalStartTime = Date.now();
   
   while (hasMore) {
     const url = buildUrl(DATABASE_ENDPOINT);
     url.searchParams.set('page', page.toString());
     
+    const pageStartTime = Date.now();
     const response = await fetch(url.toString());
+    const pageTime = Date.now() - pageStartTime;
     const cacheStatus = response.headers.get('X-Cache');
-    console.log(`[DEBUG] Page ${page} - Status: ${response.status}, X-Cache: ${cacheStatus}`);
+    console.log(`[DEBUG] Page ${page} - ${cacheStatus} - ${pageTime}ms (total: ${Date.now() - totalStartTime}ms)`);
     
     if (!response.ok) {
       throw new Error(`API Error: ${response.status}`);
