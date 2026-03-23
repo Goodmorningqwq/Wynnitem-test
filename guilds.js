@@ -1,9 +1,95 @@
 const GUILD_API = '/api/guild';
-const REDIS_API = '/api/guild/history';
+const USER_API = '/api/user';
 
+let currentUser = null;
 let currentGuild = null;
 let activeEvent = null;
 
+// User session management
+function getCurrentUser() {
+  try {
+    return localStorage.getItem('currentUser');
+  } catch {
+    return null;
+  }
+}
+
+function setCurrentUser(username) {
+  localStorage.setItem('currentUser', username);
+}
+
+function logout() {
+  localStorage.removeItem('currentUser');
+  currentUser = null;
+  showAuthSection();
+}
+
+async function loadUserData() {
+  if (!currentUser) return null;
+  
+  try {
+    const response = await fetch(`${USER_API}/data?username=${encodeURIComponent(currentUser)}`);
+    if (!response.ok) throw new Error('Failed to load user data');
+    return await response.json();
+  } catch (e) {
+    console.error('Load user data error:', e);
+    return null;
+  }
+}
+
+async function updateUserData(data) {
+  if (!currentUser) return false;
+  
+  try {
+    const response = await fetch(`${USER_API}/data?username=${encodeURIComponent(currentUser)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    return response.ok;
+  } catch (e) {
+    console.error('Update user data error:', e);
+    return false;
+  }
+}
+
+async function registerUser(username, password) {
+  try {
+    const response = await fetch(`${USER_API}/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.error || 'Registration failed');
+    }
+    return result;
+  } catch (e) {
+    console.error('Register error:', e);
+    throw e;
+  }
+}
+
+async function loginUser(username, password) {
+  try {
+    const response = await fetch(`${USER_API}/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const result = await response.json();
+    if (!response.ok) {
+      throw new Error(result.error || 'Login failed');
+    }
+    return result;
+  } catch (e) {
+    console.error('Login error:', e);
+    throw e;
+  }
+}
+
+// Legacy functions (kept for compatibility)
 function getTrackedGuilds() {
   try {
     return JSON.parse(localStorage.getItem('trackedGuilds')) || [];
@@ -29,7 +115,21 @@ function saveActiveEvent(event) {
 }
 
 function clearActiveEvent() {
+  if (activeEvent) {
+    saveActiveEventToRedis(null);
+  }
+  activeEvent = null;
   localStorage.removeItem('activeEvent');
+}
+
+async function saveActiveEventToRedis(event) {
+  if (!currentUser) return;
+  await updateUserData({ activeEvent: event });
+}
+
+async function saveEventToRedis(eventRecord) {
+  if (!currentUser) return;
+  await updateUserData({ addEvent: eventRecord });
 }
 
 function escapeHtml(value) {
@@ -240,6 +340,7 @@ function startEvent(type, memberUsername = null) {
   };
 
   saveActiveEvent(activeEvent);
+  saveActiveEventToRedis(activeEvent);
   displayActiveEvent();
 }
 
@@ -282,21 +383,29 @@ function refreshEvent() {
   });
 
   saveActiveEvent(activeEvent);
+  saveActiveEventToRedis(activeEvent);
   displayActiveEvent();
 }
 
 function endEvent() {
   if (!activeEvent || !currentGuild) return;
 
-  const endValue = activeEvent.type === 'xp'
-    ? (currentGuild.xpPercent || 0)
-    : (currentGuild.wars || 0);
+  let endValue;
+  if (activeEvent.type === 'member') {
+    const member = findMemberByUsername(activeEvent.memberUsername);
+    endValue = member ? (member.contributed || 0) : 0;
+  } else if (activeEvent.type === 'xp') {
+    endValue = currentGuild.xpPercent || 0;
+  } else {
+    endValue = currentGuild.wars || 0;
+  }
 
   const totalDelta = endValue - activeEvent.startValue;
 
   const eventRecord = {
     guildName: activeEvent.guildName,
     type: activeEvent.type,
+    memberUsername: activeEvent.memberUsername,
     startTime: activeEvent.startTime,
     startValue: activeEvent.startValue,
     updates: activeEvent.updates,
@@ -314,18 +423,8 @@ function endEvent() {
 }
 
 async function saveEventToHistory(eventRecord) {
-  try {
-    const response = await fetch(REDIS_API, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(eventRecord)
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to save event');
-    }
-  } catch (e) {
-    console.error('Error saving event:', e);
+  if (currentUser) {
+    await updateUserData({ addEvent: eventRecord });
   }
 }
 
@@ -474,12 +573,224 @@ document.addEventListener('DOMContentLoaded', () => {
   const refreshBtn = document.getElementById('refreshEventBtn');
   const endBtn = document.getElementById('endEventBtn');
 
+  // Auth elements
+  const authSection = document.getElementById('authSection');
+  const authTitle = document.getElementById('authTitle');
+  const authUsername = document.getElementById('authUsername');
+  const authPassword = document.getElementById('authPassword');
+  const authSubmitBtn = document.getElementById('authSubmitBtn');
+  const authSwitchBtn = document.getElementById('authSwitchBtn');
+  const authError = document.getElementById('authError');
+  const authSwitchText = document.getElementById('authSwitchText');
+
+  // Main UI elements
+  const searchSection = document.getElementById('searchSection');
+  const userMenu = document.getElementById('userMenu');
+  const userDisplayName = document.getElementById('userDisplayName');
+  const trackedGuildDisplay = document.getElementById('trackedGuildDisplay');
+  const logoutBtn = document.getElementById('logoutBtn');
+
+  // User dashboard elements
+  const userDashboard = document.getElementById('userDashboard');
+  const noGuildTracked = document.getElementById('noGuildTracked');
+  const guildTracked = document.getElementById('guildTracked');
+  const dashboardGuildName = document.getElementById('dashboardGuildName');
+  const dashboardGuildPrefix = document.getElementById('dashboardGuildPrefix');
+  const dashboardEventSection = document.getElementById('dashboardEventSection');
+  const dashboardEventDuration = document.getElementById('dashboardEventDuration');
+  const dashboardEventDelta = document.getElementById('dashboardEventDelta');
+  const viewGuildBtn = document.getElementById('viewGuildBtn');
+  const changeGuildBtn = document.getElementById('changeGuildBtn');
+  const dashboardRefreshBtn = document.getElementById('dashboardRefreshBtn');
+  const dashboardEndBtn = document.getElementById('dashboardEndBtn');
+
+  let isRegisterMode = false;
+
+  // Check if user is logged in
+  currentUser = getCurrentUser();
+  if (currentUser) {
+    showLoggedInUI();
+  } else {
+    showAuthSection();
+  }
+
+  function showAuthSection() {
+    authSection.classList.remove('hidden');
+    userMenu.classList.add('hidden');
+    searchSection.classList.add('hidden');
+    userDashboard.classList.add('hidden');
+    isRegisterMode = false;
+    updateAuthUI();
+  }
+
+  function showLoggedInUI() {
+    authSection.classList.add('hidden');
+    userMenu.classList.remove('hidden');
+    searchSection.classList.remove('hidden');
+    userDashboard.classList.remove('hidden');
+    userDisplayName.textContent = currentUser;
+    
+    loadUserDashboard();
+  }
+
+  function updateAuthUI() {
+    authTitle.textContent = isRegisterMode ? 'Register' : 'Login';
+    authSubmitBtn.textContent = isRegisterMode ? 'Register' : 'Login';
+    authSwitchText.textContent = isRegisterMode ? 'Already have an account?' : "Don't have an account?";
+    authSwitchBtn.textContent = isRegisterMode ? 'Login' : 'Register';
+    authError.classList.add('hidden');
+    authUsername.value = '';
+    authPassword.value = '';
+  }
+
+  async function loadUserDashboard() {
+    const userData = await loadUserData();
+    if (!userData) {
+      logout();
+      return;
+    }
+
+    trackedGuildDisplay.textContent = userData.trackedGuild ? `Tracking: ${userData.trackedGuild}` : 'No guild tracked';
+
+    if (userData.trackedGuild) {
+      noGuildTracked.classList.add('hidden');
+      guildTracked.classList.remove('hidden');
+      dashboardGuildName.textContent = userData.trackedGuild;
+      dashboardGuildPrefix.textContent = '';
+      
+      if (userData.activeEvent) {
+        dashboardEventSection.classList.remove('hidden');
+        activeEvent = userData.activeEvent;
+        displayDashboardEvent();
+      } else {
+        dashboardEventSection.classList.add('hidden');
+      }
+
+      // Load user's event history
+      userData.events = userData.events || [];
+      displayUserEventHistory(userData.events);
+    } else {
+      noGuildTracked.classList.remove('hidden');
+      guildTracked.classList.add('hidden');
+    }
+  }
+
+  function displayDashboardEvent() {
+    if (!activeEvent) return;
+
+    const currentValue = activeEvent.updates.length > 0
+      ? activeEvent.updates[activeEvent.updates.length - 1].value
+      : activeEvent.startValue;
+
+    const delta = currentValue - activeEvent.startValue;
+    const deltaClass = delta >= 0 ? 'text-green-400' : 'text-red-400';
+    const deltaPrefix = delta >= 0 ? '+' : '';
+
+    const elapsed = Date.now() - activeEvent.startTime;
+    const hours = Math.floor(elapsed / 3600000);
+    const minutes = Math.floor((elapsed % 3600000) / 60000);
+
+    dashboardEventDuration.textContent = `${hours}h ${minutes}m`;
+    dashboardEventDelta.textContent = `${deltaPrefix}${delta.toLocaleString()}`;
+    dashboardEventDelta.className = `text-xl font-bold ${deltaClass}`;
+  }
+
+  function displayUserEventHistory(events) {
+    const listEl = document.getElementById('eventHistoryList');
+    const noEl = document.getElementById('noEventHistory');
+
+    if (!events || events.length === 0) {
+      noEl.classList.remove('hidden');
+      listEl.innerHTML = '';
+      return;
+    }
+
+    noEl.classList.add('hidden');
+    listEl.innerHTML = events.map(evt => formatEventCard(evt)).join('');
+  }
+
+  // Auth handlers
+  authSubmitBtn.addEventListener('click', async () => {
+    const username = authUsername.value.trim();
+    const password = authPassword.value;
+
+    if (!username || !password) {
+      authError.textContent = 'Please enter username and password';
+      authError.classList.remove('hidden');
+      return;
+    }
+
+    try {
+      if (isRegisterMode) {
+        await registerUser(username, password);
+      }
+      await loginUser(username, password);
+      setCurrentUser(username);
+      currentUser = username;
+      showLoggedInUI();
+    } catch (e) {
+      authError.textContent = e.message;
+      authError.classList.remove('hidden');
+    }
+  });
+
+  authSwitchBtn.addEventListener('click', () => {
+    isRegisterMode = !isRegisterMode;
+    updateAuthUI();
+  });
+
+  logoutBtn.addEventListener('click', () => {
+    logout();
+  });
+
+  viewGuildBtn.addEventListener('click', async () => {
+    const userData = await loadUserData();
+    if (userData && userData.trackedGuild) {
+      searchGuild(userData.trackedGuild);
+    }
+  });
+
+  changeGuildBtn.addEventListener('click', () => {
+    // Allow searching new guild
+  });
+
+  dashboardRefreshBtn.addEventListener('click', async () => {
+    const userData = await loadUserData();
+    if (userData && userData.trackedGuild) {
+      await searchGuild(userData.trackedGuild);
+      refreshEvent();
+    }
+  });
+
+  dashboardEndBtn.addEventListener('click', async () => {
+    if (confirm('End this event and save to history?')) {
+      const userData = await loadUserData();
+      if (userData && userData.trackedGuild) {
+        await searchGuild(userData.trackedGuild);
+        endEvent();
+        loadUserDashboard();
+      }
+    }
+  });
+
+  // Existing handlers
   searchBtn.addEventListener('click', () => searchGuild(searchInput.value));
   searchInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') searchGuild(searchInput.value);
   });
 
-  trackBtn.addEventListener('click', trackGuild);
+  trackBtn.addEventListener('click', async () => {
+    if (!currentGuild || !currentGuild.name) return;
+    
+    // Update tracked guild in Redis
+    await updateUserData({ trackedGuild: currentGuild.name });
+    
+    const trackBtn = document.getElementById('trackGuildBtn');
+    trackBtn.textContent = '✓ Tracking';
+    trackBtn.disabled = true;
+
+    loadUserDashboard();
+  });
 
   trackXpBtn.addEventListener('click', () => startEvent('xp'));
   trackWarsBtn.addEventListener('click', () => startEvent('wars'));
@@ -501,23 +812,10 @@ document.addEventListener('DOMContentLoaded', () => {
     searchGuild(currentGuild.name).then(() => refreshEvent());
   });
 
-  endBtn.addEventListener('click', () => {
+  endBtn.addEventListener('click', async () => {
     if (confirm('End this event and save to history?')) {
       endEvent();
+      loadUserDashboard();
     }
   });
-
-  activeEvent = getActiveEvent();
-  if (activeEvent && activeEvent.guildName) {
-    searchGuild(activeEvent.guildName).then(() => {
-      displayActiveEvent();
-    });
-  } else {
-    activeEvent = null;
-    clearActiveEvent();
-  }
-
-  updateTrackedGuildsList();
-  loadEventHistory();
-  updateEventButtons();
 });

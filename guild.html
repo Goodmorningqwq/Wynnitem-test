@@ -108,11 +108,88 @@
     </div>
   </header>
 
+  <!-- Login/Register Section -->
+  <div id="authSection" class="hidden container mx-auto px-4 py-8">
+    <div class="max-w-md mx-auto">
+      <div class="theme-panel p-8 rounded-xl">
+        <h2 class="hero-title mb-6 text-center" id="authTitle">Login</h2>
+        
+        <div class="space-y-4">
+          <div>
+            <label class="text-gray-400 text-sm mb-1 block">Username</label>
+            <input type="text" id="authUsername" class="w-full bg-[rgba(26,12,40,0.95)] border border-[rgba(143,95,216,0.45)] rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-violet-500 focus:outline-none" placeholder="Username">
+          </div>
+          <div>
+            <label class="text-gray-400 text-sm mb-1 block">Password</label>
+            <input type="password" id="authPassword" class="w-full bg-[rgba(26,12,40,0.95)] border border-[rgba(143,95,216,0.45)] rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-violet-500 focus:outline-none" placeholder="Password">
+          </div>
+          
+          <button id="authSubmitBtn" class="theme-btn-primary w-full py-3 rounded-lg font-medium">Login</button>
+          
+          <div class="text-center">
+            <span class="text-gray-500 text-sm" id="authSwitchText">Don't have an account?</span>
+            <button id="authSwitchBtn" class="text-violet-400 text-sm ml-1 hover:underline">Register</button>
+          </div>
+          
+          <p id="authError" class="text-red-400 text-sm text-center hidden"></p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- User Menu (when logged in) -->
+  <div id="userMenu" class="hidden bg-[rgba(22,22,22,0.98)] border-b border-[rgba(50,50,50,0.5)]">
+    <div class="container mx-auto px-4 py-2 flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <span class="text-white font-medium" id="userDisplayName"></span>
+        <span class="text-gray-500 text-sm">|</span>
+        <span class="text-gray-400 text-sm" id="trackedGuildDisplay"></span>
+      </div>
+      <button id="logoutBtn" class="text-gray-400 hover:text-white text-sm">Logout</button>
+    </div>
+  </div>
+
   <!-- Main Content -->
   <main class="flex-1 container mx-auto px-4 py-8">
     <div class="max-w-4xl mx-auto">
       
-      <!-- Guild Search -->
+      <!-- User Dashboard (when logged in) -->
+      <div id="userDashboard" class="hidden theme-panel p-6 rounded-xl mb-6">
+        <h3 class="text-gray-400 uppercase text-xs tracking-widest font-semibold mb-4">Your Guild</h3>
+        <div id="noGuildTracked" class="hidden text-center py-4">
+          <p class="text-gray-500 mb-4">You haven't tracked any guild yet.</p>
+          <p class="text-gray-400 text-sm">Search for a guild below to start tracking.</p>
+        </div>
+        <div id="guildTracked" class="hidden">
+          <div class="flex justify-between items-center mb-4">
+            <div>
+              <h4 class="text-xl font-bold text-white" id="dashboardGuildName">-</h4>
+              <p class="text-gray-400 text-sm" id="dashboardGuildPrefix">-</p>
+            </div>
+            <button id="viewGuildBtn" class="theme-btn px-4 py-2 rounded-lg text-sm">View Guild</button>
+          </div>
+          <div id="dashboardEventSection" class="hidden">
+            <div class="bg-green-900/20 border border-green-500/30 rounded-lg p-4">
+              <div class="flex justify-between items-center mb-2">
+                <span class="text-green-400 font-medium">Event in Progress</span>
+                <span class="text-gray-400 text-sm" id="dashboardEventDuration">0h 0m</span>
+              </div>
+              <div class="text-center mb-2">
+                <span class="text-gray-500 text-sm">Delta: </span>
+                <span class="text-xl font-bold text-green-400" id="dashboardEventDelta">+0</span>
+              </div>
+              <div class="flex gap-2">
+                <button id="dashboardRefreshBtn" class="theme-btn px-4 py-2 rounded-lg text-sm flex-1">Refresh</button>
+                <button id="dashboardEndBtn" class="theme-btn px-4 py-2 rounded-lg text-sm flex-1 bg-red-900/30 border-red-500/50">End Event</button>
+              </div>
+            </div>
+          </div>
+          <button id="changeGuildBtn" class="text-violet-400 text-sm hover:underline mt-2">Change Guild</button>
+        </div>
+      </div>
+      
+      <!-- Guild Search (only when logged in) -->
+      <div id="searchSection" class="hidden theme-panel p-6 rounded-xl mb-6">
       <div class="theme-panel p-6 rounded-xl mb-6">
         <h2 class="hero-title mb-3 text-center">Guild Tracker</h2>
         <p class="text-gray-400 text-center mb-6">Search for a guild and track their XP or war progress</p>
