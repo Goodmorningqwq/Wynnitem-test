@@ -13,6 +13,8 @@ const redis = new Redis({
 const TTL = 12 * 60 * 60; // 12 hours in seconds
 
 module.exports = async function handler(req, res) {
+  res.setHeader('Cache-Control', 'no-store');
+  
   const page = parseInt(req.query.page) || 1;
   const cacheKey = `wynn_page_${page}`;
   
@@ -61,7 +63,7 @@ module.exports = async function handler(req, res) {
     res.setHeader('X-Cache', 'MISS');
     return res.status(200).json(data);
   } catch (e) {
-    console.error(`[Vercel/database] Error: ${e.message}`);
+    console.error(`[Vercel/Redis] Error: ${e.message}`);
     return res.status(500).json({ error: e.message });
   }
 };

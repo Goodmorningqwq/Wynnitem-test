@@ -8,6 +8,8 @@ const redis = new Redis({
 const TTL = 12 * 60 * 60; // 12 hours in seconds
 
 module.exports = async function handler(req, res) {
+  res.setHeader('Cache-Control', 'no-store');
+  
   const query = req.query.query || '';
   const cacheKey = `wynn_quick_${query}`;
   
