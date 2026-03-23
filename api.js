@@ -207,62 +207,32 @@ export function filterByCategory(items, category) {
 export async function fetchFilteredItems(options = {}, onProgress) {
   console.log('[DEBUG] fetchFilteredItems called:', options);
   const { category, weaponType, armourType, accessoryType, miscType, tier, levelMin, levelMax } = options;
-  const allItems = {};
-  let page = 1;
-  let hasMore = true;
-  let cachedCount = 0;
   const totalStartTime = Date.now();
   
-  while (hasMore) {
-    const url = buildUrl(DATABASE_ENDPOINT);
-    url.searchParams.set('page', page.toString());
-    
-    const pageStartTime = Date.now();
-    const response = await fetch(url.toString());
-    const pageTime = Date.now() - pageStartTime;
-    const cacheStatus = response.headers.get('X-Cache');
-    console.log(`[DEBUG] Page ${page} - ${cacheStatus} - ${pageTime}ms (total: ${Date.now() - totalStartTime}ms)`);
-    
-    if (!response.ok) {
-      throw new Error(`API Error: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    const results = data.results || {};
-    const isCached = cacheStatus === 'HIT';
-    
-    if (isCached) {
-      cachedCount++;
-    }
-    
-    if (Object.keys(results).length === 0) {
-      hasMore = false;
-      break;
-    }
-    
-    Object.assign(allItems, results);
-    
-    if (onProgress) {
-      const totalPages = data.controller?.pages || 276;
-      const itemCount = Object.keys(allItems).length;
-      onProgress(page, totalPages, itemCount, cachedCount);
-    }
-    
-    const nextPage = data.controller?.next;
-    if (!nextPage || page >= 276) {
-      hasMore = false;
-    } else {
-      page++;
-    }
-    
-    if (!isCached) {
-      await new Promise(r => setTimeout(r, 1500));
-    }
+  onProgress?.(0, 1, 0, 0);
+  
+  const url = buildUrl(DATABASE_ENDPOINT);
+  const response = await fetch(url.toString());
+  const fetchTime = Date.now() - totalStartTime;
+  const cacheStatus = response.headers.get('X-Cache');
+  
+  console.log(`[DEBUG] Full DB fetched: ${cacheStatus} - ${fetchTime}ms`);
+  
+  if (!response.ok) {
+    throw new Error(`API Error: ${response.status}`);
   }
+  
+  onProgress?.(1, 1, 0, 0);
+  
+  const allItems = await response.json();
+  const results = allItems.results || {};
+  const totalItems = Object.keys(results).length;
+  
+  console.log(`[DEBUG] Got ${totalItems} items, now filtering...`);
   
   let filteredItems = {};
   
-  for (const [name, item] of Object.entries(allItems)) {
+  for (const [name, item] of Object.entries(results)) {
     const itemType = item.type?.toLowerCase();
     const itemArmorType = item.armourType?.toLowerCase();
     const itemWeaponType = item.weaponType?.toLowerCase();
@@ -290,12 +260,15 @@ export async function fetchFilteredItems(options = {}, onProgress) {
     filteredItems[name] = item;
   }
   
-  console.log(`[DEBUG] Filtering: category=${category}, weaponType=${weaponType}, totalItems=${Object.keys(allItems).length}, filteredCount=${Object.keys(filteredItems).length}`);
+  const filterTime = Date.now() - totalStartTime;
+  console.log(`[DEBUG] Done! Filtered ${totalItems} -> ${Object.keys(filteredItems).length} items in ${filterTime}ms`);
+  
+  onProgress?.(1, 1, Object.keys(filteredItems).length, 276);
   
   return {
     items: filteredItems,
     totalCount: Object.keys(filteredItems).length,
-    cachedPages: cachedCount
+    cachedPages: cacheStatus?.includes('HIT') ? 276 : 0
   };
 }
 
