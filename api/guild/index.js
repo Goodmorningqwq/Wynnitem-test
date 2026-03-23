@@ -8,7 +8,7 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const response = await fetch(`https://api.wynncraft.com/v3/guild/${encodeURIComponent(guildName)}`, {
+    const response = await fetch(`https://api.wynncraft.com/v3/guild/${encodeURIComponent(guildName)}?identifier=${Date.now()}`, {
       headers: {
         'Accept': 'application/json'
       }
