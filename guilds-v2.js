@@ -307,11 +307,13 @@ function getSnapshot(metric, guild, trackedPlayers) {
     const entry = playerMap[username] || { xp: 0, wars: 0 };
     snapshotPlayers[username] = Number(metric === 'wars' ? entry.wars : entry.xp);
   }
+  const selectedTotal = Object.values(snapshotPlayers).reduce((sum, value) => sum + Number(value || 0), 0);
+  const metricValue = metric === 'wars' ? Number(guild.wars || 0) : Number(guild.xpPercent || 0);
   // #region agent log
-  debugLog('pre-fix', 'H4', 'guilds-v2.js:getSnapshot', 'snapshot metric values computed', { metric, selectedCount: selected.length, samplePlayers: Object.entries(snapshotPlayers).slice(0, 3), guildWars: Number(guild?.wars || 0), guildXp: Number(guild?.xpPercent || 0) });
+  debugLog('pre-fix', 'H6', 'guilds-v2.js:getSnapshot:metricSource', 'snapshot metric source comparison', { metric, selectedCount: selected.length, metricValue, selectedTotal, selectedPlayers: selected.slice(0, 5), samplePlayers: Object.entries(snapshotPlayers).slice(0, 3), guildWars: Number(guild?.wars || 0), guildXp: Number(guild?.xpPercent || 0) });
   // #endregion
   return {
-    metricValue: metric === 'wars' ? Number(guild.wars || 0) : Number(guild.xpPercent || 0),
+    metricValue,
     playerValues: snapshotPlayers,
     capturedAt: Date.now()
   };
