@@ -217,13 +217,16 @@ export async function fetchFilteredItems(options = {}, onProgress) {
     url.searchParams.set('page', page.toString());
     
     const response = await fetch(url.toString());
+    const cacheStatus = response.headers.get('X-Cache');
+    console.log(`[DEBUG] Page ${page} - Status: ${response.status}, X-Cache: ${cacheStatus}`);
+    
     if (!response.ok) {
       throw new Error(`API Error: ${response.status}`);
     }
     
     const data = await response.json();
     const results = data.results || {};
-    const isCached = response.headers.get('X-Cache') === 'HIT';
+    const isCached = cacheStatus === 'HIT';
     
     if (isCached) {
       cachedCount++;

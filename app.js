@@ -1,6 +1,6 @@
 // Main Application Logic
 
-import { cache, filterAndSortItems, filterByCategory, filterByArmourType, fetchItemPages, getAllFetchedItems, quickSearch } from './api.js';
+import { cache, filterAndSortItems, filterByCategory, filterByArmourType, fetchItemPages, getAllFetchedItems, clearPageCache, fetchFilteredItems } from './api.js';
 
 // App State
 const AppState = {
@@ -596,6 +596,8 @@ async function loadItemsForCategory(category) {
   loadingCancelled = false;
   currentCategory = category;
   
+  clearPageCache();
+  
   const categoryNames = {
     armour: 'Armor',
     weapon: 'Weapons',
@@ -604,59 +606,41 @@ async function loadItemsForCategory(category) {
   };
   
   loadingTitleEl.textContent = `Loading ${categoryNames[category]}...`;
-  loadingSubtitleEl.textContent = 'Searching for items...';
+  loadingSubtitleEl.textContent = 'Please wait while we fetch item data';
   
   const filters = getSearchFilters();
   
   try {
-    showLoadingOverlay(50, 1, 0, 'Fetching from API...');
-    console.log('[DEBUG] Searching for:', category);
-    const searchResult = await quickSearch(category);
-    console.log('[DEBUG] Raw search result keys:', Object.keys(searchResult));
+    const result = await fetchFilteredItems({
+      category,
+      weaponType: selectedWeaponType || undefined,
+      armourType: selectedArmorType || undefined,
+      accessoryType: selectedAccessoryType || undefined,
+      miscType: selectedMiscType || undefined,
+      tier: filters.tier || undefined,
+      levelMin: filters.levelMin,
+      levelMax: filters.levelMax
+    }, (currentPageNum, totalPagesNum, itemCount, cachedPages = 0) => {
+      if (loadingCancelled) return;
+      const percent = Math.round((currentPageNum / totalPagesNum) * 100);
+      const eta = calculateETA(currentPageNum, totalPagesNum, cachedPages);
+      showLoadingOverlay(percent, currentPageNum, totalPagesNum, eta);
+    });
     
     if (loadingCancelled) {
       showSearchPanel();
       return;
     }
     
-    let items = Object.entries(searchResult).map(([name, item]) => ({ name, ...item }));
-    console.log('[DEBUG] Total items from search:', items.length);
-    
-    items = items.filter(item => {
-      if (category === 'weapon' && item.type === 'weapon') {
-        if (selectedWeaponType && item.weaponType !== selectedWeaponType) return false;
-        return true;
-      }
-      if (category === 'armour' && item.type === 'armour') {
-        if (selectedArmorType && item.armourType !== selectedArmorType) return false;
-        return true;
-      }
-      if (category === 'accessory' && item.type === 'accessory') {
-        if (selectedAccessoryType && item.accessoryType !== selectedAccessoryType) return false;
-        return true;
-      }
-      if (category === 'misc' && (item.type === 'charm' || item.type === 'tome')) {
-        if (selectedMiscType && item.type !== selectedMiscType) return false;
-        return true;
-      }
-      return false;
-    });
-    console.log('[DEBUG] Items after type filter:', items.length);
-    
-    if (filters.tier) {
-      items = items.filter(item => item.rarity?.toLowerCase() === filters.tier.toLowerCase());
-    }
-    
-    items.sort((a, b) => {
+    allLoadedItems = Object.entries(result.items).map(([name, item]) => ({ name, ...item }));
+    allLoadedItems.sort((a, b) => {
       const tierOrder = ['mythic', 'fabled', 'legendary', 'epic', 'rare', 'uncommon', 'common'];
       const aIdx = tierOrder.indexOf(a.rarity?.toLowerCase() || '');
       const bIdx = tierOrder.indexOf(b.rarity?.toLowerCase() || '');
       return (aIdx === -1 ? tierOrder.length : aIdx) - (bIdx === -1 ? tierOrder.length : bIdx);
     });
     
-    allLoadedItems = items;
     filteredItems = [...allLoadedItems];
-    console.log('[DEBUG] Final items count:', filteredItems.length);
     
     showLoadingOverlay(100, 1, 1, 'Complete!');
     
@@ -664,7 +648,7 @@ async function loadItemsForCategory(category) {
       showResults(filteredItems, category);
       currentPage = 1;
       renderItems();
-    }, 300);
+    }, 500);
     
   } catch (error) {
     console.error('Error loading items:', error);
