@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Item Search - Wynncraft Item Database</title>
+  <title>Wynncraft Database</title>
   
-  <!-- Tailwind CSS (CDN for development) -->
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -19,9 +19,6 @@
             'legendary': '#F97316',
             'fabled': '#EF4444',
             'mythic': '#EC4899',
-            gray: {
-              750: '#374151'
-            }
           }
         }
       }
@@ -31,32 +28,11 @@
   <style>
     :root {
       --game-bg: rgba(20, 8, 30, 0.9);
-      --game-bg-soft: rgba(30, 14, 44, 0.88);
-      --game-bg-deep: #110818;
-      --game-surface: rgba(33, 14, 49, 0.9);
       --game-border: rgba(120, 68, 190, 0.7);
       --game-border-soft: rgba(120, 68, 190, 0.35);
       --game-text: #e8e4ef;
-      --game-muted: #9ca3af;
-      --game-positive: #58ff66;
-      --game-negative: #ff5a68;
-      --game-neutral: #ffe27a;
-      --game-cyan: #2ce8ff;
       --game-accent: #8f5fd8;
       --game-accent-strong: #a774ff;
-      --game-accent-soft: rgba(143, 95, 216, 0.25);
-      --game-header: rgba(21, 10, 33, 0.96);
-      --game-input-bg: rgba(26, 12, 40, 0.95);
-      --game-input-border: rgba(143, 95, 216, 0.45);
-      --card-bg: rgba(26, 26, 26, 0.95);
-      --card-border: rgba(50, 50, 50, 0.8);
-      --tier-common: #FFFFFF;
-      --tier-uncommon: #22C55E;
-      --tier-rare: #3B82F6;
-      --tier-epic: #A855F7;
-      --tier-legendary: #F97316;
-      --tier-fabled: #EF4444;
-      --tier-mythic: #EC4899;
     }
 
     body {
@@ -66,318 +42,6 @@
         linear-gradient(180deg, #1a1a1a 0%, #111 100%);
       color: var(--game-text);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-    }
-
-    ::selection {
-      background: rgba(143, 95, 216, 0.4);
-      color: #fff;
-    }
-
-    .theme-panel {
-      background: linear-gradient(180deg, rgba(39, 18, 57, 0.95), rgba(27, 12, 42, 0.95));
-      border: 1px solid var(--game-border-soft);
-      box-shadow: inset 0 0 0 1px rgba(73, 38, 102, 0.55);
-    }
-
-    .theme-header {
-      background: rgba(22, 22, 22, 0.98);
-      border-bottom: 1px solid rgba(50, 50, 50, 0.5);
-      backdrop-filter: blur(12px);
-    }
-
-    .theme-footer {
-      background: rgba(22, 22, 22, 0.98);
-      border-top: 1px solid rgba(50, 50, 50, 0.5);
-    }
-
-    .theme-btn {
-      background: linear-gradient(180deg, rgba(60, 60, 60, 0.95), rgba(45, 45, 45, 0.95));
-      border: 1px solid rgba(80, 80, 80, 0.5);
-      color: var(--game-text);
-      transition: all 180ms ease;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .theme-btn::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(180deg, rgba(255,255,255,0.05) 0%, transparent 100%);
-      opacity: 0;
-      transition: opacity 180ms ease;
-    }
-
-    .theme-btn:hover::before {
-      opacity: 1;
-    }
-
-    .theme-btn:hover {
-      border-color: var(--game-accent);
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(143, 95, 216, 0.2);
-    }
-
-    .theme-btn:active {
-      transform: translateY(0px) scale(0.98);
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
-    }
-
-    .theme-btn-primary {
-      background: linear-gradient(180deg, rgba(130, 75, 206, 0.95), rgba(96, 52, 165, 0.95));
-      border: 1px solid rgba(180, 132, 255, 0.6);
-      color: #fff;
-      text-shadow: 0 1px 2px rgba(0,0,0,0.3);
-    }
-
-    .theme-btn-primary:hover {
-      background: linear-gradient(180deg, rgba(147, 93, 224, 1), rgba(109, 62, 181, 1));
-      border-color: rgba(200, 160, 255, 0.8);
-      transform: translateY(-2px);
-      box-shadow: 0 4px 15px rgba(130, 75, 206, 0.4);
-    }
-
-    .theme-btn-primary:active {
-      transform: translateY(0px) scale(0.98);
-    }
-
-    .theme-btn-selected {
-      background: linear-gradient(180deg, rgba(80, 50, 120, 0.95), rgba(60, 35, 95, 0.95));
-      border-color: var(--game-accent-strong);
-      box-shadow: 0 0 0 1px rgba(167, 116, 255, 0.3), inset 0 0 20px rgba(143, 95, 216, 0.15);
-      color: #efe4ff;
-    }
-
-    .theme-input,
-    .theme-select {
-      background: rgba(30, 30, 30, 0.95);
-      border: 1px solid rgba(70, 70, 70, 0.5);
-      color: var(--game-text);
-      transition: all 180ms ease;
-    }
-
-    .theme-input:focus,
-    .theme-select:focus {
-      outline: none;
-      border-color: var(--game-accent);
-      box-shadow: 0 0 0 2px rgba(143, 95, 216, 0.2), 0 0 15px rgba(143, 95, 216, 0.1);
-    }
-
-    .theme-muted {
-      color: var(--game-muted);
-    }
-
-    .item-card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 12px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
-      color: var(--game-text);
-      transition: all 200ms ease;
-      overflow: hidden;
-    }
-
-    .item-card::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 3px;
-      background: var(--tier-color, var(--game-accent));
-      opacity: 0.8;
-    }
-
-    .item-card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4), 0 0 20px rgba(var(--tier-glow-rgb, 143, 95, 216), 0.15);
-      border-color: var(--tier-color, var(--game-border));
-    }
-
-    .item-card:active {
-      transform: translateY(-2px);
-    }
-
-    .category-card {
-      background: linear-gradient(135deg, rgba(45, 45, 45, 0.9), rgba(30, 30, 30, 0.9));
-      border: 1px solid rgba(70, 70, 70, 0.5);
-      border-radius: 16px;
-      transition: all 200ms ease;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .category-card::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(135deg, rgba(143, 95, 216, 0.1) 0%, transparent 50%);
-      opacity: 0;
-      transition: opacity 200ms ease;
-    }
-
-    .category-card:hover::before {
-      opacity: 1;
-    }
-
-    .category-card:hover {
-      transform: translateY(-4px);
-      border-color: var(--game-accent);
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), 0 0 30px rgba(143, 95, 216, 0.2);
-    }
-
-    .category-card:active {
-      transform: translateY(-2px) scale(0.98);
-    }
-
-    .category-icon {
-      font-size: 3rem;
-      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
-    }
-
-    .page-btn {
-      min-width: 40px;
-      height: 40px;
-      transition: all 180ms ease;
-    }
-
-    .page-btn:hover:not(:disabled) {
-      background: rgba(143, 95, 216, 0.2);
-      border-color: var(--game-accent);
-    }
-
-    .page-btn.theme-btn-selected {
-      background: var(--game-accent);
-      border-color: var(--game-accent-strong);
-      color: white;
-      font-weight: 600;
-    }
-
-    .tag-pill {
-      display: inline-flex;
-      align-items: center;
-      padding: 2px 8px;
-      border-radius: 9999px;
-      font-size: 10px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      background: rgba(60, 60, 60, 0.8);
-      border: 1px solid rgba(80, 80, 80, 0.5);
-      color: var(--game-muted);
-    }
-
-    .tag-pill.tier-common { background: rgba(255,255,255,0.1); border-color: var(--tier-common); color: var(--tier-common); }
-    .tag-pill.tier-uncommon { background: rgba(34,197,94,0.15); border-color: var(--tier-uncommon); color: var(--tier-uncommon); }
-    .tag-pill.tier-rare { background: rgba(59,130,246,0.15); border-color: var(--tier-rare); color: var(--tier-rare); }
-    .tag-pill.tier-epic { background: rgba(168,85,247,0.15); border-color: var(--tier-epic); color: var(--tier-epic); }
-    .tag-pill.tier-legendary { background: rgba(249,115,22,0.15); border-color: var(--tier-legendary); color: var(--tier-legendary); }
-    .tag-pill.tier-fabled { background: rgba(239,68,68,0.15); border-color: var(--tier-fabled); color: var(--tier-fabled); }
-    .tag-pill.tier-mythic { background: rgba(236,72,153,0.15); border-color: var(--tier-mythic); color: var(--tier-mythic); }
-
-    .class-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 4px 10px;
-      border-radius: 6px;
-      font-size: 11px;
-      font-weight: 600;
-      background: rgba(143, 95, 216, 0.15);
-      border: 1px solid rgba(143, 95, 216, 0.3);
-      color: var(--game-accent-strong);
-    }
-
-    .skeleton {
-      background: linear-gradient(90deg, rgba(50,50,50,0.5) 25%, rgba(70,70,70,0.5) 50%, rgba(50,50,50,0.5) 75%);
-      background-size: 200% 100%;
-      animation: shimmer 1.5s infinite;
-      border-radius: 8px;
-    }
-
-    @keyframes shimmer {
-      0% { background-position: 200% 0; }
-      100% { background-position: -200% 0; }
-    }
-
-    .skeleton-card {
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 12px;
-      padding: 16px;
-      min-height: 200px;
-    }
-
-    .game-line {
-      display: flex;
-      justify-content: space-between;
-      gap: 0.5rem;
-      line-height: 1.3;
-    }
-
-    .game-label {
-      color: var(--game-muted);
-      white-space: nowrap;
-    }
-
-    .game-value {
-      color: var(--game-text);
-      text-align: right;
-    }
-
-    .game-positive { color: var(--game-positive); font-weight: 600; }
-    .game-negative { color: var(--game-negative); font-weight: 600; }
-    .game-neutral { color: var(--game-neutral); font-weight: 600; }
-    .game-cyan { color: var(--game-cyan); font-weight: 600; }
-
-    .game-section-title {
-      color: var(--game-accent-strong);
-      font-size: 10px;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      font-weight: 700;
-      margin-top: 0.1rem;
-      margin-bottom: 0.25rem;
-    }
-
-    .game-divider {
-      height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(143, 95, 216, 0.3), transparent);
-      margin: 0.25rem 0 0.3rem;
-    }
-
-    .game-modal-shell {
-      background: linear-gradient(180deg, rgba(20, 20, 20, 0.98), rgba(26, 26, 26, 0.98));
-      border: 1px solid var(--game-border);
-      border-radius: 16px;
-      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
-    }
-
-    .game-modal-section {
-      background: rgba(38, 38, 38, 0.8);
-      border: 1px solid rgba(60, 60, 60, 0.5);
-      border-radius: 10px;
-    }
-
-    ::-webkit-scrollbar { width: 8px; }
-    ::-webkit-scrollbar-track { background: #1a1a1a; }
-    ::-webkit-scrollbar-thumb { background: #404040; border-radius: 4px; }
-    ::-webkit-scrollbar-thumb:hover { background: #505050; }
-
-    ::-webkit-scrollbar {
-      width: 10px;
-    }
-    ::-webkit-scrollbar-track {
-      background: #1a1a1a;
-      border-radius: 5px;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: #404040;
-      border-radius: 5px;
-      border: 2px solid #1a1a1a;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: #505050;
     }
 
     .hero-title {
@@ -390,416 +54,72 @@
       letter-spacing: -0.02em;
     }
 
-    .section-heading {
-      font-size: 1.5rem;
-      font-weight: 700;
-      color: var(--game-text);
-      letter-spacing: -0.01em;
+    .menu-card {
+      background: linear-gradient(180deg, rgba(39, 18, 57, 0.95), rgba(27, 12, 42, 0.95));
+      border: 1px solid var(--game-border-soft);
+      box-shadow: inset 0 0 0 1px rgba(73, 38, 102, 0.55);
+      transition: all 200ms ease;
     }
 
-    .stat-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 8px 12px;
-      border-radius: 6px;
-      transition: background 150ms ease;
+    .menu-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--game-accent);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), 0 0 30px rgba(143, 95, 216, 0.2);
     }
 
-    .stat-row:hover {
-      background: rgba(143, 95, 216, 0.08);
-    }
-
-    .modal-tier-badge {
-      display: inline-block;
-      padding: 4px 12px;
-      border-radius: 6px;
-      font-size: 11px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
+    .menu-card:active {
+      transform: translateY(-2px) scale(0.98);
     }
   </style>
 </head>
 <body class="text-gray-100 min-h-screen flex flex-col">
   
   <!-- Header -->
-  <header class="theme-header sticky top-0 z-50">
+  <header class="bg-[rgba(22,22,22,0.98)] border-b border-[rgba(50,50,50,0.5)] sticky top-0 z-50">
     <div class="container mx-auto px-4 py-3 flex items-center justify-between">
       <div class="flex items-center gap-3">
         <svg class="w-8 h-8 text-violet-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M14.5 17.5L3 6V3h3l11.5 11.5M13 19l6-6M15 21l6-6M19 3l2 2-9.5 9.5-2-2L19 3z"/>
         </svg>
-        <div>
-          <h1 class="text-xl font-bold text-white tracking-tight">
-            Wynncraft Database
-          </h1>
-          <p class="text-xs text-gray-500 -mt-1">Item Browser</p>
-        </div>
+        <h1 class="text-xl font-bold text-white tracking-tight">Wynncraft Database</h1>
       </div>
-      <span id="headerItemCount" class="hidden">
-        <span id="itemCountHeader" class="text-violet-400 font-semibold">0</span>
-        <span class="text-gray-500 text-sm"> items</span>
-      </span>
     </div>
   </header>
 
   <!-- Main Content -->
-  <main class="flex-1 container mx-auto px-4 py-8">
-    
-    <!-- Search Panel (Initial State) -->
-    <div id="searchPanel" class="max-w-5xl mx-auto">
-      <!-- Hero Section -->
-      <div class="text-center mb-10 pt-6">
-        <h2 class="hero-title mb-3">Browse Item Database</h2>
-        <p class="text-gray-400 text-lg">Discover weapons, armor, and accessories from Wynncraft</p>
+  <main class="flex-1 container mx-auto px-4 py-16">
+    <div class="max-w-3xl mx-auto">
+      <!-- Hero -->
+      <div class="text-center mb-12">
+        <h2 class="hero-title mb-4">Welcome to Wynncraft Database</h2>
+        <p class="text-gray-400 text-lg">Browse items, track guilds, and explore the Wynncraft world</p>
       </div>
       
-      <!-- Category Cards -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-        <button 
-          id="btnWeapon"
-          class="category-btn category-card p-6 text-center"
-          data-category="weapon"
-        >
-          <div class="category-icon mb-3">⚔️</div>
-          <div class="text-lg font-bold text-white mb-1">Weapons</div>
-          <div class="text-xs text-gray-500">Swords, Bows, Wands & more</div>
-        </button>
-        <button 
-          id="btnArmor"
-          class="category-btn category-card p-6 text-center"
-          data-category="armour"
-        >
-          <div class="category-icon mb-3">🛡️</div>
-          <div class="text-lg font-bold text-white mb-1">Armor</div>
-          <div class="text-xs text-gray-500">Helmets, Chestplates & more</div>
-        </button>
-        <button 
-          id="btnAccessory"
-          class="category-btn category-card p-6 text-center"
-          data-category="accessory"
-        >
-          <div class="category-icon mb-3">💍</div>
-          <div class="text-lg font-bold text-white mb-1">Accessories</div>
-          <div class="text-xs text-gray-500">Rings, Bracelets & more</div>
-        </button>
-        <button 
-          id="btnMisc"
-          class="category-btn category-card p-6 text-center"
-          data-category="misc"
-        >
-          <div class="category-icon mb-3">📦</div>
-          <div class="text-lg font-bold text-white mb-1">Misc</div>
-          <div class="text-xs text-gray-500">Tomes, Charms & more</div>
-        </button>
-      </div>
-      
-      <!-- Sub-type Filters -->
-      <div class="theme-panel p-5 rounded-xl mb-4">
-        <h3 class="text-gray-400 mb-4 uppercase text-xs tracking-widest font-semibold">Sub-Type Filter</h3>
+      <!-- Menu Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Items -->
+        <a href="/item" class="menu-card p-8 rounded-xl text-center block">
+          <div class="text-6xl mb-4">⚔️</div>
+          <div class="text-2xl font-bold text-white mb-2">Items</div>
+          <div class="text-gray-400">Browse weapons, armor, accessories and more</div>
+        </a>
         
-        <!-- Weapon Types -->
-        <div id="weaponTypeFilters" class="mb-4 hidden">
-          <p class="text-gray-500 text-xs mb-2 uppercase tracking-wide">Weapon Type</p>
-          <div class="flex flex-wrap gap-2">
-            <button class="weapon-type-btn theme-btn px-4 py-2 rounded-lg text-sm font-medium" data-weapon-type="">All</button>
-            <button class="weapon-type-btn theme-btn px-4 py-2 rounded-lg text-sm font-medium" data-weapon-type="bow">🏹 Bow</button>
-            <button class="weapon-type-btn theme-btn px-4 py-2 rounded-lg text-sm font-medium" data-weapon-type="wand">🔮 Wand</button>
-            <button class="weapon-type-btn theme-btn px-4 py-2 rounded-lg text-sm font-medium" data-weapon-type="dagger">🗡️ Dagger</button>
-            <button class="weapon-type-btn theme-btn px-4 py-2 rounded-lg text-sm font-medium" data-weapon-type="spear">🔱 Spear</button>
-            <button class="weapon-type-btn theme-btn px-4 py-2 rounded-lg text-sm font-medium" data-weapon-type="relik">✨ Relik</button>
-          </div>
+        <!-- Guilds (Coming Soon) -->
+        <div class="menu-card p-8 rounded-xl text-center opacity-60 cursor-not-allowed relative">
+          <div class="text-6xl mb-4">🏰</div>
+          <div class="text-2xl font-bold text-white mb-2">Guilds</div>
+          <div class="text-gray-400">Coming soon</div>
+          <span class="absolute top-4 right-4 text-xs bg-gray-700 px-2 py-1 rounded">Soon</span>
         </div>
-        
-        <!-- Armor Types -->
-        <div id="armorTypeFilters" class="hidden">
-          <p class="text-gray-500 text-xs mb-2 uppercase tracking-wide">Armor Piece</p>
-          <div class="flex flex-wrap gap-2">
-            <button class="armor-type-btn theme-btn px-4 py-2 rounded-lg text-sm font-medium" data-armor-type="">All</button>
-            <button class="armor-type-btn theme-btn px-4 py-2 rounded-lg text-sm font-medium" data-armor-type="helmet">🪖 Helmet</button>
-            <button class="armor-type-btn theme-btn px-4 py-2 rounded-lg text-sm font-medium" data-armor-type="chestplate">👕 Chestplate</button>
-            <button class="armor-type-btn theme-btn px-4 py-2 rounded-lg text-sm font-medium" data-armor-type="leggings">👖 Leggings</button>
-            <button class="armor-type-btn theme-btn px-4 py-2 rounded-lg text-sm font-medium" data-armor-type="boots">👟 Boots</button>
-          </div>
-        </div>
-
-        <!-- Accessory Types -->
-        <div id="accessoryTypeFilters" class="hidden">
-          <p class="text-gray-500 text-xs mb-2 uppercase tracking-wide">Accessory Type</p>
-          <div class="flex flex-wrap gap-2">
-            <button class="accessory-type-btn theme-btn px-4 py-2 rounded-lg text-sm font-medium" data-accessory-type="">All</button>
-            <button class="accessory-type-btn theme-btn px-4 py-2 rounded-lg text-sm font-medium" data-accessory-type="ring">💍 Ring</button>
-            <button class="accessory-type-btn theme-btn px-4 py-2 rounded-lg text-sm font-medium" data-accessory-type="bracelet">📿 Bracelet</button>
-            <button class="accessory-type-btn theme-btn px-4 py-2 rounded-lg text-sm font-medium" data-accessory-type="necklace">📿 Necklace</button>
-          </div>
-        </div>
-
-        <!-- Misc Types -->
-        <div id="miscTypeFilters" class="hidden">
-          <p class="text-gray-500 text-xs mb-2 uppercase tracking-wide">Misc Type</p>
-          <div class="flex flex-wrap gap-2">
-            <button class="misc-type-btn theme-btn px-4 py-2 rounded-lg text-sm font-medium" data-misc-type="">All</button>
-            <button class="misc-type-btn theme-btn px-4 py-2 rounded-lg text-sm font-medium" data-misc-type="tome">📚 Tome</button>
-            <button class="misc-type-btn theme-btn px-4 py-2 rounded-lg text-sm font-medium" data-misc-type="charm">🔮 Charm</button>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Optional Filters -->
-      <div class="theme-panel p-5 rounded-xl">
-        <h3 class="text-gray-400 mb-4 uppercase text-xs tracking-widest font-semibold">Optional Filters</h3>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label for="tierFilterSearch" class="block text-gray-400 text-xs mb-2 uppercase tracking-wide">Tier</label>
-            <select id="tierFilterSearch" class="theme-select w-full rounded-lg p-3 bg-[rgba(30,30,30,0.9)]">
-              <option value="">Any Tier</option>
-              <option value="common">⚪ Common</option>
-              <option value="uncommon">🟢 Uncommon</option>
-              <option value="rare">🔵 Rare</option>
-              <option value="epic">🟣 Epic</option>
-              <option value="legendary">🟠 Legendary</option>
-              <option value="fabled">🔴 Fabled</option>
-              <option value="mythic">💗 Mythic</option>
-            </select>
-          </div>
-          <div>
-            <label for="levelMinFilterSearch" class="block text-gray-400 text-xs mb-2 uppercase tracking-wide">Min Level</label>
-            <input 
-              type="number" 
-              id="levelMinFilterSearch" 
-              class="theme-input w-full rounded-lg p-3 bg-[rgba(30,30,30,0.9)]" 
-              placeholder="1" 
-              min="1"
-            >
-          </div>
-          <div>
-            <label for="levelMaxFilterSearch" class="block text-gray-400 text-xs mb-2 uppercase tracking-wide">Max Level</label>
-            <input 
-              type="number" 
-              id="levelMaxFilterSearch" 
-              class="theme-input w-full rounded-lg p-3 bg-[rgba(30,30,30,0.9)]" 
-              placeholder="100" 
-              min="1"
-            >
-          </div>
-        </div>
-        
-        <!-- Search Button -->
-        <div class="mt-6 text-center">
-          <button 
-            id="searchBtn"
-            class="theme-btn-primary px-10 py-3 rounded-xl text-base font-bold tracking-wide transition-all"
-          >
-            <span class="inline-flex items-center gap-2">🔍 Browse Items</span>
-          </button>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Loading Overlay -->
-    <div id="loadingOverlay" class="hidden fixed inset-0 bg-black/95 flex items-center justify-center z-50">
-      <div class="max-w-4xl w-full mx-4">
-        <div class="text-center mb-8">
-          <h2 id="loadingTitle" class="text-2xl font-bold text-white mb-2">Loading Items...</h2>
-          <p id="loadingSubtitle" class="text-gray-400">Fetching from Wynncraft database</p>
-        </div>
-        
-        <!-- Skeleton Cards -->
-        <div id="skeletonGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
-          <!-- Skeleton cards injected by JS -->
-        </div>
-        
-        <!-- Progress Bar -->
-        <div class="max-w-md mx-auto">
-          <div class="w-full bg-gray-800 rounded-full h-2 mb-3 overflow-hidden">
-            <div id="progressBar" class="bg-gradient-to-r from-violet-500 to-purple-400 h-2 rounded-full transition-all duration-500 ease-out" style="width: 0%"></div>
-          </div>
-          <div class="flex justify-between text-sm">
-            <p id="progressText" class="text-gray-400">0 / 276 pages</p>
-            <p id="etaText" class="text-violet-400">Calculating...</p>
-          </div>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Results Panel -->
-    <div id="resultsPanel" class="hidden">
-      <!-- Results Header -->
-      <div class="flex items-center justify-between mb-6 pt-2">
-        <button 
-          id="backBtn" 
-          class="theme-btn px-4 py-2 rounded-lg flex items-center gap-2 transition-all"
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-          </svg>
-          <span>Back</span>
-        </button>
-        <div class="text-center">
-          <h2 id="resultsTitle" class="text-xl font-bold text-white">Results</h2>
-          <span id="itemCountResults" class="text-gray-500 text-sm"><span id="headerItemCount2">0</span> items</span>
-        </div>
-        <span id="resultsItemCount" class="hidden px-3 py-1 rounded-full bg-violet-500/20 border border-violet-500/30 text-violet-400 text-sm font-medium">
-          <span id="itemCountHeader">0</span> loaded
-        </span>
-      </div>
-      
-      <!-- Category Quick Switch -->
-      <div class="flex flex-wrap gap-2 mb-4">
-        <button class="category-switch-btn theme-btn px-4 py-2 rounded-lg text-sm font-medium transition-all" data-category="weapon">⚔️ Weapons</button>
-        <button class="category-switch-btn theme-btn px-4 py-2 rounded-lg text-sm font-medium transition-all" data-category="armour">🛡️ Armor</button>
-        <button class="category-switch-btn theme-btn px-4 py-2 rounded-lg text-sm font-medium transition-all" data-category="accessory">💍 Accessories</button>
-        <button class="category-switch-btn theme-btn px-4 py-2 rounded-lg text-sm font-medium transition-all" data-category="misc">📦 Misc</button>
-      </div>
-      
-      <!-- Filters -->
-      <div class="theme-panel flex flex-wrap gap-4 items-end mb-6 p-4 rounded-xl">
-        <div>
-          <label for="tierFilterResults" class="block text-gray-400 text-xs mb-2 uppercase tracking-wide">Tier</label>
-          <select id="tierFilterResults" class="theme-select rounded-lg p-2.5 bg-[rgba(30,30,30,0.9)] min-w-[120px]">
-            <option value="">Any Tier</option>
-            <option value="common">⚪ Common</option>
-            <option value="uncommon">🟢 Uncommon</option>
-            <option value="rare">🔵 Rare</option>
-            <option value="epic">🟣 Epic</option>
-            <option value="legendary">🟠 Legendary</option>
-            <option value="fabled">🔴 Fabled</option>
-            <option value="mythic">💗 Mythic</option>
-          </select>
-        </div>
-        <div>
-          <label for="levelMinFilterResults" class="block text-gray-400 text-xs mb-2 uppercase tracking-wide">Min Lv</label>
-          <input 
-            type="number" 
-            id="levelMinFilterResults" 
-            class="theme-input rounded-lg p-2.5 w-20 bg-[rgba(30,30,30,0.9)]" 
-            placeholder="1" 
-            min="1"
-          >
-        </div>
-        <div>
-          <label for="levelMaxFilterResults" class="block text-gray-400 text-xs mb-2 uppercase tracking-wide">Max Lv</label>
-          <input 
-            type="number" 
-            id="levelMaxFilterResults" 
-            class="theme-input rounded-lg p-2.5 w-20 bg-[rgba(30,30,30,0.9)]" 
-            placeholder="100" 
-            min="1"
-          >
-        </div>
-        <button 
-          id="applyFiltersBtn" 
-          class="theme-btn-primary px-5 py-2.5 rounded-lg font-semibold transition-all"
-        >
-          Apply
-        </button>
-        <button 
-          id="clearFiltersBtn" 
-          class="theme-btn px-4 py-2.5 rounded-lg transition-all"
-        >
-          Clear
-        </button>
-      </div>
-      
-      <!-- Items Grid -->
-      <div id="itemsGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 min-h-[400px]">
-        <!-- Item cards injected by JS -->
-      </div>
-      
-      <!-- Empty State -->
-      <div id="emptyState" class="hidden text-center py-20">
-        <div class="text-6xl mb-4">🔍</div>
-        <p class="text-gray-300 text-xl mb-2">No items found</p>
-        <p class="text-gray-500">Try adjusting your filters or search criteria.</p>
-      </div>
-      
-      <!-- Pagination -->
-      <div id="pagination" class="mt-8 flex flex-col items-center gap-4">
-        <div class="flex items-center gap-2">
-          <button 
-            id="prevPage"
-            class="theme-btn px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-          >
-            ← Prev
-          </button>
-          <div id="pageNumbers" class="flex gap-1"></div>
-          <button 
-            id="nextPage"
-            class="theme-btn px-4 py-2 rounded-lg text-sm font-medium disabled:opacity-40 disabled:cursor-not-allowed transition-all"
-          >
-            Next →
-          </button>
-        </div>
-        <div id="pageInfo" class="text-gray-500 text-sm"></div>
       </div>
     </div>
   </main>
 
-  <!-- Item Detail Modal -->
-  <div id="itemModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div class="game-modal-shell max-w-2xl w-full max-h-[90vh] overflow-hidden">
-      <div class="sticky top-0 bg-[rgba(26,26,26,0.98)] border-b border-gray-800 px-6 py-4 flex justify-between items-center backdrop-blur-md">
-        <h2 class="text-xl font-bold text-white" id="modalTitle">Item Name</h2>
-        <button 
-          id="closeModal"
-          class="text-gray-400 hover:text-white hover:bg-gray-700/50 w-8 h-8 flex items-center justify-center rounded-lg transition-all"
-        >
-          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-          </svg>
-        </button>
-      </div>
-      <div class="p-6" id="modalContent">
-        <!-- Item details injected by JS -->
-      </div>
-    </div>
-  </div>
-
   <!-- Footer -->
-  <footer class="theme-footer mt-auto">
-    <div class="container mx-auto px-4 py-8">
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
-        <!-- Brand -->
-        <div>
-          <div class="flex items-center gap-2 mb-3">
-            <svg class="w-6 h-6 text-violet-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M14.5 17.5L3 6V3h3l11.5 11.5M13 19l6-6M15 21l6-6M19 3l2 2-9.5 9.5-2-2L19 3z"/>
-            </svg>
-            <span class="font-bold text-white">Wynncraft Database</span>
-          </div>
-          <p class="text-gray-500 text-sm">Browse and explore items from the Wynncraft item database.</p>
-        </div>
-        
-        <!-- Links -->
-        <div>
-          <h4 class="text-gray-400 text-xs uppercase tracking-widest font-semibold mb-3">Resources</h4>
-          <ul class="space-y-2 text-sm">
-            <li><a href="https://api.wynncraft.com" target="_blank" class="text-gray-400 hover:text-violet-400 transition-colors">Wynncraft API</a></li>
-            <li><a href="https://wynncraft.com" target="_blank" class="text-gray-400 hover:text-violet-400 transition-colors">Official Website</a></li>
-            <li><a href="https://wynn.wiki.gg" target="_blank" class="text-gray-400 hover:text-violet-400 transition-colors">Wynn Wiki</a></li>
-          </ul>
-        </div>
-        
-        <!-- Attribution -->
-        <div>
-          <h4 class="text-gray-400 text-xs uppercase tracking-widest font-semibold mb-3">Legal</h4>
-          <p class="text-gray-500 text-sm">Not affiliated with Wynncraft Industries.</p>
-          <p class="text-gray-600 text-xs mt-2">All item data belongs to Wynncraft.</p>
-        </div>
-      </div>
-      
-      <!-- Bottom Bar -->
-      <div class="pt-6 border-t border-gray-800/50 text-center">
-        <p class="text-gray-600 text-xs">
-          Built with ❤️ using Vanilla JS • 
-          <span class="text-gray-500">Powered by Wynncraft API v3</span>
-        </p>
-      </div>
+  <footer class="bg-[rgba(22,22,22,0.98)] border-t border-[rgba(50,50,50,0.5)] mt-auto">
+    <div class="container mx-auto px-4 py-6 text-center">
+      <p class="text-gray-500 text-sm">Not affiliated with Wynncraft Industries.</p>
     </div>
   </footer>
-
-  <!-- Scripts -->
-  <script type="module" src="app.js"></script>
 </body>
 </html>
