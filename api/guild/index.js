@@ -1,18 +1,23 @@
-const fetch = (...args) => import('node-fetch').then(module => module.default(...args));
-
 module.exports = async (req, res) => {
   const guildName = req.query.name;
+
+  console.log('[DEBUG] guildName:', guildName);
 
   if (!guildName) {
     return res.status(400).json({ error: 'Guild name required' });
   }
 
   try {
-    const response = await fetch(`https://api.wynncraft.com/v3/guild/${encodeURIComponent(guildName)}?identifier=uuid`, {
+    const url = `https://api.wynncraft.com/v3/guild/${encodeURIComponent(guildName)}?identifier=uuid`;
+    console.log('[DEBUG] Fetching:', url);
+    
+    const response = await fetch(url, {
       headers: {
         'Accept': 'application/json'
       }
     });
+
+    console.log('[DEBUG] Response status:', response.status);
 
     if (!response.ok) {
       if (response.status === 404) {
@@ -22,9 +27,10 @@ module.exports = async (req, res) => {
     }
 
     const data = await response.json();
+    console.log('[DEBUG] Guild data received:', data.name);
     return res.json(data);
   } catch (e) {
-    console.error('Guild API error:', e.message);
+    console.error('[DEBUG] Guild API error:', e.message, e.stack);
     return res.status(500).json({ error: e.message });
   }
 };
