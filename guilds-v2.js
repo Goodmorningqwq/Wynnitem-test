@@ -48,7 +48,6 @@ async function updateUserData(payload) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
-    // #region agent log
     if (!response.ok) {
       let errorData = {};
       try {
@@ -56,19 +55,8 @@ async function updateUserData(payload) {
       } catch {
         errorData = { error: 'unknown' };
       }
-      console.debug('[agent-debug]', {
-        hypothesisId: 'H1_H2_H3_H4',
-        location: 'guilds-v2.js:updateUserData',
-        status: response.status,
-        error: errorData?.error || 'unknown',
-        payloadKeys: Object.keys(payload || {}),
-        hasActiveEvent: Object.prototype.hasOwnProperty.call(payload || {}, 'activeEvent'),
-        hasGuildName: Object.prototype.hasOwnProperty.call(payload || {}, 'guildName'),
-        trackedPlayersType: Array.isArray(payload?.trackedPlayers) ? 'array' : typeof payload?.trackedPlayers
-      });
       return { ok: false, status: response.status, error: errorData?.error || 'unknown' };
     }
-    // #endregion
     return { ok: true };
   } catch (e) {
     console.error('Update user data error:', e);
@@ -217,59 +205,8 @@ function getSnapshot(metric, guild, trackedPlayers) {
   };
 }
 
-function computeLeaderboard(event) {
-  const baselinePlayers = event.baseline?.playerValues || {};
-  const currentPlayers = event.current?.playerValues || baselinePlayers;
-  const entries = Object.keys(baselinePlayers).map((username) => {
-    const startValue = Number(baselinePlayers[username] || 0);
-    const currentValue = Number(currentPlayers[username] || 0);
-    return {
-      username,
-      startValue,
-      currentValue,
-      delta: currentValue - startValue
-    };
-  });
-  entries.sort((a, b) => b.delta - a.delta);
-  return entries;
-}
-
-function renderLeaderboard(event) {
-  const section = document.getElementById('leaderboardSection');
-  const list = document.getElementById('leaderboardList');
-  const summary = document.getElementById('leaderboardSummary');
-  const entries = computeLeaderboard(event);
-  const total = entries.reduce((sum, item) => sum + item.delta, 0);
-  // #region agent log
-  console.debug('[agent-debug]', {
-    hypothesisId: 'Hlb1',
-    location: 'guilds-v2.js:renderLeaderboard',
-    message: 'Rendering leaderboard',
-    entriesCount: entries.length,
-    metric: event?.metric,
-    scope: event?.scope
-  });
-  // #endregion
-
-  summary.textContent = `${formatMetric(event.metric)} · ${formatScope(event.scope)} · Total ${formatDelta(total)}`;
-  if (!entries.length) {
-    list.innerHTML = '<p class="text-sm text-gray-500">No leaderboard entries yet.</p>';
-  } else {
-    list.innerHTML = entries.map((entry, idx) => `
-      <div class="bg-gray-900/50 rounded p-3 text-sm">
-        <div class="flex justify-between items-center mb-1">
-          <span class="text-white font-medium">#${idx + 1} ${escapeHtml(entry.username)}</span>
-          <span class="${entry.delta >= 0 ? 'text-green-400' : 'text-red-400'} font-semibold">${formatDelta(entry.delta)}</span>
-        </div>
-        <div class="text-xs text-gray-400">${entry.startValue.toLocaleString()} -> ${entry.currentValue.toLocaleString()}</div>
-      </div>
-    `).join('');
-  }
-  section.classList.remove('hidden');
-}
-
-function hideLeaderboard() {
-  document.getElementById('leaderboardSection').classList.add('hidden');
+function openLeaderboardPage() {
+  window.location.href = '/guild/leaderboard';
 }
 
 function getGuildDelta(event) {
@@ -448,37 +385,16 @@ async function refreshEvent() {
   const now = Date.now();
   const cooldownUntil = Number(activeEvent.lastRefreshAt || 0) + Number(activeEvent.refreshCooldownMs || REFRESH_COOLDOWN_MS);
   if (now < cooldownUntil) {
-    // #region agent log
-    console.debug('[agent-debug]', {
-      hypothesisId: 'Hrf1',
-      location: 'guilds-v2.js:refreshEvent',
-      message: 'Refresh blocked by cooldown',
-      remainingMs: cooldownUntil - now
-    });
-    // #endregion
     updateCooldownText();
     return;
   }
-  // #region agent log
-  console.debug('[agent-debug]', {
-    hypothesisId: 'Hrf2',
-    location: 'guilds-v2.js:refreshEvent',
-    message: 'Refresh accepted'
-  });
-  // #endregion
   await searchGuild(activeEvent.guildName);
   const snapshot = getSnapshot(activeEvent.metric, currentGuild, activeEvent.trackedPlayers || []);
   activeEvent.current = snapshot;
   activeEvent.lastRefreshAt = Date.now();
   const saveResult = await updateUserData({ activeEvent });
   if (!saveResult.ok) {
-    console.debug('[agent-debug]', {
-      hypothesisId: 'H1_H2_H3_H4',
-      location: 'guilds-v2.js:refreshEvent',
-      message: 'Failed to persist refreshed activeEvent',
-      error: saveResult.error,
-      status: saveResult.status
-    });
+    console.error('Failed to persist refreshed active event:', saveResult.error);
   }
   renderActiveEvent();
 }
@@ -487,7 +403,6 @@ async function endEvent() {
   if (!activeEvent) return;
   if (!confirm('End this event and save to history?')) return;
 
-  const leaderboard = computeLeaderboard(activeEvent);
   const totalDelta = getGuildDelta(activeEvent);
   const historyEvent = {
     guildName: activeEvent.guildName,
@@ -498,8 +413,7 @@ async function endEvent() {
     endedAt: Date.now(),
     baseline: activeEvent.baseline,
     current: activeEvent.current,
-    totalDelta,
-    leaderboard
+    totalDelta
   };
 
   const endResult = await updateUserData({ addEvent: historyEvent, activeEvent: null });
@@ -508,7 +422,6 @@ async function endEvent() {
     return;
   }
   activeEvent = null;
-  hideLeaderboard();
   renderActiveEvent();
   stopCooldownTicker();
   await loadUserDashboard();
@@ -615,6 +528,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   document.getElementById('logoutBtn').addEventListener('click', logout);
+  document.getElementById('headerUserBtn').addEventListener('click', () => {
+    window.location.href = '/guild';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
   document.getElementById('headerLoginBtn').addEventListener('click', () => {
     window.location.href = '/login';
   });
@@ -643,24 +560,27 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   document.getElementById('startEventBtn').addEventListener('click', startEvent);
+  document.getElementById('trackGuildBtn').addEventListener('click', () => {
+    const section = document.getElementById('playerSelectSection');
+    section.classList.remove('hidden');
+    section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
+  document.getElementById('viewGuildBtn').addEventListener('click', () => {
+    const result = document.getElementById('guildResult');
+    result.classList.remove('hidden');
+    result.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
+  document.getElementById('changeGuildBtn').addEventListener('click', () => {
+    const section = document.getElementById('playerSelectSection');
+    const scope = document.getElementById('trackScopeSelect');
+    scope.value = 'selected';
+    updateScopeUI();
+    section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  });
   document.getElementById('refreshEventBtn').addEventListener('click', refreshEvent);
   document.getElementById('dashboardRefreshBtn').addEventListener('click', refreshEvent);
   document.getElementById('endEventBtn').addEventListener('click', endEvent);
   document.getElementById('dashboardEndBtn').addEventListener('click', endEvent);
-
-  const openLeaderboard = () => {
-    // #region agent log
-    console.debug('[agent-debug]', {
-      hypothesisId: 'Hlb2',
-      location: 'guilds-v2.js:openLeaderboard',
-      message: 'Leaderboard button clicked',
-      hasActiveEvent: Boolean(activeEvent)
-    });
-    // #endregion
-    if (!activeEvent) return;
-    renderLeaderboard(activeEvent);
-  };
-  document.getElementById('viewLeaderboardBtn').addEventListener('click', openLeaderboard);
-  document.getElementById('dashboardViewLeaderboardBtn').addEventListener('click', openLeaderboard);
-  document.getElementById('closeLeaderboardBtn').addEventListener('click', hideLeaderboard);
+  document.getElementById('viewLeaderboardBtn').addEventListener('click', openLeaderboardPage);
+  document.getElementById('dashboardViewLeaderboardBtn').addEventListener('click', openLeaderboardPage);
 });

@@ -2,6 +2,7 @@
   "rewrites": [
     { "source": "/", "destination": "/index.html" },
     { "source": "/item", "destination": "/item.html" },
+    { "source": "/guild/leaderboard", "destination": "/guild-leaderboard.html" },
     { "source": "/guild", "destination": "/guild.html" },
     { "source": "/login", "destination": "/login.html" },
     { "source": "/api/item(.*)", "destination": "/api/item$1" },
