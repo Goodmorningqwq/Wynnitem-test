@@ -13,6 +13,32 @@ function getDefaultUserData() {
   };
 }
 
+function sanitizeActiveEvent(value) {
+  if (!value || typeof value !== 'object') return null;
+  const metric = value.metric === 'wars' ? 'wars' : 'xp';
+  const scope = value.scope === 'guild' ? 'guild' : 'selected';
+  const trackedPlayers = Array.isArray(value.trackedPlayers)
+    ? value.trackedPlayers.filter((p) => typeof p === 'string').slice(0, 100)
+    : [];
+  const refreshCooldownMs = Number(value.refreshCooldownMs || 15 * 60 * 1000);
+  const startedAt = Number(value.startedAt || Date.now());
+  const lastRefreshAt = Number(value.lastRefreshAt || startedAt);
+  const baseline = value.baseline && typeof value.baseline === 'object' ? value.baseline : null;
+  const current = value.current && typeof value.current === 'object' ? value.current : baseline;
+
+  return {
+    guildName: typeof value.guildName === 'string' ? value.guildName : null,
+    metric,
+    scope,
+    trackedPlayers,
+    refreshCooldownMs,
+    startedAt,
+    lastRefreshAt,
+    baseline,
+    current
+  };
+}
+
 function parseJsonSafe(value, fallback) {
   if (!value) return fallback;
   if (typeof value !== 'string') return value;
@@ -75,6 +101,9 @@ module.exports = async (req, res) => {
       }
 
       if (trackedPlayers !== undefined) {
+        if (!Array.isArray(trackedPlayers)) {
+          return res.status(400).json({ error: 'trackedPlayers must be an array' });
+        }
         if (trackedPlayers.length > 0 && userData.guildName && trackedPlayers[0]) {
           const currentGuild = userData.guildName;
           userData.trackedPlayers = trackedPlayers;
@@ -102,7 +131,14 @@ module.exports = async (req, res) => {
       }
 
       if (activeEvent !== undefined) {
-        userData.activeEvent = activeEvent;
+        const sanitizedEvent = sanitizeActiveEvent(activeEvent);
+        if (sanitizedEvent && userData.activeEvent) {
+          return res.status(400).json({ error: 'Only one active event is allowed' });
+        }
+        if (sanitizedEvent && userData.guildName && sanitizedEvent.guildName && sanitizedEvent.guildName !== userData.guildName) {
+          return res.status(400).json({ error: 'Active event guild must match tracked guild' });
+        }
+        userData.activeEvent = sanitizedEvent;
       }
 
       await redis.set(dataKey, JSON.stringify(userData));
