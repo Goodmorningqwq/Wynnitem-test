@@ -574,16 +574,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const headerLoginBtn = document.getElementById('headerLoginBtn');
   const headerUserBtn = document.getElementById('headerUserBtn');
 
-  // Auth elements
-  const authSection = document.getElementById('authSection');
-  const authTitle = document.getElementById('authTitle');
-  const authUsername = document.getElementById('authUsername');
-  const authPassword = document.getElementById('authPassword');
-  const authSubmitBtn = document.getElementById('authSubmitBtn');
-  const authSwitchBtn = document.getElementById('authSwitchBtn');
-  const authError = document.getElementById('authError');
-  const authSwitchText = document.getElementById('authSwitchText');
-
   // Main UI elements
   const searchSection = document.getElementById('searchSection');
   const userMenu = document.getElementById('userMenu');
@@ -605,27 +595,16 @@ document.addEventListener('DOMContentLoaded', () => {
   const dashboardRefreshBtn = document.getElementById('dashboardRefreshBtn');
   const dashboardEndBtn = document.getElementById('dashboardEndBtn');
 
-  let isRegisterMode = false;
-
-  // Define UI functions first
-  window.showAuthSection = function() {
-    authSection.classList.remove('hidden');
-    userMenu.classList.add('hidden');
-    userDashboard.classList.add('hidden');
-    headerLoginBtn.classList.remove('hidden');
-    headerUserBtn.classList.add('hidden');
-    isRegisterMode = false;
-    updateAuthUI();
-  };
-
+  // Define UI functions
   window.showLoggedInUI = function() {
-    authSection.classList.add('hidden');
-    userMenu.classList.remove('hidden');
-    userDashboard.classList.remove('hidden');
-    headerLoginBtn.classList.add('hidden');
-    headerUserBtn.classList.remove('hidden');
-    headerUserBtn.textContent = currentUser;
-    userDisplayName.textContent = currentUser;
+    if (userMenu) userMenu.classList.remove('hidden');
+    if (userDashboard) userDashboard.classList.remove('hidden');
+    if (headerLoginBtn) headerLoginBtn.classList.add('hidden');
+    if (headerUserBtn) {
+      headerUserBtn.classList.remove('hidden');
+      headerUserBtn.textContent = currentUser;
+    }
+    if (userDisplayName) userDisplayName.textContent = currentUser;
     loadUserDashboard();
   };
 
@@ -633,18 +612,6 @@ document.addEventListener('DOMContentLoaded', () => {
   currentUser = getCurrentUser();
   if (currentUser) {
     window.showLoggedInUI();
-  } else {
-    window.showAuthSection();
-  }
-
-  function updateAuthUI() {
-    authTitle.textContent = isRegisterMode ? 'Register' : 'Login';
-    authSubmitBtn.textContent = isRegisterMode ? 'Register' : 'Login';
-    authSwitchText.textContent = isRegisterMode ? 'Already have an account?' : "Don't have an account?";
-    authSwitchBtn.textContent = isRegisterMode ? 'Login' : 'Register';
-    authError.classList.add('hidden');
-    authUsername.value = '';
-    authPassword.value = '';
   }
 
   async function loadUserDashboard() {
@@ -713,38 +680,8 @@ document.addEventListener('DOMContentLoaded', () => {
     listEl.innerHTML = events.map(evt => formatEventCard(evt)).join('');
   }
 
-  // Auth handlers
-  authSubmitBtn.addEventListener('click', async () => {
-    const username = authUsername.value.trim();
-    const password = authPassword.value;
-
-    if (!username || !password) {
-      authError.textContent = 'Please enter username and password';
-      authError.classList.remove('hidden');
-      return;
-    }
-
-    try {
-      if (isRegisterMode) {
-        await registerUser(username, password);
-      }
-      await loginUser(username, password);
-      setCurrentUser(username);
-      currentUser = username;
-      window.showLoggedInUI();
-    } catch (e) {
-      authError.textContent = e.message;
-      authError.classList.remove('hidden');
-    }
-  });
-
-  authSwitchBtn.addEventListener('click', () => {
-    isRegisterMode = !isRegisterMode;
-    updateAuthUI();
-  });
-
   headerLoginBtn.addEventListener('click', () => {
-    window.showAuthSection();
+    window.location.href = '/login';
   });
 
   logoutBtn.addEventListener('click', () => {

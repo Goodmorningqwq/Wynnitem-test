@@ -3,6 +3,7 @@
     { "source": "/", "destination": "/index.html" },
     { "source": "/item", "destination": "/item.html" },
     { "source": "/guild", "destination": "/guild.html" },
+    { "source": "/login", "destination": "/login.html" },
     { "source": "/api/item(.*)", "destination": "/api/item$1" },
     { "source": "/api/guild(.*)", "destination": "/api/guild$1" },
     { "source": "/api/user(.*)", "destination": "/api/user$1" }
