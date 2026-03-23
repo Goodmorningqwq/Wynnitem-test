@@ -84,6 +84,7 @@ function displayGuild(guild) {
 
   // Display members list
   displayMembersList(guild.members);
+  populateMemberSelect(guild.members);
 
   const trackedGuilds = getTrackedGuilds();
   const trackBtn = document.getElementById('trackGuildBtn');
@@ -148,6 +149,25 @@ function displayMembersList(members) {
   listEl.innerHTML = memberHtml;
 }
 
+function populateMemberSelect(members) {
+  const selectEl = document.getElementById('memberSelect');
+  const rankOrder = ['owner', 'chief', 'strategist', 'captain', 'recruiter', 'recruit'];
+  
+  let options = '<option value="">-- Select a member --</option>';
+  
+  for (const rank of rankOrder) {
+    if (!members[rank]) continue;
+    
+    const rankMembers = Object.entries(members[rank]);
+    for (const [uuid, data] of rankMembers) {
+      const contribution = data.contributed ? data.contributed.toLocaleString() : '0';
+      options += `<option value="${escapeHtml(data.username)}" data-contributed="${data.contributed || 0}">${escapeHtml(data.username)} (${contribution} XP)</option>`;
+    }
+  }
+  
+  selectEl.innerHTML = options;
+}
+
 function trackGuild() {
   if (!currentGuild || !currentGuild.name) return;
 
@@ -189,17 +209,31 @@ function updateTrackedGuildsList() {
   });
 }
 
-function startEvent(type) {
+function startEvent(type, memberUsername = null) {
   if (!currentGuild || !currentGuild.name) {
     alert('Please search for a guild first');
     return;
   }
 
-  const value = type === 'xp' ? (currentGuild.xpPercent || 0) : (currentGuild.wars || 0);
+  let value;
+  if (type === 'member') {
+    // Find member's current contribution
+    const member = findMemberByUsername(memberUsername);
+    value = member ? (member.contributed || 0) : 0;
+    if (!member) {
+      alert('Member not found');
+      return;
+    }
+  } else if (type === 'xp') {
+    value = currentGuild.xpPercent || 0;
+  } else {
+    value = currentGuild.wars || 0;
+  }
   
   activeEvent = {
     guildName: currentGuild.name,
     type: type,
+    memberUsername: memberUsername,
     startTime: Date.now(),
     startValue: value,
     updates: []
@@ -209,12 +243,35 @@ function startEvent(type) {
   displayActiveEvent();
 }
 
+function findMemberByUsername(username) {
+  if (!currentGuild || !currentGuild.members) return null;
+  
+  const rankOrder = ['owner', 'chief', 'strategist', 'captain', 'recruiter', 'recruit'];
+  
+  for (const rank of rankOrder) {
+    if (!currentGuild.members[rank]) continue;
+    
+    for (const [uuid, data] of Object.entries(currentGuild.members[rank])) {
+      if (data.username === username) {
+        return data;
+      }
+    }
+  }
+  return null;
+}
+
 function refreshEvent() {
   if (!activeEvent || !currentGuild) return;
 
-  const newValue = activeEvent.type === 'xp' 
-    ? (currentGuild.xpPercent || 0) 
-    : (currentGuild.wars || 0);
+  let newValue;
+  if (activeEvent.type === 'member') {
+    const member = findMemberByUsername(activeEvent.memberUsername);
+    newValue = member ? (member.contributed || 0) : 0;
+  } else if (activeEvent.type === 'xp') {
+    newValue = currentGuild.xpPercent || 0;
+  } else {
+    newValue = currentGuild.wars || 0;
+  }
   
   const delta = newValue - activeEvent.startValue;
 
@@ -301,9 +358,21 @@ async function loadEventHistory() {
 function formatEventCard(evt) {
   const startDate = new Date(evt.startTime).toLocaleDateString();
   const endDate = new Date(evt.endTime).toLocaleDateString();
-  const typeLabel = evt.type === 'xp' ? 'XP' : 'Wars';
+  
+  let typeLabel;
+  if (evt.type === 'xp') {
+    typeLabel = 'Guild XP';
+  } else if (evt.type === 'wars') {
+    typeLabel = 'Wars';
+  } else if (evt.type === 'member') {
+    typeLabel = `Member: ${escapeHtml(evt.memberUsername)}`;
+  } else {
+    typeLabel = evt.type;
+  }
+  
   const deltaClass = evt.totalDelta >= 0 ? 'text-green-400' : 'text-red-400';
   const deltaPrefix = evt.totalDelta >= 0 ? '+' : '';
+  const formatValue = (val) => val ? val.toLocaleString() : '0';
 
   return `
     <div class="bg-gray-800/50 p-4 rounded-lg">
@@ -312,10 +381,10 @@ function formatEventCard(evt) {
           <span class="text-white font-medium">${escapeHtml(evt.guildName)}</span>
           <span class="text-gray-500 text-sm ml-2">(${typeLabel})</span>
         </div>
-        <span class="${deltaClass} font-bold">${deltaPrefix}${evt.totalDelta}</span>
+        <span class="${deltaClass} font-bold">${deltaPrefix}${formatValue(evt.totalDelta)}</span>
       </div>
       <div class="text-gray-500 text-xs">
-        ${startDate} → ${endDate} | ${evt.startValue} → ${evt.endValue}
+        ${startDate} → ${endDate} | ${formatValue(evt.startValue)} → ${formatValue(evt.endValue)}
       </div>
     </div>
   `;
@@ -324,6 +393,7 @@ function formatEventCard(evt) {
 function displayActiveEvent() {
   const activeSection = document.getElementById('activeEventSection');
   const noActiveSection = document.getElementById('noActiveEventSection');
+  const eventInfo = document.getElementById('eventInfo');
 
   if (!activeEvent) {
     activeSection.classList.add('hidden');
@@ -346,31 +416,48 @@ function displayActiveEvent() {
   const hours = Math.floor(elapsed / 3600000);
   const minutes = Math.floor((elapsed % 3600000) / 60000);
 
+  // Format values with commas for large numbers
+  const formatValue = (val) => val.toLocaleString();
+
   document.getElementById('eventDuration').textContent = `${hours}h ${minutes}m`;
-  document.getElementById('eventStartValue').textContent = activeEvent.startValue;
-  document.getElementById('eventCurrentValue').textContent = currentValue;
-  document.getElementById('eventDelta').textContent = `${deltaPrefix}${delta}`;
+  document.getElementById('eventStartValue').textContent = formatValue(activeEvent.startValue);
+  document.getElementById('eventCurrentValue').textContent = formatValue(currentValue);
+  document.getElementById('eventDelta').textContent = `${deltaPrefix}${formatValue(delta)}`;
 
   const trackXpBtn = document.getElementById('trackXpBtn');
   const trackWarsBtn = document.getElementById('trackWarsBtn');
+  const trackMemberXpBtn = document.getElementById('trackMemberXpBtn');
   trackXpBtn.disabled = true;
   trackWarsBtn.disabled = true;
+  trackMemberXpBtn.disabled = true;
   trackXpBtn.classList.add('opacity-50');
   trackWarsBtn.classList.add('opacity-50');
+  trackMemberXpBtn.classList.add('opacity-50');
 }
 
 function updateEventButtons() {
   const trackXpBtn = document.getElementById('trackXpBtn');
   const trackWarsBtn = document.getElementById('trackWarsBtn');
+  const trackMemberXpBtn = document.getElementById('trackMemberXpBtn');
+  const memberSelectSection = document.getElementById('memberSelectSection');
   
   if (activeEvent) {
     trackXpBtn.disabled = true;
     trackWarsBtn.disabled = true;
+    trackMemberXpBtn.disabled = true;
     trackXpBtn.classList.add('opacity-50');
     trackWarsBtn.classList.add('opacity-50');
+    trackMemberXpBtn.classList.add('opacity-50');
+    memberSelectSection.classList.add('hidden');
   } else {
     trackXpBtn.disabled = false;
     trackWarsBtn.disabled = false;
+    trackMemberXpBtn.disabled = false;
+    trackXpBtn.classList.remove('opacity-50');
+    trackWarsBtn.classList.remove('opacity-50');
+    trackMemberXpBtn.classList.remove('opacity-50');
+    memberSelectSection.classList.remove('hidden');
+  }
     trackXpBtn.classList.remove('opacity-50');
     trackWarsBtn.classList.remove('opacity-50');
   }
@@ -382,6 +469,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const trackBtn = document.getElementById('trackGuildBtn');
   const trackXpBtn = document.getElementById('trackXpBtn');
   const trackWarsBtn = document.getElementById('trackWarsBtn');
+  const trackMemberXpBtn = document.getElementById('trackMemberXpBtn');
+  const startMemberTrackBtn = document.getElementById('startMemberTrackBtn');
   const refreshBtn = document.getElementById('refreshEventBtn');
   const endBtn = document.getElementById('endEventBtn');
 
@@ -394,6 +483,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
   trackXpBtn.addEventListener('click', () => startEvent('xp'));
   trackWarsBtn.addEventListener('click', () => startEvent('wars'));
+  trackMemberXpBtn.addEventListener('click', () => {
+    document.getElementById('memberSelectSection').classList.remove('hidden');
+  });
+  
+  startMemberTrackBtn.addEventListener('click', () => {
+    const memberSelect = document.getElementById('memberSelect');
+    const selectedUsername = memberSelect.value;
+    if (!selectedUsername) {
+      alert('Please select a member to track');
+      return;
+    }
+    startEvent('member', selectedUsername);
+  });
 
   refreshBtn.addEventListener('click', () => {
     searchGuild(currentGuild.name).then(() => refreshEvent());
