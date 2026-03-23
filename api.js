@@ -17,105 +17,6 @@ function buildUrl(endpointPath) {
   }
   return new URL(endpointPath, window.location.origin);
 }
-}
-
-function setItemCacheToStorage(cache) {
-  try {
-    localStorage.setItem(ITEM_CACHE_KEY, JSON.stringify(cache));
-  } catch (e) {
-    console.warn('localStorage full, clearing old cache');
-    try {
-      localStorage.removeItem(ITEM_CACHE_KEY);
-    } catch {}
-  }
-}
-
-export const itemCache = {
-  get(name) {
-    const cache = getItemCacheFromStorage();
-    const entry = cache[name];
-    if (!entry) return null;
-    if (Date.now() > entry.timestamp + ITEM_CACHE_TTL) {
-      delete cache[name];
-      setItemCacheToStorage(cache);
-      return null;
-    }
-    return entry.data;
-  },
-  
-  set(name, data) {
-    const cache = getItemCacheFromStorage();
-    cache[name] = { data, timestamp: Date.now() };
-    setItemCacheToStorage(cache);
-  },
-  
-  has(name) {
-    return this.get(name) !== null;
-  },
-  
-  getAll() {
-    return getItemCacheFromStorage();
-  },
-  
-  clear() {
-    try {
-      localStorage.removeItem(ITEM_CACHE_KEY);
-    } catch {}
-  }
-};
-
-export async function fetchItemByName(name) {
-  const cached = itemCache.get(name);
-  if (cached) return cached;
-  
-  const url = buildUrl(`${API_BASE}/quick`);
-  url.searchParams.set('query', name);
-  
-  const response = await fetch(url.toString());
-  if (!response.ok) {
-    throw new Error(`API Error: ${response.status}`);
-  }
-  
-  const data = await response.json();
-  const item = data[name];
-  
-  if (item) {
-    itemCache.set(name, item);
-  }
-  
-  return item || null;
-}
-
-export async function refreshStaleItems() {
-  const cache = getItemCacheFromStorage();
-  const now = Date.now();
-  const staleThreshold = 60 * 60 * 1000; // 1 hour
-  
-  const staleItems = Object.entries(cache)
-    .filter(([_, entry]) => now - entry.timestamp > staleThreshold);
-  
-  console.log(`[ItemCache] Refreshing ${staleItems.length} stale items...`);
-  
-  for (const [name] of staleItems) {
-    try {
-      const url = buildUrl(`${API_BASE}/quick`);
-      url.searchParams.set('query', name);
-      const response = await fetch(url.toString());
-      if (response.ok) {
-        const data = await response.json();
-        if (data[name]) {
-          itemCache.set(name, data[name]);
-        }
-      }
-    } catch (e) {
-      console.warn(`Failed to refresh ${name}:`, e.message);
-    }
-    
-    await new Promise(r => setTimeout(r, 500));
-  }
-  
-  console.log(`[ItemCache] Refresh complete`);
-}
 
 const ITEM_TYPES = ['weapon', 'armour'];
 const TIER_ORDER = ['mythic', 'fabled', 'legendary', 'epic', 'rare', 'uncommon', 'common'];
@@ -124,13 +25,6 @@ const TIER_ORDER = ['mythic', 'fabled', 'legendary', 'epic', 'rare', 'uncommon',
 const ARMOUR_PIECES = ['helmet', 'chestplate', 'leggings', 'boots'];
 const ACCESSORY_TYPES = ['ring', 'bracelet', 'necklace'];
 const MISC_TYPES = ['charm', 'tome'];
-
-function buildUrl(endpointPath) {
-  if (endpointPath.startsWith('http://') || endpointPath.startsWith('https://')) {
-    return new URL(endpointPath);
-  }
-  return new URL(endpointPath, window.location.origin);
-}
 
 /**
  * Fetch single page of items
