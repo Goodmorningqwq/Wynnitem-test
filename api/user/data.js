@@ -5,6 +5,24 @@ const redis = new Redis({
   token: process.env.UPSTASH_REDIS_REST_TOKEN_GUILD,
 });
 
+function getDefaultUserData() {
+  return {
+    guildName: null,
+    trackedPlayers: [],
+    activeEvent: null
+  };
+}
+
+function parseJsonSafe(value, fallback) {
+  if (!value) return fallback;
+  if (typeof value !== 'string') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+}
+
 module.exports = async (req, res) => {
   const username = req.query.username;
 
@@ -20,8 +38,11 @@ module.exports = async (req, res) => {
       const userDataStr = await redis.get(dataKey);
       const events = await redis.lrange(eventsKey, 0, 49);
 
-      const userData = userDataStr ? JSON.parse(userDataStr) : { guildName: null, trackedPlayers: [], activeEvent: null };
-      const parsedEvents = events.map(e => typeof e === 'string' ? JSON.parse(e) : e).reverse();
+      const userData = parseJsonSafe(userDataStr, getDefaultUserData());
+      const parsedEvents = events
+        .map(e => parseJsonSafe(e, null))
+        .filter(Boolean)
+        .reverse();
 
       return res.json({
         username: username,
@@ -32,7 +53,7 @@ module.exports = async (req, res) => {
       });
     } catch (e) {
       console.error('Get data error:', e);
-      return res.status(500).json({ error: e.message });
+      return res.status(500).json({ error: 'Internal server error' });
     }
   }
 
@@ -44,7 +65,7 @@ module.exports = async (req, res) => {
       const eventsKey = `user:${username}:events`;
 
       const userDataStr = await redis.get(dataKey);
-      const userData = userDataStr ? JSON.parse(userDataStr) : { guildName: null, trackedPlayers: [], activeEvent: null };
+      const userData = parseJsonSafe(userDataStr, getDefaultUserData());
 
       if (guildName !== undefined) {
         if (guildName !== userData.guildName && userData.trackedPlayers.length > 0) {
@@ -94,7 +115,7 @@ module.exports = async (req, res) => {
       return res.json({ success: true, trackedPlayers: userData.trackedPlayers });
     } catch (e) {
       console.error('Update data error:', e);
-      return res.status(500).json({ error: e.message });
+      return res.status(500).json({ error: 'Internal server error' });
     }
   }
 
