@@ -342,7 +342,8 @@ function renderActiveEvent() {
   const elapsed = Date.now() - Number(activeEvent.startedAt || Date.now());
   const hours = Math.floor(elapsed / 3600000);
   const minutes = Math.floor((elapsed % 3600000) / 60000);
-  const durationText = `${hours}h ${minutes}m`;
+  const seconds = Math.floor((elapsed % 60000) / 1000);
+  const durationText = `${hours}h ${minutes}m ${seconds}s`;
   const delta = getGuildDelta(activeEvent);
   const startValue = Number(activeEvent.baseline?.metricValue || 0);
   const currentValue = Number(activeEvent.current?.metricValue || startValue);
@@ -521,14 +522,16 @@ function updateScopeUI() {
 async function loadEventHistory() {
   const list = document.getElementById('eventHistoryList');
   const noEl = document.getElementById('noEventHistory');
+  if (!list) return;
   const userData = await loadUserData();
   const events = userData?.events || [];
   if (!events.length) {
-    noEl.classList.remove('hidden');
-    list.innerHTML = '';
+    list.innerHTML = '<p class="text-gray-500 text-sm text-center py-4" id="noEventHistory">No events recorded yet.</p>';
     return;
   }
-  noEl.classList.add('hidden');
+  if (noEl) {
+    noEl.classList.add('hidden');
+  }
   list.innerHTML = events.map((evt) => `
     <div class="bg-gray-800/50 p-4 rounded-lg">
       <div class="flex justify-between items-center mb-1">
