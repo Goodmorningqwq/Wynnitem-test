@@ -1,18 +1,13 @@
 const { Redis } = require('@upstash/redis');
+const crypto = require('crypto');
 
 const redis = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL_GUILD,
   token: process.env.UPSTASH_REDIS_REST_TOKEN_GUILD,
 });
 
-function simpleHash(str) {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    const char = str.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash;
-  }
-  return hash.toString(16);
+function hashPassword(password, salt) {
+  return crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha256').toString('hex');
 }
 
 module.exports = async (req, res) => {
@@ -42,9 +37,11 @@ module.exports = async (req, res) => {
       return res.status(409).json({ error: 'Username already exists' });
     }
 
+    const passwordSalt = crypto.randomBytes(16).toString('hex');
     const userData = {
       username: username,
-      passwordHash: simpleHash(password),
+      passwordSalt: passwordSalt,
+      passwordHash: hashPassword(password, passwordSalt),
       createdAt: Date.now()
     };
 
@@ -53,6 +50,6 @@ module.exports = async (req, res) => {
     return res.json({ success: true, username: username });
   } catch (e) {
     console.error('Register error:', e);
-    return res.status(500).json({ error: e.message });
+    return res.status(500).json({ error: 'Internal server error' });
   }
 };
