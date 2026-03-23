@@ -1,6 +1,6 @@
 // Main Application Logic
 
-import { cache, filterAndSortItems, filterByCategory, filterByArmourType, fetchItemPages, getAllFetchedItems, clearPageCache, fetchFilteredItems, quickSearch } from './api.js';
+import { cache, filterAndSortItems, filterByCategory, filterByArmourType, fetchItemPages, getAllFetchedItems, quickSearch } from './api.js';
 
 // App State
 const AppState = {
@@ -596,8 +596,6 @@ async function loadItemsForCategory(category) {
   loadingCancelled = false;
   currentCategory = category;
   
-  clearPageCache();
-  
   const categoryNames = {
     armour: 'Armor',
     weapon: 'Weapons',
@@ -606,40 +604,46 @@ async function loadItemsForCategory(category) {
   };
   
   loadingTitleEl.textContent = `Loading ${categoryNames[category]}...`;
-  loadingSubtitleEl.textContent = 'Please wait while we fetch item data';
+  loadingSubtitleEl.textContent = 'Searching for items...';
   
   const filters = getSearchFilters();
   
+  let searchQuery = '';
+  if (category === 'weapon' && selectedWeaponType) {
+    searchQuery = selectedWeaponType;
+  } else if (category === 'armour' && selectedArmorType) {
+    searchQuery = selectedArmorType;
+  } else if (category === 'accessory' && selectedAccessoryType) {
+    searchQuery = selectedAccessoryType;
+  } else if (category === 'misc' && selectedMiscType) {
+    searchQuery = selectedMiscType;
+  } else {
+    searchQuery = category;
+  }
+  
   try {
-    const result = await fetchFilteredItems({
-      category,
-      weaponType: selectedWeaponType || undefined,
-      armourType: selectedArmorType || undefined,
-      accessoryType: selectedAccessoryType || undefined,
-      miscType: selectedMiscType || undefined,
-      tier: filters.tier || undefined,
-      levelMin: filters.levelMin,
-      levelMax: filters.levelMax
-    }, (currentPageNum, totalPagesNum, itemCount, cachedPages = 0) => {
-      if (loadingCancelled) return;
-      const percent = Math.round((currentPageNum / totalPagesNum) * 100);
-      const eta = calculateETA(currentPageNum, totalPagesNum, cachedPages);
-      showLoadingOverlay(percent, currentPageNum, totalPagesNum, eta);
-    });
+    showLoadingOverlay(50, 1, 0, 'Fetching from API...');
+    const searchResult = await quickSearch(searchQuery);
     
     if (loadingCancelled) {
       showSearchPanel();
       return;
     }
     
-    allLoadedItems = Object.entries(result.items).map(([name, item]) => ({ name, ...item }));
-    allLoadedItems.sort((a, b) => {
+    let items = Object.entries(searchResult).map(([name, item]) => ({ name, ...item }));
+    
+    if (filters.tier) {
+      items = items.filter(item => item.rarity?.toLowerCase() === filters.tier.toLowerCase());
+    }
+    
+    items.sort((a, b) => {
       const tierOrder = ['mythic', 'fabled', 'legendary', 'epic', 'rare', 'uncommon', 'common'];
       const aIdx = tierOrder.indexOf(a.rarity?.toLowerCase() || '');
       const bIdx = tierOrder.indexOf(b.rarity?.toLowerCase() || '');
       return (aIdx === -1 ? tierOrder.length : aIdx) - (bIdx === -1 ? tierOrder.length : bIdx);
     });
     
+    allLoadedItems = items;
     filteredItems = [...allLoadedItems];
     
     showLoadingOverlay(100, 1, 1, 'Complete!');
@@ -648,7 +652,7 @@ async function loadItemsForCategory(category) {
       showResults(filteredItems, category);
       currentPage = 1;
       renderItems();
-    }, 500);
+    }, 300);
     
   } catch (error) {
     console.error('Error loading items:', error);
