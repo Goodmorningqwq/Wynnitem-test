@@ -240,6 +240,16 @@ function renderLeaderboard(event) {
   const summary = document.getElementById('leaderboardSummary');
   const entries = computeLeaderboard(event);
   const total = entries.reduce((sum, item) => sum + item.delta, 0);
+  // #region agent log
+  console.debug('[agent-debug]', {
+    hypothesisId: 'Hlb1',
+    location: 'guilds-v2.js:renderLeaderboard',
+    message: 'Rendering leaderboard',
+    entriesCount: entries.length,
+    metric: event?.metric,
+    scope: event?.scope
+  });
+  // #endregion
 
   summary.textContent = `${formatMetric(event.metric)} · ${formatScope(event.scope)} · Total ${formatDelta(total)}`;
   if (!entries.length) {
@@ -437,9 +447,24 @@ async function refreshEvent() {
   const now = Date.now();
   const cooldownUntil = Number(activeEvent.lastRefreshAt || 0) + Number(activeEvent.refreshCooldownMs || REFRESH_COOLDOWN_MS);
   if (now < cooldownUntil) {
+    // #region agent log
+    console.debug('[agent-debug]', {
+      hypothesisId: 'Hrf1',
+      location: 'guilds-v2.js:refreshEvent',
+      message: 'Refresh blocked by cooldown',
+      remainingMs: cooldownUntil - now
+    });
+    // #endregion
     updateCooldownText();
     return;
   }
+  // #region agent log
+  console.debug('[agent-debug]', {
+    hypothesisId: 'Hrf2',
+    location: 'guilds-v2.js:refreshEvent',
+    message: 'Refresh accepted'
+  });
+  // #endregion
   await searchGuild(activeEvent.guildName);
   const snapshot = getSnapshot(activeEvent.metric, currentGuild, activeEvent.trackedPlayers || []);
   activeEvent.current = snapshot;
@@ -621,6 +646,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('dashboardEndBtn').addEventListener('click', endEvent);
 
   const openLeaderboard = () => {
+    // #region agent log
+    console.debug('[agent-debug]', {
+      hypothesisId: 'Hlb2',
+      location: 'guilds-v2.js:openLeaderboard',
+      message: 'Leaderboard button clicked',
+      hasActiveEvent: Boolean(activeEvent)
+    });
+    // #endregion
     if (!activeEvent) return;
     renderLeaderboard(activeEvent);
   };
