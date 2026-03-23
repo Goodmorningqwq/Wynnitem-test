@@ -2,7 +2,9 @@
   "rewrites": [
     { "source": "/", "destination": "/index.html" },
     { "source": "/item", "destination": "/item.html" },
-    { "source": "/api/item(.*)", "destination": "/api/item$1" }
+    { "source": "/guild", "destination": "/guild.html" },
+    { "source": "/api/item(.*)", "destination": "/api/item$1" },
+    { "source": "/api/guild(.*)", "destination": "/api/guild$1" }
   ],
   "crons": [
     {

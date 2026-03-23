@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guilds - Wynncraft Database</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'common': '#FFFFFF',
+            'uncommon': '#22C55E',
+            'rare': '#3B82F6',
+            'epic': '#A855F7',
+            'legendary': '#F97316',
+            'fabled': '#EF4444',
+            'mythic': '#EC4899',
+          }
+        }
+      }
+    }
+  </script>
+  
+  <style>
+    :root {
+      --game-bg: rgba(20, 8, 30, 0.9);
+      --game-border: rgba(120, 68, 190, 0.7);
+      --game-border-soft: rgba(120, 68, 190, 0.35);
+      --game-text: #e8e4ef;
+      --game-muted: #9ca3af;
+      --game-accent: #8f5fd8;
+      --game-accent-strong: #a774ff;
+    }
+
+    body {
+      background:
+        radial-gradient(circle at 15% 15%, rgba(118, 63, 186, 0.14), transparent 36%),
+        radial-gradient(circle at 85% 10%, rgba(44, 232, 255, 0.1), transparent 30%),
+        linear-gradient(180deg, #1a1a1a 0%, #111 100%);
+      color: var(--game-text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    }
+
+    .hero-title {
+      font-size: 2.5rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #fff 0%, #a78bfa 50%, #818cf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .theme-panel {
+      background: linear-gradient(180deg, rgba(39, 18, 57, 0.95), rgba(27, 12, 42, 0.95));
+      border: 1px solid var(--game-border-soft);
+      box-shadow: inset 0 0 0 1px rgba(73, 38, 102, 0.55);
+    }
+
+    .theme-btn {
+      background: linear-gradient(180deg, rgba(60, 60, 60, 0.95), rgba(45, 45, 45, 0.95));
+      border: 1px solid rgba(80, 80, 80, 0.5);
+      color: var(--game-text);
+      transition: all 180ms ease;
+    }
+
+    .theme-btn:hover {
+      border-color: var(--game-accent);
+      transform: translateY(-2px);
+    }
+
+    .theme-btn-primary {
+      background: linear-gradient(180deg, rgba(130, 75, 206, 0.95), rgba(96, 52, 165, 0.95));
+      border: 1px solid rgba(180, 132, 255, 0.6);
+      color: #fff;
+    }
+
+    .theme-btn-primary:hover {
+      background: linear-gradient(180deg, rgba(147, 93, 224, 1), rgba(109, 62, 181, 1));
+      border-color: rgba(200, 160, 255, 0.8);
+      transform: translateY(-2px);
+    }
+  </style>
+</head>
+<body class="text-gray-100 min-h-screen flex flex-col">
+  
+  <!-- Header -->
+  <header class="bg-[rgba(22,22,22,0.98)] border-b border-[rgba(50,50,50,0.5)] sticky top-0 z-50">
+    <div class="container mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <a href="/" class="flex items-center gap-3 cursor-pointer">
+          <svg class="w-8 h-8 text-violet-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14.5 17.5L3 6V3h3l11.5 11.5M13 19l6-6M15 21l6-6M19 3l2 2-9.5 9.5-2-2L19 3z"/>
+          </svg>
+          <div>
+            <h1 class="text-xl font-bold text-white tracking-tight">Wynncraft Database</h1>
+            <p class="text-xs text-gray-500 -mt-1">Guild Tracker</p>
+          </div>
+        </a>
+      </div>
+      <nav class="flex items-center gap-4">
+        <a href="/item" class="text-gray-400 hover:text-white transition-colors text-sm font-medium">Items</a>
+        <a href="/guild" class="text-white font-semibold text-sm font-medium">Guilds</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="flex-1 container mx-auto px-4 py-8">
+    <div class="max-w-4xl mx-auto">
+      
+      <!-- Guild Search -->
+      <div class="theme-panel p-6 rounded-xl mb-6">
+        <h2 class="hero-title mb-3 text-center">Guild Tracker</h2>
+        <p class="text-gray-400 text-center mb-6">Search for a guild and track their XP or war progress</p>
+        
+        <div class="flex gap-4">
+          <input 
+            type="text" 
+            id="guildSearchInput" 
+            placeholder="Enter exact guild name..."
+            class="flex-1 bg-[rgba(26,12,40,0.95)] border border-[rgba(143,95,216,0.45)] rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-violet-500 focus:outline-none"
+          >
+          <button id="guildSearchBtn" class="theme-btn-primary px-6 py-3 rounded-lg font-medium">
+            Search
+          </button>
+        </div>
+      </div>
+
+      <!-- Guild Result -->
+      <div id="guildResult" class="hidden theme-panel p-6 rounded-xl mb-6">
+        <div class="flex justify-between items-start mb-4">
+          <div>
+            <h3 class="text-2xl font-bold text-white" id="guildName">Guild Name</h3>
+            <p class="text-violet-400" id="guildPrefix">[PREFIX]</p>
+          </div>
+          <button id="trackGuildBtn" class="theme-btn px-4 py-2 rounded-lg text-sm">
+            📌 Track Guild
+          </button>
+        </div>
+        
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+          <div class="bg-gray-800/50 p-4 rounded-lg text-center">
+            <div class="text-2xl font-bold text-yellow-400" id="guildLevel">0</div>
+            <div class="text-gray-500 text-sm">Level</div>
+          </div>
+          <div class="bg-gray-800/50 p-4 rounded-lg text-center">
+            <div class="text-2xl font-bold text-red-400" id="guildWars">0</div>
+            <div class="text-gray-500 text-sm">Wars</div>
+          </div>
+          <div class="bg-gray-800/50 p-4 rounded-lg text-center">
+            <div class="text-2xl font-bold text-green-400" id="guildTerritories">0</div>
+            <div class="text-gray-500 text-sm">Territories</div>
+          </div>
+          <div class="bg-gray-800/50 p-4 rounded-lg text-center">
+            <div class="text-2xl font-bold text-blue-400" id="guildMembers">0</div>
+            <div class="text-gray-500 text-sm">Members</div>
+          </div>
+        </div>
+
+        <!-- XP Display -->
+        <div class="bg-gray-800/50 p-4 rounded-lg mb-4">
+          <div class="flex justify-between items-center">
+            <span class="text-gray-400">XP Progress</span>
+            <span class="text-xl font-bold text-violet-400" id="guildXp">0%</span>
+          </div>
+        </div>
+
+        <!-- Event Tracker -->
+        <div class="border-t border-gray-700 pt-4 mt-4">
+          <h4 class="text-gray-400 uppercase text-xs tracking-widest font-semibold mb-3">Event Tracker</h4>
+          
+          <!-- Track Type Selection -->
+          <div class="flex gap-2 mb-4">
+            <button id="trackXpBtn" class="theme-btn px-4 py-2 rounded-lg text-sm flex-1">Track XP</button>
+            <button id="trackWarsBtn" class="theme-btn px-4 py-2 rounded-lg text-sm flex-1">Track Wars</button>
+          </div>
+          
+          <!-- Active Event -->
+          <div id="activeEventSection" class="hidden mb-4">
+            <div class="bg-green-900/20 border border-green-500/30 rounded-lg p-4">
+              <div class="flex justify-between items-center mb-2">
+                <span class="text-green-400 font-medium">Event in Progress</span>
+                <span class="text-gray-400 text-sm" id="eventDuration">0h 0m</span>
+              </div>
+              <div class="grid grid-cols-2 gap-4 mb-3">
+                <div>
+                  <span class="text-gray-500 text-sm">Start Value</span>
+                  <div class="text-lg font-bold text-white" id="eventStartValue">0</div>
+                </div>
+                <div>
+                  <span class="text-gray-500 text-sm">Current Value</span>
+                  <div class="text-lg font-bold text-white" id="eventCurrentValue">0</div>
+                </div>
+              </div>
+              <div class="text-center mb-3">
+                <span class="text-gray-500 text-sm">Delta: </span>
+                <span class="text-xl font-bold text-green-400" id="eventDelta">+0</span>
+              </div>
+              <div class="flex gap-2">
+                <button id="refreshEventBtn" class="theme-btn px-4 py-2 rounded-lg text-sm flex-1">🔄 Refresh</button>
+                <button id="endEventBtn" class="theme-btn px-4 py-2 rounded-lg text-sm flex-1 bg-red-900/30 border-red-500/50 hover:border-red-500">⏹️ End Event</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- No Active Event -->
+          <div id="noActiveEventSection">
+            <p class="text-gray-500 text-sm text-center mb-2">Select a track type above and click Start to begin tracking</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- No Result -->
+      <div id="noResult" class="hidden theme-panel p-6 rounded-xl mb-6 text-center">
+        <div class="text-4xl mb-3">🔍</div>
+        <h3 class="text-xl font-bold text-white mb-2">Guild Not Found</h3>
+        <p class="text-gray-400">No guild with that name was found. Please check the spelling.</p>
+      </div>
+
+      <!-- Tracked Guilds -->
+      <div class="theme-panel p-6 rounded-xl mb-6">
+        <h3 class="text-gray-400 uppercase text-xs tracking-widest font-semibold mb-4">Tracked Guilds</h3>
+        <div id="trackedGuildsList" class="space-y-2">
+          <p class="text-gray-500 text-sm text-center py-4" id="noTrackedGuilds">No guilds tracked yet. Search for a guild and click "Track Guild".</p>
+        </div>
+      </div>
+
+      <!-- Event History -->
+      <div class="theme-panel p-6 rounded-xl">
+        <h3 class="text-gray-400 uppercase text-xs tracking-widest font-semibold mb-4">Event History</h3>
+        <div id="eventHistoryList" class="space-y-2">
+          <p class="text-gray-500 text-sm text-center py-4" id="noEventHistory">No events recorded yet.</p>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-[rgba(22,22,22,0.98)] border-t border-[rgba(50,50,50,0.5)] mt-auto">
+    <div class="container mx-auto px-4 py-6 text-center">
+      <p class="text-gray-500 text-sm">Not affiliated with Wynncraft Industries.</p>
+    </div>
+  </footer>
+
+  <script type="module" src="guilds.js"></script>
+</body>
+</html>
