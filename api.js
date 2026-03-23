@@ -301,12 +301,16 @@ export async function fetchFilteredItems(options = {}, onProgress) {
 export async function quickSearch(query) {
   const url = buildUrl(`${API_BASE}/quick`);
   url.searchParams.set('query', query);
+  console.log('[DEBUG] quickSearch URL:', url.toString());
 
   const response = await fetch(url.toString());
+  console.log('[DEBUG] quickSearch response status:', response.status);
   if (!response.ok) {
     throw new Error(`API Error: ${response.status}`);
   }
-  return await response.json();
+  const data = await response.json();
+  console.log('[DEBUG] quickSearch response keys:', Object.keys(data));
+  return data;
 }
 
 /**

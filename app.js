@@ -610,7 +610,9 @@ async function loadItemsForCategory(category) {
   
   try {
     showLoadingOverlay(50, 1, 0, 'Fetching from API...');
+    console.log('[DEBUG] Searching for:', category);
     const searchResult = await quickSearch(category);
+    console.log('[DEBUG] Raw search result keys:', Object.keys(searchResult));
     
     if (loadingCancelled) {
       showSearchPanel();
@@ -618,6 +620,7 @@ async function loadItemsForCategory(category) {
     }
     
     let items = Object.entries(searchResult).map(([name, item]) => ({ name, ...item }));
+    console.log('[DEBUG] Total items from search:', items.length);
     
     items = items.filter(item => {
       if (category === 'weapon' && item.type === 'weapon') {
@@ -638,6 +641,7 @@ async function loadItemsForCategory(category) {
       }
       return false;
     });
+    console.log('[DEBUG] Items after type filter:', items.length);
     
     if (filters.tier) {
       items = items.filter(item => item.rarity?.toLowerCase() === filters.tier.toLowerCase());
@@ -652,6 +656,7 @@ async function loadItemsForCategory(category) {
     
     allLoadedItems = items;
     filteredItems = [...allLoadedItems];
+    console.log('[DEBUG] Final items count:', filteredItems.length);
     
     showLoadingOverlay(100, 1, 1, 'Complete!');
     
