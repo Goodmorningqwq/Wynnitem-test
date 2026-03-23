@@ -21,7 +21,7 @@ function setCurrentUser(username) {
 function logout() {
   localStorage.removeItem('currentUser');
   currentUser = null;
-  window.location.href = '/login';
+  window.location.href = '/guild';
 }
 
 async function loadUserData() {
