@@ -21,7 +21,7 @@ function setCurrentUser(username) {
 function logout() {
   localStorage.removeItem('currentUser');
   currentUser = null;
-  showAuthSection();
+  window.showAuthSection();
 }
 
 async function loadUserData() {
@@ -606,21 +606,21 @@ document.addEventListener('DOMContentLoaded', () => {
   // Check if user is logged in
   currentUser = getCurrentUser();
   if (currentUser) {
-    showLoggedInUI();
+    window.showLoggedInUI();
   } else {
-    showAuthSection();
+    window.showAuthSection();
   }
 
-  function showAuthSection() {
+  window.showAuthSection = function() {
     authSection.classList.remove('hidden');
     userMenu.classList.add('hidden');
     searchSection.classList.add('hidden');
     userDashboard.classList.add('hidden');
     isRegisterMode = false;
     updateAuthUI();
-  }
+  };
 
-  function showLoggedInUI() {
+  window.showLoggedInUI = function() {
     authSection.classList.add('hidden');
     userMenu.classList.remove('hidden');
     searchSection.classList.remove('hidden');
@@ -628,7 +628,7 @@ document.addEventListener('DOMContentLoaded', () => {
     userDisplayName.textContent = currentUser;
     
     loadUserDashboard();
-  }
+  };
 
   function updateAuthUI() {
     authTitle.textContent = isRegisterMode ? 'Register' : 'Login';
@@ -724,7 +724,7 @@ document.addEventListener('DOMContentLoaded', () => {
       await loginUser(username, password);
       setCurrentUser(username);
       currentUser = username;
-      showLoggedInUI();
+      window.showLoggedInUI();
     } catch (e) {
       authError.textContent = e.message;
       authError.classList.remove('hidden');
