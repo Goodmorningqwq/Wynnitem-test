@@ -29,6 +29,20 @@ function escapeHtml(value) {
   return div.innerHTML;
 }
 
+function debugLog(runId, hypothesisId, location, message, data) {
+  const payload = {
+    sessionId: '0353be',
+    runId,
+    hypothesisId,
+    location,
+    message,
+    data,
+    timestamp: Date.now()
+  };
+  console.debug('[agent-debug]', payload);
+  fetch('http://127.0.0.1:7649/ingest/d9a33132-748f-4430-83b4-30759d15d7c7',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0353be'},body:JSON.stringify(payload)}).catch(()=>{});
+}
+
 async function loadUserData() {
   if (!currentUser) return null;
   try {
@@ -182,7 +196,7 @@ function renderMembersList(players) {
   listEl.innerHTML = players.map((player) => `
     <div class="flex justify-between items-center bg-gray-800/30 px-3 py-2 rounded text-sm">
       <span class="text-white font-medium">${escapeHtml(player.username)}</span>
-      <span class="text-gray-400">${Number(player.contributed).toLocaleString()} XP${showWars ? ` · ${player.wars == null ? '...' : Number(player.wars).toLocaleString()} Wars` : ''}</span>
+      <span class="text-gray-400">${Number(player.contributed).toLocaleString()} XP${showWars ? ` · ${player.wars == null ? '...' : Number(player.wars).toLocaleString()} Wars` : ' · ... Wars'}</span>
     </div>
   `).join('');
 }
@@ -190,6 +204,9 @@ function renderMembersList(players) {
 function renderPlayerSelection(players) {
   const container = document.getElementById('playerCheckboxes');
   const showWars = showMemberWarsEnabled();
+  // #region agent log
+  debugLog('pre-fix', 'H5', 'guilds-v2.js:renderPlayerSelection', 'rendering player selection wars state', { players: players.length, showWars, resolvedWars: players.filter((p) => p.wars != null).length, placeholderWars: players.filter((p) => p.wars == null).length });
+  // #endregion
   if (!players.length) {
     container.innerHTML = '<p class="text-gray-500 text-sm">No members available</p>';
     return;
@@ -198,7 +215,7 @@ function renderPlayerSelection(players) {
     <label class="flex items-center gap-2 p-2 hover:bg-gray-800/50 rounded cursor-pointer">
       <input type="checkbox" value="${escapeHtml(player.username)}" class="accent-purple-500">
       <span class="text-white text-sm">${escapeHtml(player.username)}</span>
-      <span class="text-gray-500 text-xs ml-auto">${Number(player.contributed).toLocaleString()} XP${showWars ? ` · ${player.wars == null ? '...' : Number(player.wars).toLocaleString()} Wars` : ''}</span>
+      <span class="text-gray-500 text-xs ml-auto">${Number(player.contributed).toLocaleString()} XP${showWars ? ` · ${player.wars == null ? '...' : Number(player.wars).toLocaleString()} Wars` : ' · ... Wars'}</span>
     </label>
   `).join('');
 }
@@ -280,6 +297,9 @@ function getSnapshot(metric, guild, trackedPlayers) {
     const entry = playerMap[username] || { xp: 0, wars: 0 };
     snapshotPlayers[username] = Number(metric === 'wars' ? entry.wars : entry.xp);
   }
+  // #region agent log
+  debugLog('pre-fix', 'H4', 'guilds-v2.js:getSnapshot', 'snapshot metric values computed', { metric, selectedCount: selected.length, samplePlayers: Object.entries(snapshotPlayers).slice(0, 3), guildWars: Number(guild?.wars || 0), guildXp: Number(guild?.xpPercent || 0) });
+  // #endregion
   return {
     metricValue: metric === 'wars' ? Number(guild.wars || 0) : Number(guild.xpPercent || 0),
     playerValues: snapshotPlayers,
@@ -292,12 +312,21 @@ async function fetchMemberWars(uuid) {
   if (memberWarsCache.has(uuid)) return memberWarsCache.get(uuid);
   try {
     const response = await fetch(`https://api.wynncraft.com/v3/player/${encodeURIComponent(uuid)}`);
+    // #region agent log
+    debugLog('pre-fix', 'H3', 'guilds-v2.js:fetchMemberWars:response', 'player endpoint response status', { uuid, ok: response.ok, status: response.status });
+    // #endregion
     if (!response.ok) return null;
     const data = await response.json();
     const wars = Number(data?.globalData?.wars || 0);
+    // #region agent log
+    debugLog('pre-fix', 'H1', 'guilds-v2.js:fetchMemberWars:parsed', 'parsed wars payload fields', { uuid, wars, hasGlobalData: Boolean(data?.globalData), globalDataKeys: data?.globalData ? Object.keys(data.globalData).slice(0, 8) : [] });
+    // #endregion
     memberWarsCache.set(uuid, wars);
     return wars;
   } catch {
+    // #region agent log
+    debugLog('pre-fix', 'H3', 'guilds-v2.js:fetchMemberWars:catch', 'player endpoint fetch threw', { uuid });
+    // #endregion
     return null;
   }
 }
@@ -305,6 +334,9 @@ async function fetchMemberWars(uuid) {
 async function hydrateVisibleMemberWars(guild) {
   const members = collectGuildMembers(guild);
   const targets = members.filter((member) => member.uuid && !memberWarsCache.has(member.uuid));
+  // #region agent log
+  debugLog('pre-fix', 'H2', 'guilds-v2.js:hydrateVisibleMemberWars:targets', 'member uuid coverage', { totalMembers: members.length, targets: targets.length, missingUuid: members.filter((m) => !m.uuid).length });
+  // #endregion
   if (!targets.length) return;
   const CONCURRENCY = 6;
   for (let i = 0; i < targets.length; i += CONCURRENCY) {
