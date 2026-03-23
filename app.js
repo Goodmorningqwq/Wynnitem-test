@@ -1192,18 +1192,5 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.target === itemModal) closeModal();
   });
 
-  document.getElementById('clearCacheBtn')?.addEventListener('click', async () => {
-    if (!confirm('Clear cache and reload data from API?')) return;
-    try {
-      const res = await fetch('/api/item/clear-cache');
-      const data = await res.json();
-      if (data.success) {
-        alert('Cache cleared! Reloading will fetch fresh data.');
-      }
-    } catch (e) {
-      alert('Failed to clear cache: ' + e.message);
-    }
-  });
-
   showSearchPanel();
 });
