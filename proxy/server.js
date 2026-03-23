@@ -237,7 +237,7 @@ app.get('/api/item/quick', async (req, res) => {
       return res.status(upstreamRes.status).json(data);
     }
     
-    setCached(cacheKey, data, 60 * 1000);
+    setCached(cacheKey, data, 24 * 60 * 60 * 1000);
     res.setHeader('X-Cache', 'MISS');
     return res.json(data);
   } catch (e) {

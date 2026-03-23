@@ -24,7 +24,7 @@ module.exports = async function handler(req, res) {
     if (!global.quickCache) global.quickCache = {};
     global.quickCache[cacheKey] = {
       data,
-      expiresAt: Date.now() + 60 * 1000
+      expiresAt: Date.now() + 24 * 60 * 60 * 1000
     };
 
     res.setHeader('X-Cache', 'MISS');

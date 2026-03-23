@@ -1,6 +1,6 @@
 // Main Application Logic
 
-import { cache, filterAndSortItems, filterByCategory, filterByArmourType, fetchItemPages, getAllFetchedItems, clearPageCache, fetchFilteredItems } from './api.js';
+import { cache, filterAndSortItems, filterByCategory, filterByArmourType, fetchItemPages, getAllFetchedItems, clearPageCache, fetchFilteredItems, fetchItemByName, refreshStaleItems } from './api.js';
 
 // App State
 const AppState = {
@@ -772,28 +772,53 @@ function updateCategorySwitchButtons(activeCategory) {
 }
 
 // Modal Functions
-function showItemModal(name, item) {
+async function showItemModal(name, item) {
   if (!name && !item) return;
   
   const itemName = name || item?.name || 'Unknown Item';
-  const rarity = item?.rarity || 'common';
+  
+  let itemData = item;
+  if (!itemData) {
+    itemData = filteredItems.find(i => i.name === itemName);
+  }
+  
+  if (!itemData) {
+    modalTitle.textContent = itemName;
+    modalTitle.style.color = TIER_COLORS.gray;
+    modalContent.innerHTML = `<div class="text-center py-8"><p class="text-gray-400">Loading item details...</p></div>`;
+    itemModal.classList.remove('hidden');
+    
+    try {
+      itemData = await fetchItemByName(itemName);
+      if (!itemData) {
+        modalContent.innerHTML = `<div class="text-center py-8"><p class="text-red-400">Item not found</p></div>`;
+        return;
+      }
+    } catch (e) {
+      console.error('Failed to fetch item:', e);
+      modalContent.innerHTML = `<div class="text-center py-8"><p class="text-red-400">Failed to load item: ${escapeHtml(e.message)}</p></div>`;
+      return;
+    }
+  }
+  
+  const rarity = itemData?.rarity || 'common';
   const tierStyle = getTierStyle(rarity);
-  const categoryIcon = item ? getItemCategory(item) : '';
-  const stats = item ? getItemStats(item) : null;
-  const reqs = item ? getRequirements(item) : {};
-  const skillPoints = item ? getSkillPointIds(item) : {};
-  const otherIds = item ? getOtherIds(item) : {};
+  const categoryIcon = getItemCategory(itemData);
+  const stats = getItemStats(itemData);
+  const reqs = getRequirements(itemData);
+  const skillPoints = getSkillPointIds(itemData);
+  const otherIds = getOtherIds(itemData);
   const orderedReqs = getOrderedRequirements(reqs);
   const orderedSkillPoints = getOrderedSkillPoints(skillPoints);
-  const orderedElemental = stats ? getOrderedElementDamages(stats.elementalDamages) : [];
+  const orderedElemental = getOrderedElementDamages(stats.elementalDamages);
   const sortedOtherIds = Object.entries(otherIds).sort((a, b) => formatIdName(a[0]).localeCompare(formatIdName(b[0])));
   
   modalTitle.textContent = itemName;
   modalTitle.style.color = tierStyle.textColor;
 
-  const weaponTypeLabel = item?.weaponType ? item.weaponType.charAt(0).toUpperCase() + item.weaponType.slice(1) : null;
-  const armorTypeLabel = item?.armourType ? item.armourType.charAt(0).toUpperCase() + item.armourType.slice(1) : null;
-  const typeLabel = weaponTypeLabel || armorTypeLabel || item?.type || 'Unknown';
+  const weaponTypeLabel = itemData?.weaponType ? itemData.weaponType.charAt(0).toUpperCase() + itemData.weaponType.slice(1) : null;
+  const armorTypeLabel = itemData?.armourType ? itemData.armourType.charAt(0).toUpperCase() + itemData.armourType.slice(1) : null;
+  const typeLabel = weaponTypeLabel || armorTypeLabel || itemData?.type || 'Unknown';
 
   let html = `<div class="space-y-4 max-h-[80vh] overflow-y-auto pr-2 text-sm">`;
 
@@ -812,130 +837,124 @@ function showItemModal(name, item) {
       </div>
     </div>`;
 
-  if (item) {
-    html += `<div class="space-y-3">`;
-    
-    if (stats.isWeapon) {
-      let weaponStatsHtml = '';
-      if (stats.damage) {
-        weaponStatsHtml += `<div class="stat-row"><span class="text-gray-400">Neutral Damage</span><span class="game-neutral font-bold text-lg">${stats.damage.min}-${stats.damage.max}</span></div>`;
-      }
-      orderedElemental.forEach(el => {
-        weaponStatsHtml += `<div class="stat-row"><span style="color:${el.color}">${el.name} Damage</span><span style="color:${el.color}" class="font-bold">${el.min}-${el.max}</span></div>`;
-      });
-      if (stats.attackSpeed) {
-        weaponStatsHtml += `<div class="stat-row"><span class="text-gray-400">Attack Speed</span><span class="text-gray-300">${escapeHtml(stats.attackSpeed)}</span></div>`;
-      }
-      
-      html += `
-        <div class="game-modal-section p-4">
-          <h3 class="game-section-title mb-3">Attack Stats</h3>
-          <div class="space-y-1">
-            ${weaponStatsHtml}
-          </div>
-        </div>`;
-    } else {
-      html += `
-        <div class="game-modal-section p-4">
-          <h3 class="game-section-title mb-3">Base Stats</h3>
-          <div class="space-y-1">
-            ${stats.baseHealth ? `<div class="stat-row"><span class="text-gray-400">Health</span><span class="game-positive font-bold">+${escapeHtml(stats.baseHealth)}</span></div>` : ''}
-            ${stats.armorType ? `<div class="stat-row"><span class="text-gray-400">Armor Type</span><span class="text-gray-300 capitalize">${escapeHtml(stats.armorType)}</span></div>` : ''}
-          </div>
-        </div>`;
+  html += `<div class="space-y-3">`;
+  
+  if (stats.isWeapon) {
+    let weaponStatsHtml = '';
+    if (stats.damage) {
+      weaponStatsHtml += `<div class="stat-row"><span class="text-gray-400">Neutral Damage</span><span class="game-neutral font-bold text-lg">${stats.damage.min}-${stats.damage.max}</span></div>`;
+    }
+    orderedElemental.forEach(el => {
+      weaponStatsHtml += `<div class="stat-row"><span style="color:${el.color}">${el.name} Damage</span><span style="color:${el.color}" class="font-bold">${el.min}-${el.max}</span></div>`;
+    });
+    if (stats.attackSpeed) {
+      weaponStatsHtml += `<div class="stat-row"><span class="text-gray-400">Attack Speed</span><span class="text-gray-300">${escapeHtml(stats.attackSpeed)}</span></div>`;
     }
     
-    if (orderedReqs.length > 0 || stats.level) {
-      html += `
-        <div class="game-modal-section p-4">
-          <h3 class="game-section-title mb-3">Requirements</h3>
-          <div class="space-y-1">`;
-      
-      if (stats.level) {
-        html += `<div class="stat-row"><span class="text-gray-400">Combat Level</span><span class="text-gray-300 font-semibold">${escapeHtml(stats.level)}</span></div>`;
-      }
-      html += `<div class="stat-row"><span class="text-gray-400">Class</span><span class="class-badge capitalize">${escapeHtml(stats.classReq)}</span></div>`;
-      orderedReqs.forEach(([key, value]) => {
-        html += `<div class="stat-row"><span class="text-gray-400">${formatRequirementLabel(key)}</span><span class="text-gray-300">${escapeHtml(value)}</span></div>`;
-      });
-      
-      html += `</div></div>`;
-    }
-    
-    if (orderedSkillPoints.length > 0) {
-      html += `
-        <div class="game-modal-section p-4">
-          <h3 class="game-section-title mb-3">Skill Points</h3>
-          <div class="grid grid-cols-2 gap-2">`;
-
-      orderedSkillPoints.forEach(([key, value]) => {
-        const plus = value > 0 ? '+' : '';
-        html += `
-          <div class="bg-gray-800/50 p-3 rounded-lg border border-gray-700/30">
-            <div class="text-gray-400 text-xs mb-1">${escapeHtml(formatIdName(key))}</div>
-            <div class="${getSignedClass(value)} text-lg font-bold">${plus}${escapeHtml(value)}</div>
-          </div>`;
-      });
-
-      html += `</div></div>`;
-    }
-
-    if (sortedOtherIds.length > 0) {
-      html += `
-        <div class="game-modal-section p-4">
-          <h3 class="game-section-title mb-3">Identifications</h3>
-          <div class="grid gap-2">`;
-
-      sortedOtherIds.forEach(([key, value]) => {
-        html += `
-          <div class="bg-gray-800/50 p-3 rounded-lg border border-gray-700/30 flex justify-between items-center">
-            <span class="text-gray-300 capitalize">${escapeHtml(formatIdName(key))}</span>
-            <span class="${getSignedIdClass(value)} font-semibold">${escapeHtml(formatIdDisplayRange(value))}</span>
-          </div>`;
-      });
-      
-      html += `</div></div>`;
-    }
-    
-    if (item.majorIds && Object.keys(item.majorIds).length > 0) {
-      html += `
-        <div class="game-modal-section p-4" style="border-left: 3px solid var(--game-cyan);">
-          <h3 class="game-section-title game-cyan mb-3">Major Identifications</h3>
-          <div class="space-y-2">`;
-      
-      Object.entries(item.majorIds).forEach(([key, value]) => {
-        html += `
-          <div class="bg-gray-800/50 p-3 rounded-lg border border-gray-700/30">
-            <div class="game-cyan font-bold mb-1">+${escapeHtml(key)}</div>
-            <p class="text-gray-400 text-sm">${escapeHtml(value)}</p>
-          </div>`;
-      });
-      
-      html += `</div></div>`;
-    }
-
     html += `
       <div class="game-modal-section p-4">
-        <h3 class="game-section-title mb-3">Details</h3>
-        <div class="space-y-2">
-          <div class="stat-row"><span class="text-gray-400">Powder Slots</span><span class="text-gray-300">[${stats.powderSlots}/3]</span></div>
+        <h3 class="game-section-title mb-3">Attack Stats</h3>
+        <div class="space-y-1">
+          ${weaponStatsHtml}
         </div>
       </div>`;
-
-    if (item.lore) {
-      html += `
-        <div class="p-4 border-l-2 border-gray-600" style="background: rgba(30,30,30,0.5);">
-          <div class="text-gray-500 text-xs uppercase tracking-wider mb-2">Lore</div>
-          <p class="text-gray-400 italic leading-relaxed text-sm">${escapeHtml(item.lore.replace(/§./g, ''))}</p>
-        </div>`;
-    }
-    
-    html += `</div>`;
-    
   } else {
-    html += `<div class="text-center py-8"><p class="text-gray-400">Loading item details...</p></div>`;
+    html += `
+      <div class="game-modal-section p-4">
+        <h3 class="game-section-title mb-3">Base Stats</h3>
+        <div class="space-y-1">
+          ${stats.baseHealth ? `<div class="stat-row"><span class="text-gray-400">Health</span><span class="game-positive font-bold">+${escapeHtml(stats.baseHealth)}</span></div>` : ''}
+          ${stats.armorType ? `<div class="stat-row"><span class="text-gray-400">Armor Type</span><span class="text-gray-300 capitalize">${escapeHtml(stats.armorType)}</span></div>` : ''}
+        </div>
+      </div>`;
   }
   
+  if (orderedReqs.length > 0 || stats.level) {
+    html += `
+      <div class="game-modal-section p-4">
+        <h3 class="game-section-title mb-3">Requirements</h3>
+        <div class="space-y-1">`;
+    
+    if (stats.level) {
+      html += `<div class="stat-row"><span class="text-gray-400">Combat Level</span><span class="text-gray-300 font-semibold">${escapeHtml(stats.level)}</span></div>`;
+    }
+    html += `<div class="stat-row"><span class="text-gray-400">Class</span><span class="class-badge capitalize">${escapeHtml(stats.classReq)}</span></div>`;
+    orderedReqs.forEach(([key, value]) => {
+      html += `<div class="stat-row"><span class="text-gray-400">${formatRequirementLabel(key)}</span><span class="text-gray-300">${escapeHtml(value)}</span></div>`;
+    });
+    
+    html += `</div></div>`;
+  }
+  
+  if (orderedSkillPoints.length > 0) {
+    html += `
+      <div class="game-modal-section p-4">
+        <h3 class="game-section-title mb-3">Skill Points</h3>
+        <div class="grid grid-cols-2 gap-2">`;
+
+    orderedSkillPoints.forEach(([key, value]) => {
+      const plus = value > 0 ? '+' : '';
+      html += `
+        <div class="bg-gray-800/50 p-3 rounded-lg border border-gray-700/30">
+          <div class="text-gray-400 text-xs mb-1">${escapeHtml(formatIdName(key))}</div>
+          <div class="${getSignedClass(value)} text-lg font-bold">${plus}${escapeHtml(value)}</div>
+        </div>`;
+    });
+
+    html += `</div></div>`;
+  }
+
+  if (sortedOtherIds.length > 0) {
+    html += `
+      <div class="game-modal-section p-4">
+        <h3 class="game-section-title mb-3">Identifications</h3>
+        <div class="grid gap-2">`;
+
+    sortedOtherIds.forEach(([key, value]) => {
+      html += `
+        <div class="bg-gray-800/50 p-3 rounded-lg border border-gray-700/30 flex justify-between items-center">
+          <span class="text-gray-300 capitalize">${escapeHtml(formatIdName(key))}</span>
+          <span class="${getSignedIdClass(value)} font-semibold">${escapeHtml(formatIdDisplayRange(value))}</span>
+        </div>`;
+    });
+    
+    html += `</div></div>`;
+  }
+  
+  if (itemData.majorIds && Object.keys(itemData.majorIds).length > 0) {
+    html += `
+      <div class="game-modal-section p-4" style="border-left: 3px solid var(--game-cyan);">
+        <h3 class="game-section-title game-cyan mb-3">Major Identifications</h3>
+        <div class="space-y-2">`;
+    
+    Object.entries(itemData.majorIds).forEach(([key, value]) => {
+      html += `
+        <div class="bg-gray-800/50 p-3 rounded-lg border border-gray-700/30">
+          <div class="game-cyan font-bold mb-1">+${escapeHtml(key)}</div>
+          <p class="text-gray-400 text-sm">${escapeHtml(value)}</p>
+        </div>`;
+    });
+    
+    html += `</div></div>`;
+  }
+
+  html += `
+    <div class="game-modal-section p-4">
+      <h3 class="game-section-title mb-3">Details</h3>
+      <div class="space-y-2">
+        <div class="stat-row"><span class="text-gray-400">Powder Slots</span><span class="text-gray-300">[${stats.powderSlots}/3]</span></div>
+      </div>
+    </div>`;
+
+  if (itemData.lore) {
+    html += `
+      <div class="p-4 border-l-2 border-gray-600" style="background: rgba(30,30,30,0.5);">
+        <div class="text-gray-500 text-xs uppercase tracking-wider mb-2">Lore</div>
+        <p class="text-gray-400 italic leading-relaxed text-sm">${escapeHtml(itemData.lore.replace(/§./g, ''))}</p>
+      </div>`;
+  }
+  
+  html += `</div>`;
   html += `</div>`;
   
   modalContent.innerHTML = html;
@@ -1186,4 +1205,8 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   showSearchPanel();
+  
+  setTimeout(() => {
+    refreshStaleItems();
+  }, 5000);
 });
