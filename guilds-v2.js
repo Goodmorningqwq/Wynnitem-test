@@ -95,12 +95,12 @@ function collectGuildMembers(guild) {
   const players = [];
   for (const rank of ranks) {
     if (!guild.members[rank]) continue;
-    for (const [, member] of Object.entries(guild.members[rank])) {
+    for (const [memberUuid, member] of Object.entries(guild.members[rank])) {
       players.push({
-        uuid: member.uuid || null,
+        uuid: member.uuid || memberUuid || null,
         username: member.username,
         contributed: Number(member.contributed || 0),
-        wars: memberWarsCache.get(member.uuid || '') ?? null
+        wars: memberWarsCache.get(member.uuid || memberUuid || '') ?? null
       });
     }
   }
