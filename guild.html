@@ -215,11 +215,14 @@
             <h3 class="text-2xl font-bold text-white" id="guildName">Guild Name</h3>
             <p class="text-violet-400" id="guildPrefix">[PREFIX]</p>
           </div>
-          <button id="trackGuildBtn" class="theme-btn px-4 py-2 rounded-lg text-sm">
-            Select Players
-          </button>
+          <div class="flex gap-2">
+            <button id="toggleGuildResultBtn" class="theme-btn px-4 py-2 rounded-lg text-sm">Minimize</button>
+            <button id="trackGuildBtn" class="theme-btn px-4 py-2 rounded-lg text-sm">
+              Select Players
+            </button>
+          </div>
         </div>
-        
+        <div id="guildResultBody">
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
           <div class="bg-gray-800/50 p-4 rounded-lg text-center">
             <div class="text-2xl font-bold text-yellow-400" id="guildLevel">0</div>
@@ -325,11 +328,11 @@
               <div id="eventInfo">
                 <div class="grid grid-cols-2 gap-4 mb-3">
                   <div>
-                    <span class="text-gray-500 text-sm">Start Value</span>
+                    <span class="text-gray-500 text-sm" id="eventStartLabel">Start Value</span>
                     <div class="text-lg font-bold text-white" id="eventStartValue">0</div>
                   </div>
                   <div>
-                    <span class="text-gray-500 text-sm">Current Value</span>
+                    <span class="text-gray-500 text-sm" id="eventCurrentLabel">Current Value</span>
                     <div class="text-lg font-bold text-white" id="eventCurrentValue">0</div>
                   </div>
                 </div>
@@ -361,6 +364,7 @@
           <div id="noActiveEventSection">
             <p class="text-gray-500 text-sm text-center mb-2">Set metric and scope, then start an event to begin tracking.</p>
           </div>
+        </div>
         </div>
       </div>
 

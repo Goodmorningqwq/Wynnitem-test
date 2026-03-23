@@ -7,6 +7,7 @@ let currentGuild = null;
 let activeEvent = null;
 let cooldownTimerId = null;
 const memberWarsCache = new Map();
+let guildResultCollapsed = false;
 
 function getCurrentUser() {
   try {
@@ -131,6 +132,12 @@ function formatMetric(metric) {
   return metric === 'wars' ? 'Wars' : 'Guild XP';
 }
 
+function formatWarsSuffix(showWars, wars) {
+  if (!showWars) return ' · ... Wars';
+  if (wars == null) return ' · ⏳ Loading wars';
+  return ` · ${Number(wars).toLocaleString()} Wars`;
+}
+
 function showMemberWarsEnabled() {
   const toggle = document.getElementById('showMemberWarsToggle');
   return Boolean(toggle?.checked);
@@ -194,6 +201,15 @@ function displayGuild(guild) {
 
   guildResult.classList.remove('hidden');
   noResult.classList.add('hidden');
+  updateGuildResultCollapseUI();
+}
+
+function updateGuildResultCollapseUI() {
+  const body = document.getElementById('guildResultBody');
+  const toggleBtn = document.getElementById('toggleGuildResultBtn');
+  if (!body || !toggleBtn) return;
+  body.classList.toggle('hidden', guildResultCollapsed);
+  toggleBtn.textContent = guildResultCollapsed ? 'Expand' : 'Minimize';
 }
 
 function renderMembersList(players) {
@@ -206,7 +222,7 @@ function renderMembersList(players) {
   listEl.innerHTML = players.map((player) => `
     <div class="flex justify-between items-center bg-gray-800/30 px-3 py-2 rounded text-sm">
       <span class="text-white font-medium">${escapeHtml(player.username)}</span>
-      <span class="text-gray-400">${Number(player.contributed).toLocaleString()} XP${showWars ? ` · ${player.wars == null ? '...' : Number(player.wars).toLocaleString()} Wars` : ' · ... Wars'}</span>
+      <span class="text-gray-400">${Number(player.contributed).toLocaleString()} XP${formatWarsSuffix(showWars, player.wars)}</span>
     </div>
   `).join('');
 }
@@ -225,7 +241,7 @@ function renderPlayerSelection(players) {
     <label class="flex items-center gap-2 p-2 hover:bg-gray-800/50 rounded cursor-pointer">
       <input type="checkbox" value="${escapeHtml(player.username)}" class="accent-purple-500">
       <span class="text-white text-sm">${escapeHtml(player.username)}</span>
-      <span class="text-gray-500 text-xs ml-auto">${Number(player.contributed).toLocaleString()} XP${showWars ? ` · ${player.wars == null ? '...' : Number(player.wars).toLocaleString()} Wars` : ' · ... Wars'}</span>
+      <span class="text-gray-500 text-xs ml-auto">${Number(player.contributed).toLocaleString()} XP${formatWarsSuffix(showWars, player.wars)}</span>
     </label>
   `).join('');
 }
@@ -310,7 +326,7 @@ function getSnapshot(metric, guild, trackedPlayers, scope = 'selected') {
   const selectedTotal = Object.values(snapshotPlayers).reduce((sum, value) => sum + Number(value || 0), 0);
   const metricValue = metric === 'wars'
     ? (scope === 'selected' ? selectedTotal : Number(guild.wars || 0))
-    : Number(guild.xpPercent || 0);
+    : (scope === 'selected' ? selectedTotal : Number(guild.xpPercent || 0));
   if (metric === 'wars') {
     // #region agent log
     console.log('[wars-snapshot]', {
@@ -334,9 +350,9 @@ function getSnapshot(metric, guild, trackedPlayers, scope = 'selected') {
   };
 }
 
-async function fetchMemberWars(uuid) {
+async function fetchMemberWars(uuid, forceRefresh = false) {
   if (!uuid) return null;
-  if (memberWarsCache.has(uuid)) return memberWarsCache.get(uuid);
+  if (!forceRefresh && memberWarsCache.has(uuid)) return memberWarsCache.get(uuid);
   try {
     const response = await fetch(`/api/player/wars?uuid=${encodeURIComponent(uuid)}`);
     // #region agent log
@@ -358,9 +374,15 @@ async function fetchMemberWars(uuid) {
   }
 }
 
-async function hydrateVisibleMemberWars(guild) {
+async function hydrateVisibleMemberWars(guild, forceRefresh = false, usernames = null) {
   const members = collectGuildMembers(guild);
-  const targets = members.filter((member) => member.uuid && !memberWarsCache.has(member.uuid));
+  const wantedUsernames = Array.isArray(usernames) ? new Set(usernames) : null;
+  const targets = members.filter((member) => {
+    if (!member.uuid) return false;
+    if (wantedUsernames && !wantedUsernames.has(member.username)) return false;
+    if (forceRefresh) return true;
+    return !memberWarsCache.has(member.uuid);
+  });
   // #region agent log
   debugLog('pre-fix', 'H2', 'guilds-v2.js:hydrateVisibleMemberWars:targets', 'member uuid coverage', { totalMembers: members.length, targets: targets.length, missingUuid: members.filter((m) => !m.uuid).length });
   // #endregion
@@ -368,7 +390,7 @@ async function hydrateVisibleMemberWars(guild) {
   const CONCURRENCY = 6;
   for (let i = 0; i < targets.length; i += CONCURRENCY) {
     const chunk = targets.slice(i, i + CONCURRENCY);
-    await Promise.all(chunk.map((member) => fetchMemberWars(member.uuid)));
+    await Promise.all(chunk.map((member) => fetchMemberWars(member.uuid, forceRefresh)));
   }
 }
 
@@ -429,11 +451,16 @@ function renderTrackedPlayersInfo(players) {
     container.innerHTML = '<p class="text-gray-500 text-sm">No selected players saved.</p>';
     return;
   }
-  container.innerHTML = players.map((username) => `
+  const maxPreview = 5;
+  const visiblePlayers = players.slice(0, maxPreview);
+  const remaining = Math.max(0, players.length - visiblePlayers.length);
+  container.innerHTML = visiblePlayers.map((username) => `
     <div class="bg-gray-800/50 rounded p-2 text-sm inline-block mr-2 mb-2">
       <span class="text-white font-medium">${escapeHtml(username)}</span>
     </div>
-  `).join('');
+  `).join('') + (remaining > 0
+    ? `<div class="bg-gray-800/40 rounded p-2 text-sm inline-block mr-2 mb-2"><span class="text-gray-300 font-medium">... +${remaining} more</span></div>`
+    : '');
 }
 
 function renderEventPlayerBreakdown(event) {
@@ -507,6 +534,20 @@ function renderActiveEvent() {
   document.getElementById('dashboardEventMetric').textContent = formatMetric(activeEvent.metric);
   document.getElementById('eventScope').textContent = formatScope(activeEvent.scope);
   document.getElementById('dashboardEventScope').textContent = formatScope(activeEvent.scope);
+  const startLabelEl = document.getElementById('eventStartLabel');
+  const currentLabelEl = document.getElementById('eventCurrentLabel');
+  if (startLabelEl && currentLabelEl) {
+    if (activeEvent.metric === 'wars') {
+      startLabelEl.textContent = 'Total Wars (Start)';
+      currentLabelEl.textContent = 'Total Wars (Now)';
+    } else if (activeEvent.metric === 'xp') {
+      startLabelEl.textContent = activeEvent.scope === 'selected' ? 'Total Player XP (Start)' : 'Guild XP % (Start)';
+      currentLabelEl.textContent = activeEvent.scope === 'selected' ? 'Total Player XP (Now)' : 'Guild XP % (Now)';
+    } else {
+      startLabelEl.textContent = 'Start Value';
+      currentLabelEl.textContent = 'Current Value';
+    }
+  }
   document.getElementById('eventStartValue').textContent = startValue.toLocaleString();
   document.getElementById('eventCurrentValue').textContent = currentValue.toLocaleString();
   document.getElementById('eventDelta').textContent = formatDelta(delta);
@@ -624,6 +665,9 @@ async function refreshEvent() {
     return;
   }
   await searchGuild(activeEvent.guildName);
+  if (activeEvent.metric === 'wars') {
+    await hydrateVisibleMemberWars(currentGuild, true, activeEvent.trackedPlayers || []);
+  }
   const snapshot = getSnapshot(activeEvent.metric, currentGuild, activeEvent.trackedPlayers || [], activeEvent.scope || 'selected');
   activeEvent.current = snapshot;
   activeEvent.lastRefreshAt = Date.now();
@@ -779,6 +823,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (e.key === 'Enter') {
       searchGuild(document.getElementById('guildSearchInput').value);
     }
+  });
+  document.getElementById('toggleGuildResultBtn').addEventListener('click', () => {
+    guildResultCollapsed = !guildResultCollapsed;
+    updateGuildResultCollapseUI();
   });
   document.getElementById('showMemberWarsToggle')?.addEventListener('change', () => {
     if (!currentGuild) return;
