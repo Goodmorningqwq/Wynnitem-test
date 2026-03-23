@@ -43,21 +43,36 @@ async function loadUserData() {
 async function updateUserData(payload) {
   if (!currentUser) return false;
   try {
-    // #region agent log
-    fetch('http://127.0.0.1:7649/ingest/d9a33132-748f-4430-83b4-30759d15d7c7',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0353be'},body:JSON.stringify({sessionId:'0353be',runId:'run1',hypothesisId:'H4',location:'guilds-v2.js:updateUserData:beforeFetch',message:'Posting user data update',data:{hasCurrentUser:Boolean(currentUser),keys:Object.keys(payload||{}),hasGuildName:Object.prototype.hasOwnProperty.call(payload||{},'guildName'),hasTrackedPlayers:Object.prototype.hasOwnProperty.call(payload||{},'trackedPlayers'),trackedPlayersType:Array.isArray(payload?.trackedPlayers)?'array':typeof payload?.trackedPlayers,hasActiveEvent:Object.prototype.hasOwnProperty.call(payload||{},'activeEvent')},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
     const response = await fetch(`${USER_API}/data?username=${encodeURIComponent(currentUser)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
     // #region agent log
-    fetch('http://127.0.0.1:7649/ingest/d9a33132-748f-4430-83b4-30759d15d7c7',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0353be'},body:JSON.stringify({sessionId:'0353be',runId:'run1',hypothesisId:'H1',location:'guilds-v2.js:updateUserData:afterFetch',message:'User data update response',data:{ok:response.ok,status:response.status},timestamp:Date.now()})}).catch(()=>{});
+    if (!response.ok) {
+      let errorData = {};
+      try {
+        errorData = await response.json();
+      } catch {
+        errorData = { error: 'unknown' };
+      }
+      console.debug('[agent-debug]', {
+        hypothesisId: 'H1_H2_H3_H4',
+        location: 'guilds-v2.js:updateUserData',
+        status: response.status,
+        error: errorData?.error || 'unknown',
+        payloadKeys: Object.keys(payload || {}),
+        hasActiveEvent: Object.prototype.hasOwnProperty.call(payload || {}, 'activeEvent'),
+        hasGuildName: Object.prototype.hasOwnProperty.call(payload || {}, 'guildName'),
+        trackedPlayersType: Array.isArray(payload?.trackedPlayers) ? 'array' : typeof payload?.trackedPlayers
+      });
+      return { ok: false, status: response.status, error: errorData?.error || 'unknown' };
+    }
     // #endregion
-    return response.ok;
+    return { ok: true };
   } catch (e) {
     console.error('Update user data error:', e);
-    return false;
+    return { ok: false, status: 0, error: e.message };
   }
 }
 
@@ -366,13 +381,13 @@ async function startEvent() {
     current: baseline
   };
 
-  const saved = await updateUserData({
+  const saveResult = await updateUserData({
     guildName: currentGuild.name,
     trackedPlayers,
     activeEvent: event
   });
-  if (!saved) {
-    alert('Failed to save event.');
+  if (!saveResult.ok) {
+    alert(`Failed to save event: ${saveResult.error}`);
     return;
   }
   activeEvent = event;
@@ -393,7 +408,16 @@ async function refreshEvent() {
   const snapshot = getSnapshot(activeEvent.metric, currentGuild, activeEvent.trackedPlayers || []);
   activeEvent.current = snapshot;
   activeEvent.lastRefreshAt = Date.now();
-  await updateUserData({ activeEvent });
+  const saveResult = await updateUserData({ activeEvent });
+  if (!saveResult.ok) {
+    console.debug('[agent-debug]', {
+      hypothesisId: 'H1_H2_H3_H4',
+      location: 'guilds-v2.js:refreshEvent',
+      message: 'Failed to persist refreshed activeEvent',
+      error: saveResult.error,
+      status: saveResult.status
+    });
+  }
   renderActiveEvent();
 }
 
@@ -416,7 +440,11 @@ async function endEvent() {
     leaderboard
   };
 
-  await updateUserData({ addEvent: historyEvent, activeEvent: null });
+  const endResult = await updateUserData({ addEvent: historyEvent, activeEvent: null });
+  if (!endResult.ok) {
+    alert(`Failed to end event: ${endResult.error}`);
+    return;
+  }
   activeEvent = null;
   hideLeaderboard();
   renderActiveEvent();
