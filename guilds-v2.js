@@ -40,7 +40,17 @@ function debugLog(runId, hypothesisId, location, message, data) {
     timestamp: Date.now()
   };
   console.debug('[agent-debug]', payload);
-  fetch('http://127.0.0.1:7649/ingest/d9a33132-748f-4430-83b4-30759d15d7c7',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0353be'},body:JSON.stringify(payload)}).catch(()=>{});
+  const host = window.location.hostname;
+  const isLocalDebugHost = host === 'localhost' || host === '127.0.0.1';
+  if (!isLocalDebugHost) return;
+  fetch('http://127.0.0.1:7649/ingest/d9a33132-748f-4430-83b4-30759d15d7c7', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Debug-Session-Id': '0353be'
+    },
+    body: JSON.stringify(payload)
+  }).catch(() => {});
 }
 
 async function loadUserData() {
