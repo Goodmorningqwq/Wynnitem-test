@@ -2,6 +2,9 @@ const { Redis } = require('@upstash/redis');
 
 const WYNCRAFT_BASE = 'https://api.wynncraft.com/v3/item/database';
 
+console.log(`[Vercel/Redis] UPSTASH_URL defined: ${!!process.env.UPSTASH_REDIS_REST_URL}`);
+console.log(`[Vercel/Redis] UPSTASH_TOKEN defined: ${!!process.env.UPSTASH_REDIS_REST_TOKEN}`);
+
 const redis = new Redis({
   url: process.env.UPSTASH_REDIS_REST_URL,
   token: process.env.UPSTASH_REDIS_REST_TOKEN,
