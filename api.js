@@ -11,17 +11,12 @@ const SEARCH_ENDPOINT = `${API_BASE}/database`;
 // GET https://api.wynncraft.com/v3/item/search/<str:query>
 // GET https://api.wynncraft.com/v3/item/search/
 
-// Item cache constants
-const ITEM_CACHE_KEY = 'wynnitem_item_cache';
-const ITEM_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours
-
-function getItemCacheFromStorage() {
-  try {
-    const cached = localStorage.getItem(ITEM_CACHE_KEY);
-    return cached ? JSON.parse(cached) : {};
-  } catch {
-    return {};
+function buildUrl(endpointPath) {
+  if (endpointPath.startsWith('http://') || endpointPath.startsWith('https://')) {
+    return new URL(endpointPath);
   }
+  return new URL(endpointPath, window.location.origin);
+}
 }
 
 function setItemCacheToStorage(cache) {

@@ -1,6 +1,6 @@
 // Main Application Logic
 
-import { cache, filterAndSortItems, filterByCategory, filterByArmourType, fetchItemPages, getAllFetchedItems, clearPageCache, fetchFilteredItems, fetchItemByName, refreshStaleItems } from './api.js';
+import { cache, filterAndSortItems, filterByCategory, filterByArmourType, fetchItemPages, getAllFetchedItems, clearPageCache, fetchFilteredItems, quickSearch } from './api.js';
 
 // App State
 const AppState = {
@@ -789,7 +789,8 @@ async function showItemModal(name, item) {
     itemModal.classList.remove('hidden');
     
     try {
-      itemData = await fetchItemByName(itemName);
+      const searchResult = await quickSearch(itemName);
+      itemData = searchResult[itemName];
       if (!itemData) {
         modalContent.innerHTML = `<div class="text-center py-8"><p class="text-red-400">Item not found</p></div>`;
         return;
@@ -1205,8 +1206,4 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   showSearchPanel();
-  
-  setTimeout(() => {
-    refreshStaleItems();
-  }, 5000);
 });
