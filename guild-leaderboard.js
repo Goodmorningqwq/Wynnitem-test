@@ -1,5 +1,9 @@
 const USER_API = '/api/user';
 
+// #region agent log
+fetch('http://127.0.0.1:7649/ingest/d9a33132-748f-4430-83b4-30759d15d7c7',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0353be'},body:JSON.stringify({sessionId:'0353be',runId:'run1',hypothesisId:'H3_H4',location:'guild-leaderboard.js:top',message:'Leaderboard JS executed',data:{pathname:window.location.pathname},timestamp:Date.now()})}).catch(()=>{});
+// #endregion
+
 function getCurrentUser() {
   try {
     return localStorage.getItem('currentUser');
