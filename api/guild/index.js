@@ -1,13 +1,5 @@
 const fetch = (...args) => import('node-fetch').then(module => module.default(...args));
 
-function generateUUID() {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-}
-
 module.exports = async (req, res) => {
   const guildName = req.query.name;
 
@@ -16,7 +8,7 @@ module.exports = async (req, res) => {
   }
 
   try {
-    const response = await fetch(`https://api.wynncraft.com/v3/guild/${encodeURIComponent(guildName)}?identifier=${generateUUID()}`, {
+    const response = await fetch(`https://api.wynncraft.com/v3/guild/${encodeURIComponent(guildName)}?identifier=uuid`, {
       headers: {
         'Accept': 'application/json'
       }
