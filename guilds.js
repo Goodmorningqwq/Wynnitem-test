@@ -21,7 +21,7 @@ function setCurrentUser(username) {
 function logout() {
   localStorage.removeItem('currentUser');
   currentUser = null;
-  window.showAuthSection();
+  window.location.href = '/login';
 }
 
 async function loadUserData() {
