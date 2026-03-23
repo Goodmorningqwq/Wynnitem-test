@@ -608,22 +608,9 @@ async function loadItemsForCategory(category) {
   
   const filters = getSearchFilters();
   
-  let searchQuery = '';
-  if (category === 'weapon' && selectedWeaponType) {
-    searchQuery = selectedWeaponType;
-  } else if (category === 'armour' && selectedArmorType) {
-    searchQuery = selectedArmorType;
-  } else if (category === 'accessory' && selectedAccessoryType) {
-    searchQuery = selectedAccessoryType;
-  } else if (category === 'misc' && selectedMiscType) {
-    searchQuery = selectedMiscType;
-  } else {
-    searchQuery = category;
-  }
-  
   try {
     showLoadingOverlay(50, 1, 0, 'Fetching from API...');
-    const searchResult = await quickSearch(searchQuery);
+    const searchResult = await quickSearch(category);
     
     if (loadingCancelled) {
       showSearchPanel();
@@ -631,6 +618,26 @@ async function loadItemsForCategory(category) {
     }
     
     let items = Object.entries(searchResult).map(([name, item]) => ({ name, ...item }));
+    
+    items = items.filter(item => {
+      if (category === 'weapon' && item.type === 'weapon') {
+        if (selectedWeaponType && item.weaponType !== selectedWeaponType) return false;
+        return true;
+      }
+      if (category === 'armour' && item.type === 'armour') {
+        if (selectedArmorType && item.armourType !== selectedArmorType) return false;
+        return true;
+      }
+      if (category === 'accessory' && item.type === 'accessory') {
+        if (selectedAccessoryType && item.accessoryType !== selectedAccessoryType) return false;
+        return true;
+      }
+      if (category === 'misc' && (item.type === 'charm' || item.type === 'tome')) {
+        if (selectedMiscType && item.type !== selectedMiscType) return false;
+        return true;
+      }
+      return false;
+    });
     
     if (filters.tier) {
       items = items.filter(item => item.rarity?.toLowerCase() === filters.tier.toLowerCase());
