@@ -627,7 +627,7 @@ document.addEventListener('DOMContentLoaded', () => {
   async function loadUserDashboard() {
     const userData = await loadUserData();
     if (!userData) {
-      logout();
+      console.error('Unable to load user dashboard data; keeping current session');
       return;
     }
 
