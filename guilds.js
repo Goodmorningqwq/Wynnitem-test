@@ -82,6 +82,9 @@ function displayGuild(guild) {
   document.getElementById('guildMembers').textContent = guild.members?.total || 0;
   document.getElementById('guildXp').textContent = (guild.xpPercent || 0) + '%';
 
+  // Display members list
+  displayMembersList(guild.members);
+
   const trackedGuilds = getTrackedGuilds();
   const trackBtn = document.getElementById('trackGuildBtn');
   if (trackedGuilds.includes(guild.name)) {
@@ -96,6 +99,53 @@ function displayGuild(guild) {
   noResult.classList.add('hidden');
 
   updateTrackedGuildsList();
+}
+
+function displayMembersList(members) {
+  const listEl = document.getElementById('guildMembersList');
+  
+  if (!members || members.total === 0) {
+    listEl.innerHTML = '<p class="text-gray-500 text-sm">No members</p>';
+    return;
+  }
+
+  const rankOrder = ['owner', 'chief', 'strategist', 'captain', 'recruiter', 'recruit'];
+  const rankLabels = {
+    owner: 'Owner',
+    chief: 'Chief',
+    strategist: 'Strategist',
+    captain: 'Captain',
+    recruiter: 'Recruiter',
+    recruit: 'Recruit'
+  };
+
+  let memberHtml = '';
+  
+  for (const rank of rankOrder) {
+    if (!members[rank]) continue;
+    
+    const rankMembers = Object.entries(members[rank]);
+    for (const [uuid, data] of rankMembers) {
+      const rankLabel = rankLabels[rank] || rank;
+      const onlineStatus = data.online ? 'text-green-400' : 'text-gray-500';
+      const contribution = data.contributed ? data.contributed.toLocaleString() : '0';
+      
+      memberHtml += `
+        <div class="flex justify-between items-center bg-gray-800/30 px-3 py-2 rounded text-sm">
+          <div class="flex items-center gap-2">
+            <span class="text-white font-medium">${escapeHtml(data.username)}</span>
+            <span class="text-xs ${onlineStatus}">●</span>
+          </div>
+          <div class="text-right">
+            <span class="text-xs text-violet-400 mr-2">${rankLabel}</span>
+            <span class="text-gray-400 text-xs">${contribution} XP</span>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  listEl.innerHTML = memberHtml;
 }
 
 function trackGuild() {
