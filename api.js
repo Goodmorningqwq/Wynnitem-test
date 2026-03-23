@@ -304,7 +304,8 @@ export async function quickSearch(query) {
   console.log('[DEBUG] quickSearch URL:', url.toString());
 
   const response = await fetch(url.toString());
-  console.log('[DEBUG] quickSearch response status:', response.status);
+  const cacheStatus = response.headers.get('X-Cache');
+  console.log('[DEBUG] quickSearch response status:', response.status, 'X-Cache:', cacheStatus);
   if (!response.ok) {
     throw new Error(`API Error: ${response.status}`);
   }
