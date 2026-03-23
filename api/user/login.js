@@ -41,7 +41,7 @@ module.exports = async (req, res) => {
       return res.status(401).json({ error: 'Invalid username or password' });
     }
 
-    return res.json({ success: true, username: username });
+    return res.json({ success: true, username: username, passwordHash: userData.passwordHash });
   } catch (e) {
     console.error('Login error:', e);
     return res.status(500).json({ error: e.message });

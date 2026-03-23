@@ -18,8 +18,21 @@ function setCurrentUser(username) {
   localStorage.setItem('currentUser', username);
 }
 
+function getUserHash() {
+  try {
+    return localStorage.getItem('userHash');
+  } catch {
+    return null;
+  }
+}
+
+function setUserHash(hash) {
+  localStorage.setItem('userHash', hash);
+}
+
 function logout() {
   localStorage.removeItem('currentUser');
+  localStorage.removeItem('userHash');
   currentUser = null;
   window.location.href = '/guild';
 }
@@ -406,6 +419,7 @@ function endEvent() {
     guildName: activeEvent.guildName,
     type: activeEvent.type,
     memberUsername: activeEvent.memberUsername,
+    userHash: getUserHash(),
     startTime: activeEvent.startTime,
     startValue: activeEvent.startValue,
     updates: activeEvent.updates,
@@ -420,6 +434,7 @@ function endEvent() {
   saveEventToHistory(eventRecord);
   displayActiveEvent();
   loadEventHistory();
+  updateEventButtons();
 }
 
 async function saveEventToHistory(eventRecord) {
@@ -432,16 +447,17 @@ async function loadEventHistory() {
   const listEl = document.getElementById('eventHistoryList');
   const noEl = document.getElementById('noEventHistory');
 
+  if (!currentUser) {
+    noEl.classList.remove('hidden');
+    listEl.innerHTML = '';
+    return;
+  }
+
   try {
-    const response = await fetch(REDIS_API);
-    
-    if (!response.ok) {
-      throw new Error('Failed to load history');
-    }
+    const userData = await loadUserData();
+    const events = userData?.events || [];
 
-    const events = await response.json();
-
-    if (!events || events.length === 0) {
+    if (events.length === 0) {
       noEl.classList.remove('hidden');
       listEl.innerHTML = '';
       return;
@@ -612,6 +628,8 @@ document.addEventListener('DOMContentLoaded', () => {
   currentUser = getCurrentUser();
   if (currentUser) {
     window.showLoggedInUI();
+  } else {
+    updateEventButtons();
   }
 
   async function loadUserDashboard() {
@@ -628,6 +646,9 @@ document.addEventListener('DOMContentLoaded', () => {
       guildTracked.classList.remove('hidden');
       dashboardGuildName.textContent = userData.trackedGuild;
       dashboardGuildPrefix.textContent = '';
+      
+      // Auto-load the tracked guild's data from Wynncraft API
+      searchGuild(userData.trackedGuild);
       
       if (userData.activeEvent) {
         dashboardEventSection.classList.remove('hidden');

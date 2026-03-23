@@ -3,24 +3,31 @@
 ## Project Overview
 Wynncraft item database browser with:
 - **Frontend**: Vanilla JavaScript (ES modules) + HTML/TailwindCSS via CDN
-- **Proxy**: Express.js server (CommonJS) handling API requests  
+- **Proxy**: Express.js server (CommonJS) handling API requests
 - **API**: Queries Wynncraft's public API (api.wynncraft.com/v3)
 
 ## Commands
 
-### Running the Application
+### Setup
 ```bash
 cd proxy && npm install
+```
+
+### Running the Application
+```bash
 cd proxy && npm start
 ```
 Server runs at http://localhost:3000. Refresh browser after code changes.
 
 ### Testing & Debugging
-Manual testing via browser at http://localhost:3000.
+No formal test framework (Jest/Mocha) is configured. Testing is done manually:
 ```bash
-cd proxy && node test-server.js   # Debug routes on port 3000
+cd proxy && node test-server.js   # Debug GET routes on port 3000
 cd proxy && node test-post.js    # Test POST requests on port 3001
 ```
+
+### Linting
+No ESLint is configured. Ensure code follows the style guidelines below.
 
 ## Code Style
 
@@ -73,6 +80,7 @@ catch (e) {
 - Always escape HTML with `escapeHtml()` or `escapeAttr()`
 - Never expose sensitive data in error messages
 - Validate user inputs before processing
+- Never log secrets, API keys, or credentials
 
 ## CSS/Tailwind
 - Use TailwindCSS utility classes in HTML

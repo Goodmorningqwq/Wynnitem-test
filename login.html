@@ -217,8 +217,9 @@
         if (isRegisterMode) {
           await registerUser(username, password);
         }
-        await loginUser(username, password);
+        const result = await loginUser(username, password);
         setCurrentUser(username);
+        localStorage.setItem('userHash', result.passwordHash);
         // Redirect back to guild
         window.location.href = '/guild';
       } catch (e) {

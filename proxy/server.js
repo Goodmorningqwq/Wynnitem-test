@@ -295,10 +295,25 @@ app.get('/api/item/clear-cache', (req, res) => {
 });
 
 const repoRoot = path.join(__dirname, '..');
+
 app.use((req, res, next) => {
-  if (req.method === 'GET' && (req.path.endsWith('.html') || req.path.endsWith('.js') || req.path === '/')) {
-    return express.static(repoRoot)(req, res, next);
+  const pathname = req.path;
+  
+  if (req.method === 'GET') {
+    if (pathname === '/' || pathname === '/guild' || pathname === '/item' || pathname === '/login') {
+      const htmlFile = pathname === '/' ? '/index.html' : `${pathname}.html`;
+      return res.sendFile(path.join(repoRoot, htmlFile), (err) => {
+        if (err) {
+          return res.status(404).send(`Cannot GET ${pathname}`);
+        }
+      });
+    }
+    
+    if (pathname.endsWith('.html') || pathname.endsWith('.js') || pathname.endsWith('.css')) {
+      return express.static(repoRoot)(req, res, next);
+    }
   }
+  
   next();
 });
 
