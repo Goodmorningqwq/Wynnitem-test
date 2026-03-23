@@ -557,9 +557,6 @@ function updateEventButtons() {
     trackMemberXpBtn.classList.remove('opacity-50');
     memberSelectSection.classList.remove('hidden');
   }
-    trackXpBtn.classList.remove('opacity-50');
-    trackWarsBtn.classList.remove('opacity-50');
-  }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
