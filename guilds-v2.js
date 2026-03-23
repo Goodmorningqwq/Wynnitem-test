@@ -298,7 +298,7 @@ function getSelectedPlayers() {
   return Array.from(checked).map((el) => el.value);
 }
 
-function getSnapshot(metric, guild, trackedPlayers) {
+function getSnapshot(metric, guild, trackedPlayers, scope = 'selected') {
   const players = collectGuildMembers(guild);
   const playerMap = buildPlayerMap(players);
   const selected = trackedPlayers.length ? trackedPlayers : players.map((p) => p.username);
@@ -308,7 +308,22 @@ function getSnapshot(metric, guild, trackedPlayers) {
     snapshotPlayers[username] = Number(metric === 'wars' ? entry.wars : entry.xp);
   }
   const selectedTotal = Object.values(snapshotPlayers).reduce((sum, value) => sum + Number(value || 0), 0);
-  const metricValue = metric === 'wars' ? Number(guild.wars || 0) : Number(guild.xpPercent || 0);
+  const metricValue = metric === 'wars'
+    ? (scope === 'selected' ? selectedTotal : Number(guild.wars || 0))
+    : Number(guild.xpPercent || 0);
+  if (metric === 'wars') {
+    // #region agent log
+    console.log('[wars-snapshot]', {
+      metric,
+      scopeHint: trackedPlayers.length ? 'selected' : 'guild',
+      scope,
+      trackedPlayersCount: trackedPlayers.length,
+      selectedTotal,
+      metricValueUsedByCard: metricValue,
+      samplePlayers: Object.entries(snapshotPlayers).slice(0, 5)
+    });
+    // #endregion
+  }
   // #region agent log
   debugLog('pre-fix', 'H6', 'guilds-v2.js:getSnapshot:metricSource', 'snapshot metric source comparison', { metric, selectedCount: selected.length, metricValue, selectedTotal, selectedPlayers: selected.slice(0, 5), samplePlayers: Object.entries(snapshotPlayers).slice(0, 3), guildWars: Number(guild?.wars || 0), guildXp: Number(guild?.xpPercent || 0) });
   // #endregion
@@ -439,6 +454,18 @@ function renderActiveEvent() {
   const delta = getGuildDelta(activeEvent);
   const startValue = Number(activeEvent.baseline?.metricValue || 0);
   const currentValue = Number(activeEvent.current?.metricValue || startValue);
+  if (activeEvent.metric === 'wars') {
+    // #region agent log
+    console.log('[wars-render]', {
+      scope: activeEvent.scope,
+      trackedPlayers: (activeEvent.trackedPlayers || []).slice(0, 10),
+      startValue,
+      currentValue,
+      baselineSample: Object.entries(activeEvent.baseline?.playerValues || {}).slice(0, 5),
+      currentSample: Object.entries(activeEvent.current?.playerValues || {}).slice(0, 5)
+    });
+    // #endregion
+  }
 
   document.getElementById('eventDuration').textContent = durationText;
   document.getElementById('dashboardEventDuration').textContent = durationText;
@@ -524,7 +551,7 @@ async function startEvent() {
     trackedPlayers = collectGuildMembers(currentGuild).map((p) => p.username);
   }
 
-  const baseline = getSnapshot(metric, currentGuild, trackedPlayers);
+  const baseline = getSnapshot(metric, currentGuild, trackedPlayers, scope);
   const event = {
     guildName: currentGuild.name,
     metric,
@@ -562,7 +589,7 @@ async function refreshEvent() {
     return;
   }
   await searchGuild(activeEvent.guildName);
-  const snapshot = getSnapshot(activeEvent.metric, currentGuild, activeEvent.trackedPlayers || []);
+  const snapshot = getSnapshot(activeEvent.metric, currentGuild, activeEvent.trackedPlayers || [], activeEvent.scope || 'selected');
   activeEvent.current = snapshot;
   activeEvent.lastRefreshAt = Date.now();
   activeEvent.firstRefreshDone = true;
