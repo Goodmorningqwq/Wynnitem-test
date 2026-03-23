@@ -43,11 +43,17 @@ async function loadUserData() {
 async function updateUserData(payload) {
   if (!currentUser) return false;
   try {
+    // #region agent log
+    fetch('http://127.0.0.1:7649/ingest/d9a33132-748f-4430-83b4-30759d15d7c7',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0353be'},body:JSON.stringify({sessionId:'0353be',runId:'run1',hypothesisId:'H4',location:'guilds-v2.js:updateUserData:beforeFetch',message:'Posting user data update',data:{hasCurrentUser:Boolean(currentUser),keys:Object.keys(payload||{}),hasGuildName:Object.prototype.hasOwnProperty.call(payload||{},'guildName'),hasTrackedPlayers:Object.prototype.hasOwnProperty.call(payload||{},'trackedPlayers'),trackedPlayersType:Array.isArray(payload?.trackedPlayers)?'array':typeof payload?.trackedPlayers,hasActiveEvent:Object.prototype.hasOwnProperty.call(payload||{},'activeEvent')},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     const response = await fetch(`${USER_API}/data?username=${encodeURIComponent(currentUser)}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
+    // #region agent log
+    fetch('http://127.0.0.1:7649/ingest/d9a33132-748f-4430-83b4-30759d15d7c7',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'0353be'},body:JSON.stringify({sessionId:'0353be',runId:'run1',hypothesisId:'H1',location:'guilds-v2.js:updateUserData:afterFetch',message:'User data update response',data:{ok:response.ok,status:response.status},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     return response.ok;
   } catch (e) {
     console.error('Update user data error:', e);
