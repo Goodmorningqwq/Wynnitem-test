@@ -603,14 +603,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let isRegisterMode = false;
 
-  // Check if user is logged in
-  currentUser = getCurrentUser();
-  if (currentUser) {
-    window.showLoggedInUI();
-  } else {
-    window.showAuthSection();
-  }
-
+  // Define UI functions first
   window.showAuthSection = function() {
     authSection.classList.remove('hidden');
     userMenu.classList.add('hidden');
@@ -626,9 +619,16 @@ document.addEventListener('DOMContentLoaded', () => {
     searchSection.classList.remove('hidden');
     userDashboard.classList.remove('hidden');
     userDisplayName.textContent = currentUser;
-    
     loadUserDashboard();
   };
+
+  // Check if user is logged in
+  currentUser = getCurrentUser();
+  if (currentUser) {
+    window.showLoggedInUI();
+  } else {
+    window.showAuthSection();
+  }
 
   function updateAuthUI() {
     authTitle.textContent = isRegisterMode ? 'Register' : 'Login';
