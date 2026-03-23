@@ -17,14 +17,12 @@ async function buildFullDatabase() {
   
   console.log(`[Refresh] Starting full DB rebuild...`);
   
-  // Build cache keys
   const cacheKeys = Array.from({ length: PAGES_COUNT }, (_, i) => `wynn_page_${i + 1}`);
-  
-  // Batch fetch all cached pages at once (MGET is more efficient)
   let allCachedPages = {};
+  
   try {
     const cachedData = await redis.mget(cacheKeys);
-    stats.commands++; // 1 MGET command for all pages
+    stats.commands++;
     
     cachedData.forEach((pageData, index) => {
       if (pageData) {
@@ -39,13 +37,12 @@ async function buildFullDatabase() {
         }
       }
     });
-    console.log(`[Refresh] MGET: ${stats.hits}/${PAGES_COUNT} pages cached (1 command)`);
+    console.log(`[Refresh] MGET: ${stats.hits}/${PAGES_COUNT} pages cached`);
   } catch (e) {
     console.error(`[Refresh] MGET error: ${e.message}`);
     stats.errors++;
   }
   
-  // Find missing pages
   const missingPages = [];
   for (let i = 1; i <= PAGES_COUNT; i++) {
     if (!allCachedPages[`wynn_page_${i}`]) {
@@ -53,9 +50,6 @@ async function buildFullDatabase() {
     }
   }
   
-  console.log(`[Refresh] Missing pages: ${missingPages.length}`);
-  
-  // Fetch missing pages one by one
   for (const page of missingPages) {
     try {
       const url = `${WYNCRAFT_BASE}?page=${page}`;
@@ -70,14 +64,9 @@ async function buildFullDatabase() {
       
       if (upstreamRes.ok && pageData?.results) {
         await redis.setex(`wynn_page_${page}`, TTL, pageData);
-        stats.commands++; // 1 SETEX per page
+        stats.commands++;
         stats.misses++;
         allCachedPages[`wynn_page_${page}`] = pageData;
-        
-        if (missingPages.indexOf(page) % 20 === 0) {
-          console.log(`[Refresh] Fetched page ${page} (${stats.misses}/${missingPages.length})`);
-        }
-        
         await new Promise(r => setTimeout(r, 1000));
       }
     } catch (e) {
@@ -86,7 +75,6 @@ async function buildFullDatabase() {
     }
   }
   
-  // Build full database from cached pages
   const fullDb = {
     controller: { total: 0, count: PAGES_COUNT },
     results: {}
@@ -99,36 +87,40 @@ async function buildFullDatabase() {
     }
   }
   
-  // Save full database (1 SET command)
   try {
     await redis.set(FULL_DB_KEY, JSON.stringify(fullDb), { ex: TTL });
-    stats.commands++; // 1 SET command
+    stats.commands++;
     console.log(`[Refresh] Saved FULL DB: ${fullDb.controller.total} items`);
   } catch (e) {
     console.error(`[Refresh] Failed to save FULL DB: ${e.message}`);
     stats.errors++;
   }
   
-  const totalTime = Date.now() - startTime;
-  console.log(`[Refresh] Complete! Commands: ${stats.commands}, Hits: ${stats.hits}, Misses: ${stats.misses}, Time: ${totalTime}ms`);
+  console.log(`[Refresh] Complete! Commands: ${stats.commands}, Hits: ${stats.hits}, Misses: ${stats.misses}`);
   
-  return { fullDb, stats, totalTime };
+  return { fullDb, stats, totalTime: Date.now() - startTime };
 }
 
 module.exports = async function handler(req, res) {
-  console.log(`[Refresh] Triggered at ${new Date().toISOString()}`);
+  // Only allow cron-triggered calls (Vercel sets this header)
+  const isCron = req.headers['x-vercel-cron'] === '1';
+  
+  if (!isCron) {
+    console.log(`[Refresh] Unauthorized access attempt blocked`);
+    return res.status(403).json({ error: 'Forbidden - cron only' });
+  }
+  
+  console.log(`[Refresh] Cron triggered at ${new Date().toISOString()}`);
   
   try {
     const result = await buildFullDatabase();
     
-    res.setHeader('Content-Type', 'application/json');
     return res.status(200).json({
       success: true,
       items: result.fullDb.controller.total,
       commands: result.stats.commands,
       cacheHits: result.stats.hits,
       cacheMisses: result.stats.misses,
-      errors: result.stats.errors,
       duration: `${result.totalTime}ms`
     });
   } catch (e) {
@@ -136,7 +128,3 @@ module.exports = async function handler(req, res) {
     return res.status(500).json({ error: e.message });
   }
 };
-
-if (require.main === module) {
-  buildFullDatabase().then(() => process.exit(0)).catch(() => process.exit(1));
-}
