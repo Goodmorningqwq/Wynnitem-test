@@ -14,20 +14,20 @@ module.exports = async (req, res) => {
 
   if (req.method === 'GET') {
     try {
-      const trackedKey = `user:${username}:tracked`;
+      const dataKey = `user:${username}:data`;
       const eventsKey = `user:${username}:events`;
-      const activeKey = `user:${username}:active`;
 
-      const tracked = await redis.get(trackedKey);
+      const userDataStr = await redis.get(dataKey);
       const events = await redis.lrange(eventsKey, 0, 49);
-      const active = await redis.get(activeKey);
 
+      const userData = userDataStr ? JSON.parse(userDataStr) : { guildName: null, trackedPlayers: [], activeEvent: null };
       const parsedEvents = events.map(e => typeof e === 'string' ? JSON.parse(e) : e).reverse();
 
       return res.json({
         username: username,
-        trackedGuild: tracked || null,
-        activeEvent: active ? JSON.parse(active) : null,
+        guildName: userData.guildName,
+        trackedPlayers: userData.trackedPlayers || [],
+        activeEvent: userData.activeEvent,
         events: parsedEvents || []
       });
     } catch (e) {
@@ -38,30 +38,60 @@ module.exports = async (req, res) => {
 
   if (req.method === 'POST') {
     try {
-      const { trackedGuild, activeEvent, addEvent } = req.body;
+      const { guildName, trackedPlayers, activeEvent, addEvent, addPlayer, removePlayer, clearPlayers } = req.body;
 
-      const trackedKey = `user:${username}:tracked`;
+      const dataKey = `user:${username}:data`;
       const eventsKey = `user:${username}:events`;
-      const activeKey = `user:${username}:active`;
 
-      if (trackedGuild !== undefined) {
-        await redis.set(trackedKey, trackedGuild);
+      const userDataStr = await redis.get(dataKey);
+      const userData = userDataStr ? JSON.parse(userDataStr) : { guildName: null, trackedPlayers: [], activeEvent: null };
+
+      if (guildName !== undefined) {
+        if (guildName !== userData.guildName && userData.trackedPlayers.length > 0) {
+          return res.status(400).json({ error: 'You can only track players from one guild. Clear current players first.' });
+        }
+        userData.guildName = guildName;
       }
+
+      if (trackedPlayers !== undefined) {
+        if (trackedPlayers.length > 0 && userData.guildName && trackedPlayers[0]) {
+          const currentGuild = userData.guildName;
+          userData.trackedPlayers = trackedPlayers;
+        } else {
+          userData.trackedPlayers = trackedPlayers;
+        }
+      }
+
+      if (addPlayer !== undefined) {
+        if (userData.trackedPlayers.length >= 20) {
+          return res.status(400).json({ error: 'Maximum 20 players allowed per user' });
+        }
+        if (!userData.trackedPlayers.includes(addPlayer)) {
+          userData.trackedPlayers.push(addPlayer);
+        }
+      }
+
+      if (removePlayer !== undefined) {
+        userData.trackedPlayers = userData.trackedPlayers.filter(p => p !== removePlayer);
+      }
+
+      if (clearPlayers !== undefined) {
+        userData.trackedPlayers = [];
+        userData.activeEvent = null;
+      }
+
+      if (activeEvent !== undefined) {
+        userData.activeEvent = activeEvent;
+      }
+
+      await redis.set(dataKey, JSON.stringify(userData));
 
       if (addEvent) {
         await redis.lpush(eventsKey, JSON.stringify(addEvent));
         await redis.ltrim(eventsKey, 0, 99);
       }
 
-      if (activeEvent !== undefined) {
-        if (activeEvent === null) {
-          await redis.del(activeKey);
-        } else {
-          await redis.set(activeKey, JSON.stringify(activeEvent));
-        }
-      }
-
-      return res.json({ success: true });
+      return res.json({ success: true, trackedPlayers: userData.trackedPlayers });
     } catch (e) {
       console.error('Update data error:', e);
       return res.status(500).json({ error: e.message });

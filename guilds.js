@@ -199,20 +199,12 @@ function displayGuild(guild) {
   displayMembersList(guild.members);
   populateMemberSelect(guild.members);
 
-  const trackedGuilds = getTrackedGuilds();
   const trackBtn = document.getElementById('trackGuildBtn');
-  if (trackedGuilds.includes(guild.name)) {
-    trackBtn.textContent = '✓ Tracked';
-    trackBtn.disabled = true;
-  } else {
-    trackBtn.textContent = '📌 Track Guild';
-    trackBtn.disabled = false;
-  }
+  trackBtn.textContent = '✓ Select Players';
+  trackBtn.disabled = false;
 
   guildResult.classList.remove('hidden');
   noResult.classList.add('hidden');
-
-  updateTrackedGuildsList();
 }
 
 function displayMembersList(members) {
@@ -639,16 +631,19 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    trackedGuildDisplay.textContent = userData.trackedGuild ? `Tracking: ${userData.trackedGuild}` : 'No guild tracked';
+    trackedGuildDisplay.textContent = userData.guildName ? `Guild: ${userData.guildName}` : 'No players tracked';
 
-    if (userData.trackedGuild) {
+    if (userData.guildName) {
       noGuildTracked.classList.add('hidden');
       guildTracked.classList.remove('hidden');
-      dashboardGuildName.textContent = userData.trackedGuild;
+      dashboardGuildName.textContent = userData.guildName;
       dashboardGuildPrefix.textContent = '';
       
       // Auto-load the tracked guild's data from Wynncraft API
-      searchGuild(userData.trackedGuild);
+      searchGuild(userData.guildName);
+      
+      // Display tracked players info
+      displayTrackedPlayersInfo(userData.trackedPlayers);
       
       if (userData.activeEvent) {
         dashboardEventSection.classList.remove('hidden');
@@ -665,6 +660,28 @@ document.addEventListener('DOMContentLoaded', () => {
       noGuildTracked.classList.remove('hidden');
       guildTracked.classList.add('hidden');
     }
+  }
+
+  function displayTrackedPlayersInfo(players) {
+    const trackedPlayersInfo = document.getElementById('trackedPlayersInfo');
+    if (!trackedPlayersInfo) return;
+    
+    if (!players || players.length === 0) {
+      trackedPlayersInfo.innerHTML = '<p class="text-gray-500 text-sm">No players selected. Select players from the member list below.</p>';
+      return;
+    }
+    
+    let html = '<div class="grid grid-cols-2 gap-2">';
+    for (const player of players) {
+      const member = findMemberByUsername(player);
+      const contributed = member ? (member.contributed || 0) : 0;
+      html += `<div class="bg-gray-800/50 rounded p-2 text-sm">
+        <span class="text-white font-medium">${escapeHtml(player)}</span>
+        <span class="text-gray-400 text-xs block">${contributed.toLocaleString()} XP</span>
+      </div>`;
+    }
+    html += '</div>';
+    trackedPlayersInfo.innerHTML = html;
   }
 
   function displayDashboardEvent() {
@@ -748,15 +765,73 @@ document.addEventListener('DOMContentLoaded', () => {
   trackBtn.addEventListener('click', async () => {
     if (!currentGuild || !currentGuild.name) return;
     
-    // Update tracked guild in Redis
-    await updateUserData({ trackedGuild: currentGuild.name });
+    // Check if user already has tracked players from a different guild
+    const userData = await loadUserData();
+    if (userData && userData.guildName && userData.guildName !== currentGuild.name && userData.trackedPlayers.length > 0) {
+      alert(`You can only track players from one guild. Your current tracked guild is: ${userData.guildName}. Clear current players first to track a different guild.`);
+      return;
+    }
     
-    const trackBtn = document.getElementById('trackGuildBtn');
-    trackBtn.textContent = '✓ Tracking';
-    trackBtn.disabled = true;
+    // Show player selection modal/section
+    document.getElementById('playerSelectSection').classList.remove('hidden');
+    populatePlayerCheckboxes();
+  });
 
+  // Save selected players button
+  document.getElementById('saveSelectedPlayersBtn')?.addEventListener('click', async () => {
+    if (!currentGuild || !currentGuild.name) return;
+    
+    const checkboxes = document.querySelectorAll('#playerCheckboxes input[type="checkbox"]:checked');
+    const selectedPlayers = Array.from(checkboxes).map(cb => cb.value);
+    
+    if (selectedPlayers.length === 0) {
+      alert('Please select at least one player');
+      return;
+    }
+    
+    // Save to user data
+    await updateUserData({ guildName: currentGuild.name, trackedPlayers: selectedPlayers });
+    
+    document.getElementById('playerSelectSection').classList.add('hidden');
     loadUserDashboard();
   });
+
+  // Select all players button
+  document.getElementById('selectAllPlayersBtn')?.addEventListener('click', () => {
+    const checkboxes = document.querySelectorAll('#playerCheckboxes input[type="checkbox"]');
+    checkboxes.forEach(cb => cb.checked = true);
+  });
+
+  // Clear all players button  
+  document.getElementById('clearPlayersBtn')?.addEventListener('click', async () => {
+    if (confirm('Clear all tracked players? This will also end any active event.')) {
+      await updateUserData({ clearPlayers: true });
+      loadUserDashboard();
+    }
+  });
+
+  function populatePlayerCheckboxes() {
+    const container = document.getElementById('playerCheckboxes');
+    if (!container || !currentGuild || !currentGuild.members) return;
+    
+    const rankOrder = ['owner', 'chief', 'strategist', 'captain', 'recruiter', 'recruit'];
+    let html = '';
+    
+    for (const rank of rankOrder) {
+      if (!currentGuild.members[rank]) continue;
+      
+      for (const [uuid, data] of Object.entries(currentGuild.members[rank])) {
+        const contributed = data.contributed || 0;
+        html += `<label class="flex items-center gap-2 p-2 hover:bg-gray-800/50 rounded cursor-pointer">
+          <input type="checkbox" value="${escapeAttr(data.username)}" class="accent-purple-500">
+          <span class="text-white text-sm">${escapeHtml(data.username)}</span>
+          <span class="text-gray-500 text-xs ml-auto">${contributed.toLocaleString()} XP</span>
+        </label>`;
+      }
+    }
+    
+    container.innerHTML = html;
+  }
 
   trackXpBtn.addEventListener('click', () => startEvent('xp'));
   trackWarsBtn.addEventListener('click', () => startEvent('wars'));
