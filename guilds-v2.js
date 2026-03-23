@@ -113,6 +113,42 @@ function formatMetric(metric) {
   return metric === 'wars' ? 'Wars' : 'Guild XP';
 }
 
+function normalizeActiveEvent(rawEvent, fallbackTrackedPlayers = []) {
+  if (!rawEvent || typeof rawEvent !== 'object') return null;
+
+  if (rawEvent.metric && rawEvent.startedAt && rawEvent.baseline) {
+    return rawEvent;
+  }
+
+  const metric = rawEvent.type === 'wars' ? 'wars' : 'xp';
+  const startedAt = Number(rawEvent.startTime || Date.now());
+  const startValue = Number(rawEvent.startValue || 0);
+  const updates = Array.isArray(rawEvent.updates) ? rawEvent.updates : [];
+  const latestUpdate = updates.length ? updates[updates.length - 1] : null;
+  const currentValue = Number(latestUpdate?.value ?? startValue);
+  const trackedPlayers = Array.isArray(rawEvent.trackedPlayers)
+    ? rawEvent.trackedPlayers
+    : (Array.isArray(fallbackTrackedPlayers) ? fallbackTrackedPlayers : []);
+
+  return {
+    guildName: rawEvent.guildName || null,
+    metric,
+    scope: rawEvent.scope || 'selected',
+    trackedPlayers,
+    refreshCooldownMs: Number(rawEvent.refreshCooldownMs || REFRESH_COOLDOWN_MS),
+    startedAt,
+    lastRefreshAt: Number(rawEvent.lastRefreshAt || latestUpdate?.time || startedAt),
+    baseline: rawEvent.baseline || {
+      metricValue: startValue,
+      playerValues: {}
+    },
+    current: rawEvent.current || {
+      metricValue: currentValue,
+      playerValues: {}
+    }
+  };
+}
+
 function displayGuild(guild) {
   const guildResult = document.getElementById('guildResult');
   const noResult = document.getElementById('noResult');
@@ -482,27 +518,31 @@ async function loadEventHistory() {
 async function loadUserDashboard() {
   const userData = await loadUserData();
   if (!userData) return;
+  const normalizedEvent = normalizeActiveEvent(userData.activeEvent, userData.trackedPlayers || []);
+  activeEvent = normalizedEvent;
 
-  document.getElementById('trackedGuildDisplay').textContent = userData.guildName
-    ? `Guild: ${userData.guildName}`
+  const effectiveGuildName = userData.guildName || normalizedEvent?.guildName || null;
+
+  document.getElementById('trackedGuildDisplay').textContent = effectiveGuildName
+    ? `Guild: ${effectiveGuildName}`
     : 'No guild tracked';
   document.getElementById('userDashboard').classList.remove('hidden');
 
-  if (!userData.guildName) {
+  if (!effectiveGuildName) {
     document.getElementById('noGuildTracked').classList.remove('hidden');
     document.getElementById('guildTracked').classList.add('hidden');
+    renderActiveEvent();
+    if (activeEvent) startCooldownTicker();
     return;
   }
 
   document.getElementById('noGuildTracked').classList.add('hidden');
   document.getElementById('guildTracked').classList.remove('hidden');
-  document.getElementById('dashboardGuildName').textContent = userData.guildName;
+  document.getElementById('dashboardGuildName').textContent = effectiveGuildName;
   document.getElementById('dashboardGuildPrefix').textContent = '';
   renderTrackedPlayersInfo(userData.trackedPlayers || []);
 
-  await searchGuild(userData.guildName);
-
-  activeEvent = userData.activeEvent || null;
+  await searchGuild(effectiveGuildName);
   renderActiveEvent();
   if (activeEvent) startCooldownTicker();
   await loadEventHistory();
