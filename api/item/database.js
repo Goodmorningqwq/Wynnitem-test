@@ -1,11 +1,13 @@
 const WYNCRAFT_BASE = 'https://api.wynncraft.com/v3/item/database';
 
+const pageCache = new Map();
+
 module.exports = async function handler(req, res) {
   const page = parseInt(req.query.page) || 1;
   const cacheKey = `page_${page}`;
   
   console.log(`[Vercel/database] Page: ${page}, Cache key: "${cacheKey}"`);
-  console.log(`[Vercel/database] Cache has key: ${!!pageCache.has(cacheKey)}`);
+  console.log(`[Vercel/database] Cache has key: ${pageCache.has(cacheKey)}`);
 
   if (pageCache.has(cacheKey)) {
     res.setHeader('X-Cache', 'HIT');
