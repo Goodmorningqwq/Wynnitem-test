@@ -321,13 +321,13 @@ async function fetchMemberWars(uuid) {
   if (!uuid) return null;
   if (memberWarsCache.has(uuid)) return memberWarsCache.get(uuid);
   try {
-    const response = await fetch(`https://api.wynncraft.com/v3/player/${encodeURIComponent(uuid)}`);
+    const response = await fetch(`/api/player/wars?uuid=${encodeURIComponent(uuid)}`);
     // #region agent log
     debugLog('pre-fix', 'H3', 'guilds-v2.js:fetchMemberWars:response', 'player endpoint response status', { uuid, ok: response.ok, status: response.status });
     // #endregion
     if (!response.ok) return null;
     const data = await response.json();
-    const wars = Number(data?.globalData?.wars || 0);
+    const wars = Number(data?.wars || 0);
     // #region agent log
     debugLog('pre-fix', 'H1', 'guilds-v2.js:fetchMemberWars:parsed', 'parsed wars payload fields', { uuid, wars, hasGlobalData: Boolean(data?.globalData), globalDataKeys: data?.globalData ? Object.keys(data.globalData).slice(0, 8) : [] });
     // #endregion
