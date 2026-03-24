@@ -4,6 +4,7 @@ const USER_API = '/api/user';
 const REFRESH_COOLDOWN_MS = 15 * 60 * 1000;
 const WYNN_PLAYER_WARS_SPACING_MS = 1600;
 const WYNN_PLAYER_WARS_429_BACKOFF_MS = 3500;
+const MEMBER_WARS_INITIAL_HYDRATE_LIMIT = 20;
 
 function isWarDebugVerbose() {
   try {
@@ -468,11 +469,17 @@ async function hydrateVisibleMemberWars(guild, forceRefresh = false, usernames =
     if (forceRefresh) return true;
     return !memberWarsCache.has(member.uuid);
   });
+  const applyInitialLimit = !forceRefresh && !wantedUsernames;
+  const limitedTargets = applyInitialLimit
+    ? targets.slice(0, MEMBER_WARS_INITIAL_HYDRATE_LIMIT)
+    : targets;
   const missingUuid = members.filter((m) => !m.uuid).length;
   warLog('hydrateVisibleMemberWars', {
     guildName: guild.name || '(unknown)',
     totalMembers: members.length,
     targets: targets.length,
+    processingTargets: limitedTargets.length,
+    deferredTargets: Math.max(0, targets.length - limitedTargets.length),
     missingUuid,
     forceRefresh,
     filterUsernames: wantedUsernames ? wantedUsernames.size : null
@@ -480,17 +487,17 @@ async function hydrateVisibleMemberWars(guild, forceRefresh = false, usernames =
   // #region agent log
   debugLog('pre-fix', 'H2', 'guilds-v2.js:hydrateVisibleMemberWars:targets', 'member uuid coverage', { totalMembers: members.length, targets: targets.length, missingUuid: members.filter((m) => !m.uuid).length });
   // #endregion
-  if (!targets.length) {
+  if (!limitedTargets.length) {
     warLog('hydrateVisibleMemberWars nothing to fetch', { reason: 'all cached or no uuids matched filter' });
     return;
   }
   let idx = 0;
-  for (const member of targets) {
+  for (const member of limitedTargets) {
     idx += 1;
-    warLogVerbose(`hydrate fetch ${idx}/${targets.length}`, { user: member.username });
+    warLogVerbose(`hydrate fetch ${idx}/${limitedTargets.length}`, { user: member.username });
     await fetchMemberWars(member.uuid, forceRefresh);
   }
-  warLog('hydrateVisibleMemberWars done', { fetched: targets.length });
+  warLog('hydrateVisibleMemberWars done', { fetched: limitedTargets.length });
 }
 
 function generateEventCode() {
