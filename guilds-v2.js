@@ -487,6 +487,16 @@ function openLeaderboardByCode(rawCode) {
   window.location.href = `/guild/leaderboard?code=${encodeURIComponent(code)}`;
 }
 
+function toggleDashboardCodePanel(forceOpen = null) {
+  const panel = document.getElementById('dashboardJoinCodeSection');
+  if (!panel) return;
+  const nextOpen = forceOpen === null ? panel.classList.contains('hidden') : Boolean(forceOpen);
+  panel.classList.toggle('hidden', !nextOpen);
+  if (nextOpen) {
+    document.getElementById('dashboardEventCodeInput')?.focus();
+  }
+}
+
 function getGuildDelta(event) {
   const start = Number(event.baseline?.metricValue || 0);
   const current = Number(event.current?.metricValue || start);
@@ -552,10 +562,11 @@ function renderTrackedPlayersInfo(players) {
     : '');
 }
 
-function renderEventPlayerBreakdown(event) {
-  const section = document.getElementById('eventPlayerBreakdownSection');
-  const meta = document.getElementById('eventPlayerBreakdownMeta');
-  const list = document.getElementById('eventPlayerBreakdownList');
+function renderEventPlayerBreakdown(event, idPrefix = '') {
+  const base = idPrefix ? `${idPrefix}EventPlayerBreakdown` : 'eventPlayerBreakdown';
+  const section = document.getElementById(`${base}Section`);
+  const meta = document.getElementById(`${base}Meta`);
+  const list = document.getElementById(`${base}List`);
   if (!section || !meta || !list) return;
 
   const baselinePlayers = event?.baseline?.playerValues || {};
@@ -625,32 +636,58 @@ function renderActiveEvent() {
   document.getElementById('dashboardEventScope').textContent = formatScope(activeEvent.scope);
   const startLabelEl = document.getElementById('eventStartLabel');
   const currentLabelEl = document.getElementById('eventCurrentLabel');
+  const dashboardStartLabelEl = document.getElementById('dashboardEventStartLabel');
+  const dashboardCurrentLabelEl = document.getElementById('dashboardEventCurrentLabel');
   if (startLabelEl && currentLabelEl) {
     if (activeEvent.metric === 'wars') {
       startLabelEl.textContent = 'Total Wars (Start)';
       currentLabelEl.textContent = 'Total Wars (Now)';
+      if (dashboardStartLabelEl && dashboardCurrentLabelEl) {
+        dashboardStartLabelEl.textContent = 'Total Wars (Start)';
+        dashboardCurrentLabelEl.textContent = 'Total Wars (Now)';
+      }
     } else if (activeEvent.metric === 'xp') {
       startLabelEl.textContent = activeEvent.scope === 'selected' ? 'Total Player XP (Start)' : 'Guild XP % (Start)';
       currentLabelEl.textContent = activeEvent.scope === 'selected' ? 'Total Player XP (Now)' : 'Guild XP % (Now)';
+      if (dashboardStartLabelEl && dashboardCurrentLabelEl) {
+        dashboardStartLabelEl.textContent = activeEvent.scope === 'selected' ? 'Total Player XP (Start)' : 'Guild XP % (Start)';
+        dashboardCurrentLabelEl.textContent = activeEvent.scope === 'selected' ? 'Total Player XP (Now)' : 'Guild XP % (Now)';
+      }
     } else {
       startLabelEl.textContent = 'Start Value';
       currentLabelEl.textContent = 'Current Value';
+      if (dashboardStartLabelEl && dashboardCurrentLabelEl) {
+        dashboardStartLabelEl.textContent = 'Start Value';
+        dashboardCurrentLabelEl.textContent = 'Current Value';
+      }
     }
   }
   document.getElementById('eventStartValue').textContent = startValue.toLocaleString();
+  document.getElementById('dashboardEventStartValue').textContent = startValue.toLocaleString();
   document.getElementById('eventCurrentValue').textContent = currentValue.toLocaleString();
+  document.getElementById('dashboardEventCurrentValue').textContent = currentValue.toLocaleString();
   document.getElementById('eventDelta').textContent = formatDelta(delta);
   document.getElementById('dashboardEventDelta').textContent = formatDelta(delta);
   const eventCodeDisplay = document.getElementById('eventCodeDisplay');
+  const dashboardEventCodeDisplay = document.getElementById('dashboardEventCodeDisplay');
   const activeEventPublicToggle = document.getElementById('activeEventPublicToggle');
+  const dashboardActiveEventPublicToggle = document.getElementById('dashboardActiveEventPublicToggle');
   if (eventCodeDisplay) {
     eventCodeDisplay.textContent = activeEvent.eventCode || '-';
+  }
+  if (dashboardEventCodeDisplay) {
+    dashboardEventCodeDisplay.textContent = activeEvent.eventCode || '-';
   }
   if (activeEventPublicToggle) {
     activeEventPublicToggle.checked = Boolean(activeEvent.isPublic);
     activeEventPublicToggle.disabled = !activeEvent.eventCode;
   }
+  if (dashboardActiveEventPublicToggle) {
+    dashboardActiveEventPublicToggle.checked = Boolean(activeEvent.isPublic);
+    dashboardActiveEventPublicToggle.disabled = !activeEvent.eventCode;
+  }
   renderEventPlayerBreakdown(activeEvent);
+  renderEventPlayerBreakdown(activeEvent, 'dashboard');
 
   updateCooldownText();
 }
@@ -953,7 +990,6 @@ async function loadUserDashboard(prefetchedUserData = null) {
   await searchGuild(effectiveGuildName, 'auto', { render: isSearchPage });
   renderActiveEvent();
   if (activeEvent) startCooldownTicker();
-  await loadEventHistory();
 }
 
 function updateTrackedGuildsList(name) {
@@ -992,7 +1028,6 @@ function configurePageMode() {
     trackedGuildsSection?.classList.add('hidden');
     eventHistorySection?.classList.add('hidden');
     backToDashboardBtn?.classList.remove('hidden');
-    dashboardOpenSearchBtn?.classList.add('hidden');
     return;
   }
 
@@ -1000,8 +1035,8 @@ function configurePageMode() {
   guildResult?.classList.add('hidden');
   noResult?.classList.add('hidden');
   userDashboard?.classList.remove('hidden');
-  trackedGuildsSection?.classList.remove('hidden');
-  eventHistorySection?.classList.remove('hidden');
+  trackedGuildsSection?.classList.add('hidden');
+  eventHistorySection?.classList.add('hidden');
   backToDashboardBtn?.classList.add('hidden');
 }
 
@@ -1043,6 +1078,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   document.getElementById('dashboardOpenSearchBtn')?.addEventListener('click', () => {
     window.location.href = '/guild/search';
+  });
+  document.getElementById('dashboardOpenHistoryBtn')?.addEventListener('click', () => {
+    window.location.href = '/guild/event_history';
+  });
+  document.getElementById('dashboardOpenCodePanelBtn')?.addEventListener('click', () => {
+    toggleDashboardCodePanel();
+  });
+  document.getElementById('dashboardCloseCodePanelBtn')?.addEventListener('click', () => {
+    toggleDashboardCodePanel(false);
   });
   document.getElementById('dashboardViewEventCodeBtn')?.addEventListener('click', () => {
     const input = document.getElementById('dashboardEventCodeInput');
@@ -1106,6 +1150,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('viewLeaderboardBtn').addEventListener('click', openLeaderboardPage);
   document.getElementById('dashboardViewLeaderboardBtn').addEventListener('click', openLeaderboardPage);
   document.getElementById('activeEventPublicToggle')?.addEventListener('change', (e) => {
+    toggleActiveEventVisibility(Boolean(e.target.checked));
+  });
+  document.getElementById('dashboardActiveEventPublicToggle')?.addEventListener('change', (e) => {
     toggleActiveEventVisibility(Boolean(e.target.checked));
   });
 });
