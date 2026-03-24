@@ -5,6 +5,31 @@ const REFRESH_COOLDOWN_MS = 15 * 60 * 1000;
 const WYNN_PLAYER_WARS_SPACING_MS = 1600;
 const WYNN_PLAYER_WARS_429_BACKOFF_MS = 3500;
 
+function isWarDebugVerbose() {
+  try {
+    return localStorage.getItem('wynnDebugWars') === '1';
+  } catch {
+    return false;
+  }
+}
+
+function warLog(message, data) {
+  if (data !== undefined) {
+    console.info('[wynn-wars]', message, data);
+  } else {
+    console.info('[wynn-wars]', message);
+  }
+}
+
+function warLogVerbose(message, data) {
+  if (!isWarDebugVerbose()) return;
+  if (data !== undefined) {
+    console.log('[wynn-wars:verbose]', message, data);
+  } else {
+    console.log('[wynn-wars:verbose]', message);
+  }
+}
+
 let nextPlayerWarsRequestAt = 0;
 let currentUser = null;
 let currentGuild = null;
@@ -30,6 +55,7 @@ async function throttlePlayerWarsRequest() {
   const now = Date.now();
   const waitMs = Math.max(0, nextPlayerWarsRequestAt - now);
   if (waitMs > 0) {
+    warLogVerbose('throttle wait ms', waitMs);
     await delay(waitMs);
   }
   nextPlayerWarsRequestAt = Date.now() + WYNN_PLAYER_WARS_SPACING_MS;
@@ -372,30 +398,56 @@ function getSnapshot(metric, guild, trackedPlayers, scope = 'selected') {
 }
 
 async function fetchMemberWars(uuid, forceRefresh = false) {
-  if (!uuid) return null;
-  if (!forceRefresh && memberWarsCache.has(uuid)) return memberWarsCache.get(uuid);
+  const uuidShort = typeof uuid === 'string' && uuid.length > 12 ? `${uuid.slice(0, 8)}…` : uuid;
+  if (!uuid) {
+    warLogVerbose('fetchMemberWars skipped', 'missing uuid');
+    return null;
+  }
+  if (!forceRefresh && memberWarsCache.has(uuid)) {
+    warLogVerbose('fetchMemberWars cache hit', { uuid: uuidShort });
+    return memberWarsCache.get(uuid);
+  }
   try {
     const doFetch = async () => {
       await throttlePlayerWarsRequest();
       return fetch(`/api/player/wars?uuid=${encodeURIComponent(uuid)}`);
     };
     let response = await doFetch();
+    warLogVerbose('fetchMemberWars response', { uuid: uuidShort, status: response.status, ok: response.ok });
     // #region agent log
     debugLog('pre-fix', 'H3', 'guilds-v2.js:fetchMemberWars:response', 'player endpoint response status', { uuid, ok: response.ok, status: response.status });
     // #endregion
     if (response.status === 429) {
+      warLog('429 from proxy, backing off then retry', { uuid: uuidShort });
       await delay(WYNN_PLAYER_WARS_429_BACKOFF_MS);
       response = await doFetch();
+      warLogVerbose('fetchMemberWars retry response', { uuid: uuidShort, status: response.status, ok: response.ok });
     }
-    if (!response.ok) return null;
+    if (!response.ok) {
+      let errDetail = '';
+      try {
+        const errJson = await response.json();
+        errDetail = errJson?.error || JSON.stringify(errJson);
+      } catch {
+        try {
+          errDetail = (await response.text()).slice(0, 200);
+        } catch {
+          errDetail = '';
+        }
+      }
+      warLog('fetchMemberWars failed', { uuid: uuidShort, status: response.status, detail: errDetail || '(no body)' });
+      return null;
+    }
     const data = await response.json();
     const wars = Number(data?.wars || 0);
     // #region agent log
     debugLog('pre-fix', 'H1', 'guilds-v2.js:fetchMemberWars:parsed', 'parsed wars payload fields', { uuid, wars, hasGlobalData: Boolean(data?.globalData), globalDataKeys: data?.globalData ? Object.keys(data.globalData).slice(0, 8) : [] });
     // #endregion
     memberWarsCache.set(uuid, wars);
+    warLogVerbose('fetchMemberWars ok', { uuid: uuidShort, wars });
     return wars;
-  } catch {
+  } catch (err) {
+    warLog('fetchMemberWars threw', { uuid: uuidShort, message: err?.message || String(err) });
     // #region agent log
     debugLog('pre-fix', 'H3', 'guilds-v2.js:fetchMemberWars:catch', 'player endpoint fetch threw', { uuid });
     // #endregion
@@ -404,6 +456,10 @@ async function fetchMemberWars(uuid, forceRefresh = false) {
 }
 
 async function hydrateVisibleMemberWars(guild, forceRefresh = false, usernames = null) {
+  if (!guild) {
+    warLog('hydrateVisibleMemberWars skipped', 'no guild');
+    return;
+  }
   const members = collectGuildMembers(guild);
   const wantedUsernames = Array.isArray(usernames) ? new Set(usernames) : null;
   const targets = members.filter((member) => {
@@ -412,13 +468,29 @@ async function hydrateVisibleMemberWars(guild, forceRefresh = false, usernames =
     if (forceRefresh) return true;
     return !memberWarsCache.has(member.uuid);
   });
+  const missingUuid = members.filter((m) => !m.uuid).length;
+  warLog('hydrateVisibleMemberWars', {
+    guildName: guild.name || '(unknown)',
+    totalMembers: members.length,
+    targets: targets.length,
+    missingUuid,
+    forceRefresh,
+    filterUsernames: wantedUsernames ? wantedUsernames.size : null
+  });
   // #region agent log
   debugLog('pre-fix', 'H2', 'guilds-v2.js:hydrateVisibleMemberWars:targets', 'member uuid coverage', { totalMembers: members.length, targets: targets.length, missingUuid: members.filter((m) => !m.uuid).length });
   // #endregion
-  if (!targets.length) return;
+  if (!targets.length) {
+    warLog('hydrateVisibleMemberWars nothing to fetch', { reason: 'all cached or no uuids matched filter' });
+    return;
+  }
+  let idx = 0;
   for (const member of targets) {
+    idx += 1;
+    warLogVerbose(`hydrate fetch ${idx}/${targets.length}`, { user: member.username });
     await fetchMemberWars(member.uuid, forceRefresh);
   }
+  warLog('hydrateVisibleMemberWars done', { fetched: targets.length });
 }
 
 function generateEventCode() {
@@ -747,6 +819,14 @@ function renderActiveEvent() {
 async function searchGuild(name, mode = 'auto', options = {}) {
   const shouldRender = options.render !== false;
   const hydrateWars = options.hydrateWars !== undefined ? options.hydrateWars : isSearchPage;
+  warLog('searchGuild', {
+    query: (name || '').slice(0, 40),
+    mode,
+    shouldRender,
+    hydrateWars,
+    isSearchPage,
+    path: window.location.pathname
+  });
   const guildResult = document.getElementById('guildResult');
   const noResult = document.getElementById('noResult');
   if (!name || !name.trim()) return;
