@@ -2,9 +2,8 @@ const GUILD_API = '/api/guild';
 const GUILD_EVENTS_API = '/api/guild/events';
 const USER_API = '/api/user';
 const REFRESH_COOLDOWN_MS = 15 * 60 * 1000;
-const WYNN_PLAYER_WARS_SPACING_MS = 850;
+const WYNN_PLAYER_WARS_SPACING_MS = 500;
 const WYNN_PLAYER_WARS_429_BACKOFF_MS = 3200;
-const MEMBER_WARS_INITIAL_HYDRATE_LIMIT = 32;
 
 function isWarDebugVerbose() {
   try {
@@ -470,17 +469,13 @@ async function hydrateVisibleMemberWars(guild, forceRefresh = false, usernames =
     if (forceRefresh) return true;
     return !memberWarsCache.has(member.uuid);
   });
-  const applyInitialLimit = !forceRefresh && !wantedUsernames;
-  const limitedTargets = applyInitialLimit
-    ? targets.slice(0, MEMBER_WARS_INITIAL_HYDRATE_LIMIT)
-    : targets;
+  const limitedTargets = targets;
   const missingUuid = members.filter((m) => !m.uuid).length;
   warLog('hydrateVisibleMemberWars', {
     guildName: guild.name || '(unknown)',
     totalMembers: members.length,
     targets: targets.length,
     processingTargets: limitedTargets.length,
-    deferredTargets: Math.max(0, targets.length - limitedTargets.length),
     missingUuid,
     forceRefresh,
     filterUsernames: wantedUsernames ? wantedUsernames.size : null
