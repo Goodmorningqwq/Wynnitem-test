@@ -338,7 +338,7 @@ function renderAmbiguousGuildResults(query, searchType, options) {
     const level = option.stats?.level != null ? `Lv.${option.stats.level}` : '';
     const wars = option.stats?.wars != null ? `${option.stats.wars} wars` : '';
     return `
-      <button class="w-full text-left bg-gray-800/50 hover:bg-gray-700/50 border border-gray-700 rounded p-3 transition-colors guild-ambiguous-option" data-prefix="${escapeHtml(option.prefix)}">
+      <button type="button" class="w-full text-left bg-gray-800/50 hover:bg-gray-700/50 border border-gray-700 rounded p-3 transition-colors guild-ambiguous-option" data-prefix="${escapeHtml(option.prefix)}">
         <div class="flex items-center justify-between">
           <span class="text-white font-medium">${escapeHtml(option.name)}</span>
           <span class="text-violet-300 text-sm">[${escapeHtml(option.prefix)}]</span>
@@ -630,6 +630,7 @@ function updateCooldownText() {
   const dashboardRefreshBtn = document.getElementById('dashboardRefreshBtn');
   const eventCooldownText = document.getElementById('eventCooldownText');
   const dashboardCooldownText = document.getElementById('dashboardCooldownText');
+  if (!refreshBtn || !dashboardRefreshBtn || !eventCooldownText || !dashboardCooldownText) return;
   const firstRefreshDone = Boolean(activeEvent.firstRefreshDone);
   const lastRefreshAt = Number(activeEvent.lastRefreshAt || activeEvent.startedAt || 0);
   const remaining = firstRefreshDone
@@ -844,8 +845,8 @@ async function searchGuild(name, mode = 'auto', options = {}) {
   if (!name || !name.trim()) return;
 
   if (shouldRender) {
-    guildResult.classList.add('hidden');
-    noResult.classList.add('hidden');
+    if (guildResult) guildResult.classList.add('hidden');
+    if (noResult) noResult.classList.add('hidden');
     hideAmbiguousGuildResults();
   }
 
@@ -867,7 +868,7 @@ async function searchGuild(name, mode = 'auto', options = {}) {
 
     if (!response.ok) {
       if (response.status === 404) {
-        if (shouldRender) {
+        if (shouldRender && noResult) {
           noResult.classList.remove('hidden');
         }
         currentGuild = null;
@@ -1191,6 +1192,7 @@ async function stopTrackingGuild() {
 function updateTrackedGuildsList(name) {
   const list = document.getElementById('trackedGuildsList');
   const noEl = document.getElementById('noTrackedGuilds');
+  if (!list || !noEl) return;
   if (!name) {
     noEl.classList.remove('hidden');
     list.innerHTML = '';
@@ -1198,7 +1200,7 @@ function updateTrackedGuildsList(name) {
   }
   noEl.classList.add('hidden');
   list.innerHTML = `
-    <button class="w-full text-left bg-gray-800/50 hover:bg-gray-700/50 p-3 rounded-lg transition-colors" data-guild-name="${escapeHtml(name)}">
+    <button type="button" class="w-full text-left bg-gray-800/50 hover:bg-gray-700/50 p-3 rounded-lg transition-colors" data-guild-name="${escapeHtml(name)}">
       <span class="text-white font-medium">${escapeHtml(name)}</span>
     </button>
   `;
