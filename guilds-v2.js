@@ -1219,10 +1219,13 @@ function configurePageMode() {
   const guildResult = document.getElementById('guildResult');
   const noResult = document.getElementById('noResult');
   const userDashboard = document.getElementById('userDashboard');
+  const guildHowToSection = document.getElementById('guildHowToSection');
   const trackedGuildsSection = document.getElementById('trackedGuildsSection');
   const eventHistorySection = document.getElementById('eventHistorySection');
   const dashboardOpenSearchBtn = document.getElementById('dashboardOpenSearchBtn');
   const backToDashboardBtn = document.getElementById('backToDashboardBtn');
+
+  guildHowToSection?.classList.toggle('hidden', isSearchPage);
 
   if (isSearchPage) {
     searchSection?.classList.remove('hidden');
@@ -1250,6 +1253,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   configurePageMode();
   currentUser = getCurrentUser();
+  document.getElementById('guildHowToLoginStep')?.classList.toggle('hidden', Boolean(currentUser));
   if (currentUser) {
     headerLoginBtn.classList.add('hidden');
     headerUserBtn.classList.remove('hidden');

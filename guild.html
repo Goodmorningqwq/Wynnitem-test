@@ -129,6 +129,31 @@
   <!-- Main Content -->
   <main class="flex-1 container mx-auto px-4 py-8">
     <div class="max-w-4xl mx-auto">
+
+      <!-- How to use (dashboard route only; toggled in guilds-v2.js) -->
+      <div id="guildHowToSection" class="hidden theme-panel p-6 rounded-xl mb-6">
+        <h3 class="text-gray-400 uppercase text-xs tracking-widest font-semibold mb-4">How to use Guild Tracker</h3>
+        <ol class="list-decimal list-inside space-y-3 text-sm text-gray-300">
+          <li id="guildHowToLoginStep">
+            <span class="text-gray-200 font-medium">Log in or register</span>
+            <span class="block pl-6 mt-1 text-gray-400">Use <strong class="text-gray-300">Login</strong> in the header, or go to </span>
+            <span class="block pl-6 mt-1"><a href="/login" class="text-violet-400 hover:text-violet-300 hover:underline">/login</a>. On that page, use <strong class="text-gray-300">Register</strong> if you need an account.</span>
+          </li>
+          <li>
+            <span class="text-gray-200 font-medium">Find a guild</span>
+            <span class="block pl-6 mt-1 text-gray-400">Click <strong class="text-gray-300">Search Guild</strong> below, or open </span>
+            <span class="block pl-6 mt-1"><a href="/guild/search" class="text-violet-400 hover:text-violet-300 hover:underline">/guild/search</a>. Search by guild name or prefix.</span>
+          </li>
+          <li>
+            <span class="text-gray-200 font-medium">Track and start an event</span>
+            <span class="block pl-6 mt-1 text-gray-400">From the guild card, click <strong class="text-gray-300">Select Players</strong>, choose members, set metric and scope, then <strong class="text-gray-300">Start Event</strong>.</span>
+          </li>
+          <li>
+            <span class="text-gray-200 font-medium">Join or review events</span>
+            <span class="block pl-6 mt-1 text-gray-400">Use <strong class="text-gray-300">Enter Event Code</strong> to join by code, <strong class="text-gray-300">Event History</strong> for past runs, and <strong class="text-gray-300">Open Leaderboard</strong> while an event is active.</span>
+          </li>
+        </ol>
+      </div>
       
       <!-- User Dashboard (when logged in) -->
       <div id="userDashboard" class="hidden theme-panel p-6 rounded-xl mb-6">
