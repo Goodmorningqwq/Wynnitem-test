@@ -3,6 +3,7 @@ const GUILD_EVENTS_API = '/api/guild/events';
 const USER_API = '/api/user';
 const REFRESH_COOLDOWN_MS = 15 * 60 * 1000;
 const WYNN_PLAYER_WARS_SPACING_MS = 500;
+const WYNN_PLAYER_WARS_REFRESH_SPACING_MS = 280;
 const WYNN_PLAYER_WARS_429_BACKOFF_MS = 3200;
 
 function isWarDebugVerbose() {
@@ -38,6 +39,7 @@ let cooldownTimerId = null;
 const memberWarsCache = new Map();
 let memberWarsHydrateSession = 0;
 let guildResultCollapsed = false;
+let eventRefreshInFlight = false;
 const isSearchPage = window.location.pathname.startsWith('/guild/search');
 
 function getCurrentUser() {
@@ -52,14 +54,14 @@ function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function throttlePlayerWarsRequest() {
+async function throttlePlayerWarsRequest(spacingMs = WYNN_PLAYER_WARS_SPACING_MS) {
   const now = Date.now();
   const waitMs = Math.max(0, nextPlayerWarsRequestAt - now);
   if (waitMs > 0) {
     warLogVerbose('throttle wait ms', waitMs);
     await delay(waitMs);
   }
-  nextPlayerWarsRequestAt = Date.now() + WYNN_PLAYER_WARS_SPACING_MS;
+  nextPlayerWarsRequestAt = Date.now() + spacingMs;
 }
 
 function logout() {
@@ -187,6 +189,11 @@ function formatWarsSuffix(showWars, wars) {
 function showMemberWarsEnabled() {
   const toggle = document.getElementById('showMemberWarsToggle');
   return Boolean(toggle?.checked);
+}
+
+function isGuildResultCardVisible() {
+  const el = document.getElementById('guildResult');
+  return Boolean(el && !el.classList.contains('hidden'));
 }
 
 function normalizeActiveEvent(rawEvent, fallbackTrackedPlayers = []) {
@@ -398,7 +405,8 @@ function getSnapshot(metric, guild, trackedPlayers, scope = 'selected') {
   };
 }
 
-async function fetchMemberWars(uuid, forceRefresh = false) {
+async function fetchMemberWars(uuid, forceRefresh = false, requestSpacingMs = null) {
+  const spacingMs = requestSpacingMs ?? WYNN_PLAYER_WARS_SPACING_MS;
   const uuidShort = typeof uuid === 'string' && uuid.length > 12 ? `${uuid.slice(0, 8)}…` : uuid;
   if (!uuid) {
     warLogVerbose('fetchMemberWars skipped', 'missing uuid');
@@ -410,7 +418,7 @@ async function fetchMemberWars(uuid, forceRefresh = false) {
   }
   try {
     const doFetch = async () => {
-      await throttlePlayerWarsRequest();
+      await throttlePlayerWarsRequest(spacingMs);
       return fetch(`/api/player/wars?uuid=${encodeURIComponent(uuid)}`);
     };
     let response = await doFetch();
@@ -456,7 +464,7 @@ async function fetchMemberWars(uuid, forceRefresh = false) {
   }
 }
 
-async function hydrateVisibleMemberWars(guild, forceRefresh = false, usernames = null, sessionId = null, progressiveUi = false) {
+async function hydrateVisibleMemberWars(guild, forceRefresh = false, usernames = null, sessionId = null, progressiveUi = false, requestSpacingMs = null) {
   if (!guild) {
     warLog('hydrateVisibleMemberWars skipped', 'no guild');
     return;
@@ -487,6 +495,7 @@ async function hydrateVisibleMemberWars(guild, forceRefresh = false, usernames =
     warLog('hydrateVisibleMemberWars nothing to fetch', { reason: 'all cached or no uuids matched filter' });
     return;
   }
+  const spacingMs = requestSpacingMs ?? WYNN_PLAYER_WARS_SPACING_MS;
   let idx = 0;
   for (const member of limitedTargets) {
     if (sessionId != null && sessionId !== memberWarsHydrateSession) {
@@ -495,7 +504,7 @@ async function hydrateVisibleMemberWars(guild, forceRefresh = false, usernames =
     }
     idx += 1;
     warLogVerbose(`hydrate fetch ${idx}/${limitedTargets.length}`, { user: member.username });
-    await fetchMemberWars(member.uuid, forceRefresh);
+    await fetchMemberWars(member.uuid, forceRefresh, spacingMs);
     if (sessionId != null && sessionId !== memberWarsHydrateSession) {
       warLog('hydrateVisibleMemberWars aborted', { sessionId, reason: 'superseded during fetch' });
       return;
@@ -507,6 +516,29 @@ async function hydrateVisibleMemberWars(guild, forceRefresh = false, usernames =
     }
   }
   warLog('hydrateVisibleMemberWars done', { fetched: limitedTargets.length });
+}
+
+function scheduleMemberWarHydrateAfterSearch(guildRef, progressiveUi) {
+  memberWarsHydrateSession += 1;
+  const sid = memberWarsHydrateSession;
+  void (async () => {
+    try {
+      await hydrateVisibleMemberWars(
+        guildRef,
+        false,
+        null,
+        sid,
+        progressiveUi,
+        WYNN_PLAYER_WARS_REFRESH_SPACING_MS
+      );
+      if (sid !== memberWarsHydrateSession) return;
+      if (progressiveUi && currentGuild && currentGuild.name === guildRef.name) {
+        displayGuild(currentGuild);
+      }
+    } catch (err) {
+      console.error('Background war hydrate error:', err);
+    }
+  })();
 }
 
 function generateEventCode() {
@@ -635,6 +667,13 @@ function updateCooldownText() {
   const eventCooldownText = document.getElementById('eventCooldownText');
   const dashboardCooldownText = document.getElementById('dashboardCooldownText');
   if (!refreshBtn || !dashboardRefreshBtn || !eventCooldownText || !dashboardCooldownText) return;
+  if (eventRefreshInFlight) {
+    refreshBtn.disabled = true;
+    dashboardRefreshBtn.disabled = true;
+    eventCooldownText.textContent = 'Refreshing...';
+    dashboardCooldownText.textContent = 'Refreshing...';
+    return;
+  }
   const firstRefreshDone = Boolean(activeEvent.firstRefreshDone);
   const lastRefreshAt = Number(activeEvent.lastRefreshAt || activeEvent.startedAt || 0);
   const remaining = firstRefreshDone
@@ -835,7 +874,9 @@ function renderActiveEvent() {
 
 async function searchGuild(name, mode = 'auto', options = {}) {
   const shouldRender = options.render !== false;
-  const hydrateWars = options.hydrateWars !== undefined ? options.hydrateWars : isSearchPage;
+  const hydrateWars = options.hydrateWars !== undefined
+    ? options.hydrateWars
+    : (isSearchPage && showMemberWarsEnabled());
   warLog('searchGuild', {
     query: (name || '').slice(0, 40),
     mode,
@@ -885,20 +926,7 @@ async function searchGuild(name, mode = 'auto', options = {}) {
       displayGuild(currentGuild);
     }
     if (hydrateWars) {
-      memberWarsHydrateSession += 1;
-      const sid = memberWarsHydrateSession;
-      const guildRef = data;
-      void (async () => {
-        try {
-          await hydrateVisibleMemberWars(guildRef, false, null, sid, shouldRender);
-          if (sid !== memberWarsHydrateSession) return;
-          if (shouldRender && currentGuild && currentGuild.name === guildRef.name) {
-            displayGuild(currentGuild);
-          }
-        } catch (err) {
-          console.error('Background war hydrate error:', err);
-        }
-      })();
+      scheduleMemberWarHydrateAfterSearch(data, shouldRender);
     } else if (shouldRender && currentGuild?.name === data?.name) {
       displayGuild(currentGuild);
     }
@@ -1007,46 +1035,62 @@ async function startEvent() {
 
 async function refreshEvent() {
   if (!activeEvent || !currentGuild?.name) return;
+  if (eventRefreshInFlight) return;
   const now = Date.now();
   const cooldownUntil = Number(activeEvent.lastRefreshAt || 0) + Number(activeEvent.refreshCooldownMs || REFRESH_COOLDOWN_MS);
   if (activeEvent.firstRefreshDone && now < cooldownUntil) {
     updateCooldownText();
     return;
   }
+  eventRefreshInFlight = true;
   setDashboardEventLoading(true, 'Refreshing event data...');
-  await searchGuild(activeEvent.guildName, 'auto', { render: isSearchPage, hydrateWars: false });
-  if (activeEvent.metric === 'wars') {
-    await hydrateVisibleMemberWars(currentGuild, true, activeEvent.trackedPlayers || [], null, isSearchPage);
-  }
-  const snapshot = getSnapshot(activeEvent.metric, currentGuild, activeEvent.trackedPlayers || [], activeEvent.scope || 'selected');
-  const previousSnapshot = activeEvent.current || null;
-  const previousMetricValue = Number(previousSnapshot?.metricValue || 0);
-  const nextMetricValue = Number(snapshot?.metricValue || 0);
-  const previousPlayers = previousSnapshot?.playerValues || {};
-  const nextPlayers = snapshot?.playerValues || {};
-  const previousKeys = Object.keys(previousPlayers).sort();
-  const nextKeys = Object.keys(nextPlayers).sort();
-  const sameKeyCount = previousKeys.length === nextKeys.length;
-  const sameKeys = sameKeyCount && previousKeys.every((key, idx) => key === nextKeys[idx]);
-  const samePlayerValues = sameKeys && previousKeys.every((key) => Number(previousPlayers[key] || 0) === Number(nextPlayers[key] || 0));
-  const snapshotChanged = previousMetricValue !== nextMetricValue || !samePlayerValues;
-  activeEvent.current = snapshot;
-  activeEvent.lastRefreshAt = Date.now();
-  activeEvent.firstRefreshDone = true;
-  if (snapshotChanged) {
-    const saveResult = await updateUserData({ activeEvent });
-    if (!saveResult.ok) {
-      console.error('Failed to persist refreshed active event:', saveResult.error);
+  updateCooldownText();
+  try {
+    await searchGuild(activeEvent.guildName, 'auto', { render: isSearchPage, hydrateWars: false });
+    if (activeEvent.metric === 'wars') {
+      await hydrateVisibleMemberWars(
+        currentGuild,
+        true,
+        activeEvent.trackedPlayers || [],
+        null,
+        isSearchPage,
+        WYNN_PLAYER_WARS_REFRESH_SPACING_MS
+      );
     }
-    if (activeEvent.eventCode) {
-      const syncResult = await upsertEventCodeIndex(activeEvent);
-      if (!syncResult.ok) {
-        console.error('Failed to sync event code on refresh:', syncResult.error);
+    const snapshot = getSnapshot(activeEvent.metric, currentGuild, activeEvent.trackedPlayers || [], activeEvent.scope || 'selected');
+    const previousSnapshot = activeEvent.current || null;
+    const previousMetricValue = Number(previousSnapshot?.metricValue || 0);
+    const nextMetricValue = Number(snapshot?.metricValue || 0);
+    const previousPlayers = previousSnapshot?.playerValues || {};
+    const nextPlayers = snapshot?.playerValues || {};
+    const previousKeys = Object.keys(previousPlayers).sort();
+    const nextKeys = Object.keys(nextPlayers).sort();
+    const sameKeyCount = previousKeys.length === nextKeys.length;
+    const sameKeys = sameKeyCount && previousKeys.every((key, idx) => key === nextKeys[idx]);
+    const samePlayerValues = sameKeys && previousKeys.every((key) => Number(previousPlayers[key] || 0) === Number(nextPlayers[key] || 0));
+    const snapshotChanged = previousMetricValue !== nextMetricValue || !samePlayerValues;
+    activeEvent.current = snapshot;
+    activeEvent.lastRefreshAt = Date.now();
+    activeEvent.firstRefreshDone = true;
+    if (snapshotChanged) {
+      const saveResult = await updateUserData({ activeEvent });
+      if (!saveResult.ok) {
+        console.error('Failed to persist refreshed active event:', saveResult.error);
+      }
+      if (activeEvent.eventCode) {
+        const syncResult = await upsertEventCodeIndex(activeEvent);
+        if (!syncResult.ok) {
+          console.error('Failed to sync event code on refresh:', syncResult.error);
+        }
       }
     }
+  } catch (err) {
+    console.error('Refresh event error:', err);
+  } finally {
+    eventRefreshInFlight = false;
+    setDashboardEventLoading(false);
+    renderActiveEvent();
   }
-  renderActiveEvent();
-  setDashboardEventLoading(false);
 }
 
 async function endEvent() {
@@ -1158,7 +1202,7 @@ async function loadUserDashboard(prefetchedUserData = null) {
     renderActiveEvent();
     setDashboardEventLoading(true, 'Loading event data...');
   }
-  await searchGuild(effectiveGuildName, 'auto', { render: isSearchPage, hydrateWars: isSearchPage });
+  await searchGuild(effectiveGuildName, 'auto', { render: isSearchPage });
   setDashboardEventLoading(false);
   renderActiveEvent();
   if (activeEvent) startCooldownTicker();
@@ -1312,6 +1356,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     const members = collectGuildMembers(currentGuild);
     renderMembersList(members);
     renderPlayerSelection(members);
+    if (showMemberWarsEnabled()) {
+      scheduleMemberWarHydrateAfterSearch(currentGuild, isGuildResultCardVisible());
+    }
   });
 
   document.getElementById('trackScopeSelect').addEventListener('change', updateScopeUI);
