@@ -614,13 +614,21 @@ function renderEventPlayerBreakdown(event, idPrefix = '') {
 
 function renderActiveEvent() {
   const hasEvent = Boolean(activeEvent);
+  const quickCodeRow = document.getElementById('dashboardQuickEventCodeRow');
+  const quickCodeValue = document.getElementById('dashboardQuickEventCodeValue');
   document.getElementById('activeEventSection').classList.toggle('hidden', !hasEvent);
   document.getElementById('dashboardEventSection').classList.toggle('hidden', !hasEvent);
   document.getElementById('eventSetupSection').classList.toggle('hidden', hasEvent);
   document.getElementById('startEventBtn').classList.toggle('hidden', hasEvent);
   document.getElementById('noActiveEventSection').classList.toggle('hidden', hasEvent);
+  if (quickCodeRow) {
+    quickCodeRow.classList.toggle('hidden', !hasEvent);
+  }
 
   if (!hasEvent) {
+    if (quickCodeValue) {
+      quickCodeValue.textContent = '-';
+    }
     updateStopTrackingState();
     return;
   }
@@ -695,6 +703,9 @@ function renderActiveEvent() {
   }
   if (dashboardEventCodeDisplay) {
     dashboardEventCodeDisplay.textContent = activeEvent.eventCode || '-';
+  }
+  if (quickCodeValue) {
+    quickCodeValue.textContent = activeEvent.eventCode || '-';
   }
   if (activeEventPublicToggle) {
     activeEventPublicToggle.checked = Boolean(activeEvent.isPublic);
