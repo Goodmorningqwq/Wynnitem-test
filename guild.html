@@ -132,6 +132,13 @@
           <h3 class="text-gray-400 uppercase text-xs tracking-widest font-semibold">Your Guild</h3>
           <button id="dashboardOpenSearchBtn" class="theme-btn px-3 py-1 rounded text-xs">Open Search</button>
         </div>
+        <div id="dashboardJoinCodeSection" class="mb-4 bg-gray-900/30 border border-gray-700 rounded-lg p-3">
+          <p class="text-xs text-gray-500 mb-2">Join Event by Code</p>
+          <div class="flex gap-2">
+            <input id="dashboardEventCodeInput" type="text" maxlength="12" placeholder="Enter event code (e.g. A7K9Q2)" class="flex-1 bg-[rgba(26,12,40,0.95)] border border-[rgba(143,95,216,0.45)] rounded-lg px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-violet-500 focus:outline-none">
+            <button id="dashboardViewEventCodeBtn" class="theme-btn px-4 py-2 rounded-lg text-sm">View Event</button>
+          </div>
+        </div>
         <div id="noGuildTracked" class="hidden text-center py-4">
           <p class="text-gray-500 mb-4">You haven't tracked any guild yet.</p>
           <p class="text-gray-400 text-sm">Go to search menu to start tracking.</p>

@@ -481,6 +481,12 @@ function openLeaderboardPage() {
   window.location.href = '/guild/leaderboard';
 }
 
+function openLeaderboardByCode(rawCode) {
+  const code = String(rawCode || '').trim().toUpperCase();
+  if (!code) return;
+  window.location.href = `/guild/leaderboard?code=${encodeURIComponent(code)}`;
+}
+
 function getGuildDelta(event) {
   const start = Number(event.baseline?.metricValue || 0);
   const current = Number(event.current?.metricValue || start);
@@ -649,14 +655,17 @@ function renderActiveEvent() {
   updateCooldownText();
 }
 
-async function searchGuild(name, mode = 'auto') {
+async function searchGuild(name, mode = 'auto', options = {}) {
+  const shouldRender = options.render !== false;
   const guildResult = document.getElementById('guildResult');
   const noResult = document.getElementById('noResult');
   if (!name || !name.trim()) return;
 
-  guildResult.classList.add('hidden');
-  noResult.classList.add('hidden');
-  hideAmbiguousGuildResults();
+  if (shouldRender) {
+    guildResult.classList.add('hidden');
+    noResult.classList.add('hidden');
+    hideAmbiguousGuildResults();
+  }
 
   try {
     const response = await fetch(`${GUILD_API}?query=${encodeURIComponent(name)}&mode=${encodeURIComponent(mode)}`);
@@ -668,27 +677,35 @@ async function searchGuild(name, mode = 'auto') {
     }
 
     if (response.status === 300 && data?.ambiguous) {
-      renderAmbiguousGuildResults(name, data.searchType || mode, data.options || {});
+      if (shouldRender) {
+        renderAmbiguousGuildResults(name, data.searchType || mode, data.options || {});
+      }
       return;
     }
 
     if (!response.ok) {
       if (response.status === 404) {
-        noResult.classList.remove('hidden');
+        if (shouldRender) {
+          noResult.classList.remove('hidden');
+        }
         currentGuild = null;
         return;
       }
       throw new Error(`API Error: ${response.status}`);
     }
     currentGuild = data;
-    displayGuild(currentGuild);
+    if (shouldRender) {
+      displayGuild(currentGuild);
+    }
     await hydrateVisibleMemberWars(currentGuild);
-    if (currentGuild?.name === data?.name) {
+    if (shouldRender && currentGuild?.name === data?.name) {
       displayGuild(currentGuild);
     }
   } catch (e) {
     console.error('Search error:', e);
-    alert(`Error searching guild: ${e.message}`);
+    if (shouldRender) {
+      alert(`Error searching guild: ${e.message}`);
+    }
   }
 }
 
@@ -795,7 +812,7 @@ async function refreshEvent() {
     updateCooldownText();
     return;
   }
-  await searchGuild(activeEvent.guildName);
+  await searchGuild(activeEvent.guildName, 'auto', { render: isSearchPage });
   if (activeEvent.metric === 'wars') {
     await hydrateVisibleMemberWars(currentGuild, true, activeEvent.trackedPlayers || []);
   }
@@ -933,7 +950,7 @@ async function loadUserDashboard(prefetchedUserData = null) {
   document.getElementById('dashboardGuildPrefix').textContent = '';
   renderTrackedPlayersInfo(userData.trackedPlayers || []);
 
-  await searchGuild(effectiveGuildName);
+  await searchGuild(effectiveGuildName, 'auto', { render: isSearchPage });
   renderActiveEvent();
   if (activeEvent) startCooldownTicker();
   await loadEventHistory();
@@ -1026,6 +1043,15 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   document.getElementById('dashboardOpenSearchBtn')?.addEventListener('click', () => {
     window.location.href = '/guild/search';
+  });
+  document.getElementById('dashboardViewEventCodeBtn')?.addEventListener('click', () => {
+    const input = document.getElementById('dashboardEventCodeInput');
+    openLeaderboardByCode(input?.value || '');
+  });
+  document.getElementById('dashboardEventCodeInput')?.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      openLeaderboardByCode(e.target?.value || '');
+    }
   });
   document.getElementById('backToDashboardBtn')?.addEventListener('click', () => {
     window.location.href = '/guild';
