@@ -2,9 +2,9 @@ const GUILD_API = '/api/guild';
 const GUILD_EVENTS_API = '/api/guild/events';
 const USER_API = '/api/user';
 const REFRESH_COOLDOWN_MS = 15 * 60 * 1000;
-const WYNN_PLAYER_WARS_SPACING_MS = 1600;
-const WYNN_PLAYER_WARS_429_BACKOFF_MS = 3500;
-const MEMBER_WARS_INITIAL_HYDRATE_LIMIT = 20;
+const WYNN_PLAYER_WARS_SPACING_MS = 850;
+const WYNN_PLAYER_WARS_429_BACKOFF_MS = 3200;
+const MEMBER_WARS_INITIAL_HYDRATE_LIMIT = 32;
 
 function isWarDebugVerbose() {
   try {
