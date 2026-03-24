@@ -2,7 +2,10 @@ const GUILD_API = '/api/guild';
 const GUILD_EVENTS_API = '/api/guild/events';
 const USER_API = '/api/user';
 const REFRESH_COOLDOWN_MS = 15 * 60 * 1000;
+const WYNN_PLAYER_WARS_SPACING_MS = 1600;
+const WYNN_PLAYER_WARS_429_BACKOFF_MS = 3500;
 
+let nextPlayerWarsRequestAt = 0;
 let currentUser = null;
 let currentGuild = null;
 let activeEvent = null;
@@ -17,6 +20,19 @@ function getCurrentUser() {
   } catch {
     return null;
   }
+}
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function throttlePlayerWarsRequest() {
+  const now = Date.now();
+  const waitMs = Math.max(0, nextPlayerWarsRequestAt - now);
+  if (waitMs > 0) {
+    await delay(waitMs);
+  }
+  nextPlayerWarsRequestAt = Date.now() + WYNN_PLAYER_WARS_SPACING_MS;
 }
 
 function logout() {
@@ -359,10 +375,18 @@ async function fetchMemberWars(uuid, forceRefresh = false) {
   if (!uuid) return null;
   if (!forceRefresh && memberWarsCache.has(uuid)) return memberWarsCache.get(uuid);
   try {
-    const response = await fetch(`/api/player/wars?uuid=${encodeURIComponent(uuid)}`);
+    const doFetch = async () => {
+      await throttlePlayerWarsRequest();
+      return fetch(`/api/player/wars?uuid=${encodeURIComponent(uuid)}`);
+    };
+    let response = await doFetch();
     // #region agent log
     debugLog('pre-fix', 'H3', 'guilds-v2.js:fetchMemberWars:response', 'player endpoint response status', { uuid, ok: response.ok, status: response.status });
     // #endregion
+    if (response.status === 429) {
+      await delay(WYNN_PLAYER_WARS_429_BACKOFF_MS);
+      response = await doFetch();
+    }
     if (!response.ok) return null;
     const data = await response.json();
     const wars = Number(data?.wars || 0);
@@ -392,10 +416,8 @@ async function hydrateVisibleMemberWars(guild, forceRefresh = false, usernames =
   debugLog('pre-fix', 'H2', 'guilds-v2.js:hydrateVisibleMemberWars:targets', 'member uuid coverage', { totalMembers: members.length, targets: targets.length, missingUuid: members.filter((m) => !m.uuid).length });
   // #endregion
   if (!targets.length) return;
-  const CONCURRENCY = 6;
-  for (let i = 0; i < targets.length; i += CONCURRENCY) {
-    const chunk = targets.slice(i, i + CONCURRENCY);
-    await Promise.all(chunk.map((member) => fetchMemberWars(member.uuid, forceRefresh)));
+  for (const member of targets) {
+    await fetchMemberWars(member.uuid, forceRefresh);
   }
 }
 
@@ -724,6 +746,7 @@ function renderActiveEvent() {
 
 async function searchGuild(name, mode = 'auto', options = {}) {
   const shouldRender = options.render !== false;
+  const hydrateWars = options.hydrateWars !== undefined ? options.hydrateWars : isSearchPage;
   const guildResult = document.getElementById('guildResult');
   const noResult = document.getElementById('noResult');
   if (!name || !name.trim()) return;
@@ -764,7 +787,9 @@ async function searchGuild(name, mode = 'auto', options = {}) {
     if (shouldRender) {
       displayGuild(currentGuild);
     }
-    await hydrateVisibleMemberWars(currentGuild);
+    if (hydrateWars) {
+      await hydrateVisibleMemberWars(currentGuild);
+    }
     if (shouldRender && currentGuild?.name === data?.name) {
       displayGuild(currentGuild);
     }
@@ -880,7 +905,7 @@ async function refreshEvent() {
     return;
   }
   setDashboardEventLoading(true, 'Refreshing event data...');
-  await searchGuild(activeEvent.guildName, 'auto', { render: isSearchPage });
+  await searchGuild(activeEvent.guildName, 'auto', { render: isSearchPage, hydrateWars: false });
   if (activeEvent.metric === 'wars') {
     await hydrateVisibleMemberWars(currentGuild, true, activeEvent.trackedPlayers || []);
   }
@@ -1024,7 +1049,7 @@ async function loadUserDashboard(prefetchedUserData = null) {
     renderActiveEvent();
     setDashboardEventLoading(true, 'Loading event data...');
   }
-  await searchGuild(effectiveGuildName, 'auto', { render: isSearchPage });
+  await searchGuild(effectiveGuildName, 'auto', { render: isSearchPage, hydrateWars: isSearchPage });
   setDashboardEventLoading(false);
   renderActiveEvent();
   if (activeEvent) startCooldownTicker();
