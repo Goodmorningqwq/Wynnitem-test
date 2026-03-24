@@ -457,7 +457,7 @@ async function fetchMemberWars(uuid, forceRefresh = false) {
   }
 }
 
-async function hydrateVisibleMemberWars(guild, forceRefresh = false, usernames = null, sessionId = null) {
+async function hydrateVisibleMemberWars(guild, forceRefresh = false, usernames = null, sessionId = null, progressiveUi = false) {
   if (!guild) {
     warLog('hydrateVisibleMemberWars skipped', 'no guild');
     return;
@@ -501,6 +501,15 @@ async function hydrateVisibleMemberWars(guild, forceRefresh = false, usernames =
     idx += 1;
     warLogVerbose(`hydrate fetch ${idx}/${limitedTargets.length}`, { user: member.username });
     await fetchMemberWars(member.uuid, forceRefresh);
+    if (sessionId != null && sessionId !== memberWarsHydrateSession) {
+      warLog('hydrateVisibleMemberWars aborted', { sessionId, reason: 'superseded during fetch' });
+      return;
+    }
+    if (progressiveUi && currentGuild && guild && currentGuild.name === guild.name) {
+      const members = collectGuildMembers(currentGuild);
+      renderMembersList(members);
+      renderPlayerSelection(members);
+    }
   }
   warLog('hydrateVisibleMemberWars done', { fetched: limitedTargets.length });
 }
@@ -886,7 +895,7 @@ async function searchGuild(name, mode = 'auto', options = {}) {
       const guildRef = data;
       void (async () => {
         try {
-          await hydrateVisibleMemberWars(guildRef, false, null, sid);
+          await hydrateVisibleMemberWars(guildRef, false, null, sid, shouldRender);
           if (sid !== memberWarsHydrateSession) return;
           if (shouldRender && currentGuild && currentGuild.name === guildRef.name) {
             displayGuild(currentGuild);
@@ -1012,7 +1021,7 @@ async function refreshEvent() {
   setDashboardEventLoading(true, 'Refreshing event data...');
   await searchGuild(activeEvent.guildName, 'auto', { render: isSearchPage, hydrateWars: false });
   if (activeEvent.metric === 'wars') {
-    await hydrateVisibleMemberWars(currentGuild, true, activeEvent.trackedPlayers || []);
+    await hydrateVisibleMemberWars(currentGuild, true, activeEvent.trackedPlayers || [], null, isSearchPage);
   }
   const snapshot = getSnapshot(activeEvent.metric, currentGuild, activeEvent.trackedPlayers || [], activeEvent.scope || 'selected');
   const previousSnapshot = activeEvent.current || null;
