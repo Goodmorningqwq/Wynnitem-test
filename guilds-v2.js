@@ -497,6 +497,13 @@ function toggleDashboardCodePanel(forceOpen = null) {
   }
 }
 
+function setDashboardEventLoading(isLoading, message = 'Loading event data...') {
+  const loadingEl = document.getElementById('dashboardEventLoadingText');
+  if (!loadingEl) return;
+  loadingEl.textContent = message;
+  loadingEl.classList.toggle('hidden', !isLoading);
+}
+
 function getGuildDelta(event) {
   const start = Number(event.baseline?.metricValue || 0);
   const current = Number(event.current?.metricValue || start);
@@ -849,6 +856,7 @@ async function refreshEvent() {
     updateCooldownText();
     return;
   }
+  setDashboardEventLoading(true, 'Refreshing event data...');
   await searchGuild(activeEvent.guildName, 'auto', { render: isSearchPage });
   if (activeEvent.metric === 'wars') {
     await hydrateVisibleMemberWars(currentGuild, true, activeEvent.trackedPlayers || []);
@@ -881,6 +889,7 @@ async function refreshEvent() {
     }
   }
   renderActiveEvent();
+  setDashboardEventLoading(false);
 }
 
 async function endEvent() {
@@ -987,7 +996,12 @@ async function loadUserDashboard(prefetchedUserData = null) {
   document.getElementById('dashboardGuildPrefix').textContent = '';
   renderTrackedPlayersInfo(userData.trackedPlayers || []);
 
+  if (activeEvent) {
+    renderActiveEvent();
+    setDashboardEventLoading(true, 'Loading event data...');
+  }
   await searchGuild(effectiveGuildName, 'auto', { render: isSearchPage });
+  setDashboardEventLoading(false);
   renderActiveEvent();
   if (activeEvent) startCooldownTicker();
 }
