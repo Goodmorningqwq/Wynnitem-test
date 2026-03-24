@@ -147,7 +147,10 @@
           <div class="mb-4">
             <div class="flex justify-between items-center mb-2">
               <span class="text-gray-400 text-xs uppercase tracking-widest">Tracked Players</span>
-              <button id="changeGuildBtn" class="text-violet-400 text-xs hover:underline">Change Players</button>
+              <div class="flex items-center gap-3">
+                <button id="stopTrackingBtn" class="text-red-400 text-xs hover:underline disabled:text-gray-500 disabled:no-underline disabled:cursor-not-allowed">Stop Tracking</button>
+                <button id="changeGuildBtn" class="text-violet-400 text-xs hover:underline">Change Players</button>
+              </div>
             </div>
             <div id="trackedPlayersInfo" class="text-gray-500 text-sm">
               <p>No players selected</p>

@@ -504,6 +504,14 @@ function setDashboardEventLoading(isLoading, message = 'Loading event data...') 
   loadingEl.classList.toggle('hidden', !isLoading);
 }
 
+function updateStopTrackingState() {
+  const stopBtn = document.getElementById('stopTrackingBtn');
+  if (!stopBtn) return;
+  const hasActiveEvent = Boolean(activeEvent);
+  stopBtn.disabled = hasActiveEvent;
+  stopBtn.title = hasActiveEvent ? 'End the active event first' : 'Stop tracking this guild';
+}
+
 function getGuildDelta(event) {
   const start = Number(event.baseline?.metricValue || 0);
   const current = Number(event.current?.metricValue || start);
@@ -612,7 +620,10 @@ function renderActiveEvent() {
   document.getElementById('startEventBtn').classList.toggle('hidden', hasEvent);
   document.getElementById('noActiveEventSection').classList.toggle('hidden', hasEvent);
 
-  if (!hasEvent) return;
+  if (!hasEvent) {
+    updateStopTrackingState();
+    return;
+  }
 
   const elapsed = Date.now() - Number(activeEvent.startedAt || Date.now());
   const hours = Math.floor(elapsed / 3600000);
@@ -697,6 +708,7 @@ function renderActiveEvent() {
   renderEventPlayerBreakdown(activeEvent, 'dashboard');
 
   updateCooldownText();
+  updateStopTrackingState();
 }
 
 async function searchGuild(name, mode = 'auto', options = {}) {
@@ -987,6 +999,7 @@ async function loadUserDashboard(prefetchedUserData = null) {
     document.getElementById('guildTracked').classList.add('hidden');
     renderActiveEvent();
     if (activeEvent) startCooldownTicker();
+    updateStopTrackingState();
     return;
   }
 
@@ -1004,6 +1017,35 @@ async function loadUserDashboard(prefetchedUserData = null) {
   setDashboardEventLoading(false);
   renderActiveEvent();
   if (activeEvent) startCooldownTicker();
+  updateStopTrackingState();
+}
+
+async function stopTrackingGuild() {
+  if (!currentUser) return;
+  if (activeEvent) {
+    alert('You can only stop tracking when there is no active event.');
+    return;
+  }
+  if (!confirm('Stop tracking this guild and clear selected players?')) return;
+  const result = await updateUserData({
+    guildName: null,
+    trackedPlayers: [],
+    activeEvent: null
+  });
+  if (!result.ok) {
+    alert(`Failed to stop tracking: ${result.error}`);
+    return;
+  }
+  currentGuild = null;
+  activeEvent = null;
+  renderActiveEvent();
+  updateTrackedGuildsList(null);
+  await loadUserDashboard({
+    guildName: null,
+    trackedPlayers: [],
+    activeEvent: null,
+    events: []
+  });
 }
 
 function updateTrackedGuildsList(name) {
@@ -1157,6 +1199,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     updateScopeUI();
     section.scrollIntoView({ behavior: 'smooth', block: 'center' });
   });
+  document.getElementById('stopTrackingBtn')?.addEventListener('click', stopTrackingGuild);
   document.getElementById('refreshEventBtn').addEventListener('click', refreshEvent);
   document.getElementById('dashboardRefreshBtn').addEventListener('click', refreshEvent);
   document.getElementById('endEventBtn').addEventListener('click', endEvent);
