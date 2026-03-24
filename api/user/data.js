@@ -24,6 +24,8 @@ function sanitizeActiveEvent(value) {
   const startedAt = Number(value.startedAt || Date.now());
   const lastRefreshAt = Number(value.lastRefreshAt || startedAt);
   const firstRefreshDone = Boolean(value.firstRefreshDone);
+  const eventCode = typeof value.eventCode === 'string' ? value.eventCode.trim().toUpperCase() : null;
+  const isPublic = Boolean(value.isPublic);
   const baseline = value.baseline && typeof value.baseline === 'object' ? value.baseline : null;
   const current = value.current && typeof value.current === 'object' ? value.current : baseline;
 
@@ -36,6 +38,8 @@ function sanitizeActiveEvent(value) {
     startedAt,
     lastRefreshAt,
     firstRefreshDone,
+    eventCode,
+    isPublic,
     baseline,
     current
   };
@@ -62,9 +66,10 @@ module.exports = async (req, res) => {
     try {
       const dataKey = `user:${username}:data`;
       const eventsKey = `user:${username}:events`;
+      const includeEvents = req.query.includeEvents === 'true';
 
       const userDataStr = await redis.get(dataKey);
-      const events = await redis.lrange(eventsKey, 0, 49);
+      const events = includeEvents ? await redis.lrange(eventsKey, 0, 49) : [];
 
       const userData = parseJsonSafe(userDataStr, getDefaultUserData());
       const parsedEvents = events
@@ -94,6 +99,7 @@ module.exports = async (req, res) => {
 
       const userDataStr = await redis.get(dataKey);
       const userData = parseJsonSafe(userDataStr, getDefaultUserData());
+      const beforeJson = JSON.stringify(userData);
 
       if (guildName !== undefined) {
         if (guildName !== userData.guildName && userData.trackedPlayers.length > 0) {
@@ -140,7 +146,10 @@ module.exports = async (req, res) => {
         userData.activeEvent = sanitizedEvent;
       }
 
-      await redis.set(dataKey, JSON.stringify(userData));
+      const afterJson = JSON.stringify(userData);
+      if (beforeJson !== afterJson) {
+        await redis.set(dataKey, afterJson);
+      }
 
       if (addEvent) {
         await redis.lpush(eventsKey, JSON.stringify(addEvent));

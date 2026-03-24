@@ -128,10 +128,13 @@
       
       <!-- User Dashboard (when logged in) -->
       <div id="userDashboard" class="hidden theme-panel p-6 rounded-xl mb-6">
-        <h3 class="text-gray-400 uppercase text-xs tracking-widest font-semibold mb-4">Your Guild</h3>
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="text-gray-400 uppercase text-xs tracking-widest font-semibold">Your Guild</h3>
+          <button id="dashboardOpenSearchBtn" class="theme-btn px-3 py-1 rounded text-xs">Open Search</button>
+        </div>
         <div id="noGuildTracked" class="hidden text-center py-4">
           <p class="text-gray-500 mb-4">You haven't tracked any guild yet.</p>
-          <p class="text-gray-400 text-sm">Search for a guild below to start tracking.</p>
+          <p class="text-gray-400 text-sm">Go to search menu to start tracking.</p>
         </div>
         <div id="guildTracked" class="hidden">
           <div class="flex justify-between items-center mb-4">
@@ -183,7 +186,10 @@
       
       <!-- Guild Search -->
       <div id="searchSection" class="theme-panel p-6 rounded-xl mb-6">
-        <h2 class="hero-title mb-3 text-center">Guild Tracker</h2>
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="hero-title text-center flex-1">Guild Tracker</h2>
+          <button id="backToDashboardBtn" class="theme-btn px-4 py-2 rounded-lg text-sm ml-4">Back to Dashboard</button>
+        </div>
         <p class="text-gray-400 text-center mb-6">Search by guild name or prefix and track XP or war progress</p>
         
         <div class="flex gap-4">
@@ -289,6 +295,13 @@
               <label class="text-gray-400 text-xs mb-1 block">Manual Refresh Cooldown</label>
               <p class="text-sm text-gray-400">15 minutes between refreshes to reduce Redis usage.</p>
             </div>
+            <div>
+              <label class="text-gray-400 text-xs mb-1 block">Event Visibility</label>
+              <label class="text-sm text-gray-300 flex items-center gap-2 cursor-pointer">
+                <input id="eventPublicToggle" type="checkbox" class="accent-purple-500">
+                Open/Public (anyone with event code can view leaderboard)
+              </label>
+            </div>
           </div>
 
           <!-- Player Selection for Tracking -->
@@ -340,6 +353,18 @@
                   <span class="text-gray-500 text-sm">Delta: </span>
                   <span class="text-xl font-bold text-green-400" id="eventDelta">+0</span>
                 </div>
+                <div class="bg-gray-900/40 border border-gray-700 rounded-lg p-3 mb-3">
+                  <div class="flex items-center justify-between gap-3">
+                    <div>
+                      <p class="text-xs text-gray-500">Event Code</p>
+                      <p id="eventCodeDisplay" class="text-sm font-semibold text-violet-300">-</p>
+                    </div>
+                    <label class="text-xs text-gray-300 flex items-center gap-2 cursor-pointer">
+                      <input id="activeEventPublicToggle" type="checkbox" class="accent-purple-500">
+                      Open/Public
+                    </label>
+                  </div>
+                </div>
                 <div id="eventPlayerBreakdownSection" class="hidden mt-3 bg-gray-900/40 border border-gray-700 rounded-lg p-3">
                   <div class="flex items-center justify-between mb-2">
                     <span class="text-gray-300 text-xs uppercase tracking-widest font-semibold">Player Breakdown</span>
@@ -376,7 +401,7 @@
       </div>
 
       <!-- Tracked Guilds -->
-      <div class="theme-panel p-6 rounded-xl mb-6">
+      <div id="trackedGuildsSection" class="theme-panel p-6 rounded-xl mb-6">
         <h3 class="text-gray-400 uppercase text-xs tracking-widest font-semibold mb-4">Tracked Guilds</h3>
         <div id="trackedGuildsList" class="space-y-2">
           <p class="text-gray-500 text-sm text-center py-4" id="noTrackedGuilds">No guilds tracked yet. Search for a guild and click "Track Guild".</p>
@@ -384,7 +409,7 @@
       </div>
 
       <!-- Event History -->
-      <div class="theme-panel p-6 rounded-xl">
+      <div id="eventHistorySection" class="theme-panel p-6 rounded-xl">
         <h3 class="text-gray-400 uppercase text-xs tracking-widest font-semibold mb-4">Event History</h3>
         <div id="eventHistoryList" class="space-y-2">
           <p class="text-gray-500 text-sm text-center py-4" id="noEventHistory">No events recorded yet.</p>

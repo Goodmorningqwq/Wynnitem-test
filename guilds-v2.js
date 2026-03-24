@@ -1,4 +1,5 @@
 const GUILD_API = '/api/guild';
+const GUILD_EVENTS_API = '/api/guild/events';
 const USER_API = '/api/user';
 const REFRESH_COOLDOWN_MS = 15 * 60 * 1000;
 
@@ -8,6 +9,7 @@ let activeEvent = null;
 let cooldownTimerId = null;
 const memberWarsCache = new Map();
 let guildResultCollapsed = false;
+const isSearchPage = window.location.pathname.startsWith('/guild/search');
 
 function getCurrentUser() {
   try {
@@ -54,10 +56,11 @@ function debugLog(runId, hypothesisId, location, message, data) {
   }).catch(() => {});
 }
 
-async function loadUserData() {
+async function loadUserData(options = {}) {
   if (!currentUser) return null;
+  const includeEvents = Boolean(options.includeEvents);
   try {
-    const response = await fetch(`${USER_API}/data?username=${encodeURIComponent(currentUser)}`);
+    const response = await fetch(`${USER_API}/data?username=${encodeURIComponent(currentUser)}&includeEvents=${includeEvents ? 'true' : 'false'}`);
     if (!response.ok) throw new Error('Failed to load user data');
     return await response.json();
   } catch (e) {
@@ -173,6 +176,8 @@ function normalizeActiveEvent(rawEvent, fallbackTrackedPlayers = []) {
     startedAt,
     lastRefreshAt,
     firstRefreshDone,
+    eventCode: typeof rawEvent.eventCode === 'string' ? rawEvent.eventCode.toUpperCase() : null,
+    isPublic: Boolean(rawEvent.isPublic),
     baseline: rawEvent.baseline || {
       metricValue: startValue,
       playerValues: {}
@@ -394,7 +399,85 @@ async function hydrateVisibleMemberWars(guild, forceRefresh = false, usernames =
   }
 }
 
+function generateEventCode() {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 6; i += 1) {
+    code += alphabet[Math.floor(Math.random() * alphabet.length)];
+  }
+  return code;
+}
+
+async function upsertEventCodeIndex(event) {
+  if (!currentUser || !event?.eventCode) return { ok: false, error: 'Missing user or code' };
+  try {
+    const response = await fetch(GUILD_EVENTS_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'upsert',
+        username: currentUser,
+        code: event.eventCode,
+        event
+      })
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      return { ok: false, status: response.status, error: data?.error || 'Failed to upsert event code' };
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, status: 0, error: e.message };
+  }
+}
+
+async function updateEventVisibility(eventCode, isPublic) {
+  if (!currentUser || !eventCode) return { ok: false, error: 'Missing user or code' };
+  try {
+    const response = await fetch(GUILD_EVENTS_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'visibility',
+        username: currentUser,
+        code: eventCode,
+        isPublic
+      })
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      return { ok: false, status: response.status, error: data?.error || 'Failed to update visibility' };
+    }
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, status: 0, error: e.message };
+  }
+}
+
+async function removeEventCodeIndex(eventCode) {
+  if (!currentUser || !eventCode) return { ok: true };
+  try {
+    await fetch(GUILD_EVENTS_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'remove',
+        username: currentUser,
+        code: eventCode
+      })
+    });
+    return { ok: true };
+  } catch {
+    return { ok: false };
+  }
+}
+
 function openLeaderboardPage() {
+  const code = activeEvent?.eventCode;
+  if (code) {
+    window.location.href = `/guild/leaderboard?code=${encodeURIComponent(code)}`;
+    return;
+  }
   window.location.href = '/guild/leaderboard';
 }
 
@@ -552,6 +635,15 @@ function renderActiveEvent() {
   document.getElementById('eventCurrentValue').textContent = currentValue.toLocaleString();
   document.getElementById('eventDelta').textContent = formatDelta(delta);
   document.getElementById('dashboardEventDelta').textContent = formatDelta(delta);
+  const eventCodeDisplay = document.getElementById('eventCodeDisplay');
+  const activeEventPublicToggle = document.getElementById('activeEventPublicToggle');
+  if (eventCodeDisplay) {
+    eventCodeDisplay.textContent = activeEvent.eventCode || '-';
+  }
+  if (activeEventPublicToggle) {
+    activeEventPublicToggle.checked = Boolean(activeEvent.isPublic);
+    activeEventPublicToggle.disabled = !activeEvent.eventCode;
+  }
   renderEventPlayerBreakdown(activeEvent);
 
   updateCooldownText();
@@ -616,6 +708,8 @@ async function startEvent() {
 
   const metric = document.getElementById('trackMetricSelect').value;
   const scope = document.getElementById('trackScopeSelect').value;
+  const eventPublicToggle = document.getElementById('eventPublicToggle');
+  const isPublic = Boolean(eventPublicToggle?.checked);
   let trackedPlayers = [];
   if (scope === 'selected') {
     trackedPlayers = getSelectedPlayers();
@@ -628,6 +722,36 @@ async function startEvent() {
   }
 
   const baseline = getSnapshot(metric, currentGuild, trackedPlayers, scope);
+  let eventCode = null;
+  for (let attempts = 0; attempts < 8; attempts += 1) {
+    const candidate = generateEventCode();
+    const reserveResult = await upsertEventCodeIndex({
+      eventCode: candidate,
+      isPublic,
+      guildName: currentGuild.name,
+      metric,
+      scope,
+      trackedPlayers,
+      refreshCooldownMs: REFRESH_COOLDOWN_MS,
+      startedAt: Date.now(),
+      lastRefreshAt: Date.now(),
+      firstRefreshDone: false,
+      baseline,
+      current: baseline
+    });
+    if (reserveResult.ok) {
+      eventCode = candidate;
+      break;
+    }
+    if (reserveResult.status !== 409) {
+      alert(`Failed to reserve event code: ${reserveResult.error}`);
+      return;
+    }
+  }
+  if (!eventCode) {
+    alert('Unable to generate unique event code. Please try again.');
+    return;
+  }
   const event = {
     guildName: currentGuild.name,
     metric,
@@ -637,6 +761,8 @@ async function startEvent() {
     startedAt: Date.now(),
     lastRefreshAt: Date.now(),
     firstRefreshDone: false,
+    eventCode,
+    isPublic,
     baseline,
     current: baseline
   };
@@ -647,8 +773,13 @@ async function startEvent() {
     activeEvent: event
   });
   if (!saveResult.ok) {
+    await removeEventCodeIndex(eventCode);
     alert(`Failed to save event: ${saveResult.error}`);
     return;
+  }
+  const syncResult = await upsertEventCodeIndex(event);
+  if (!syncResult.ok) {
+    console.error('Failed to sync event index after start:', syncResult.error);
   }
   activeEvent = event;
   renderTrackedPlayersInfo(trackedPlayers);
@@ -669,12 +800,31 @@ async function refreshEvent() {
     await hydrateVisibleMemberWars(currentGuild, true, activeEvent.trackedPlayers || []);
   }
   const snapshot = getSnapshot(activeEvent.metric, currentGuild, activeEvent.trackedPlayers || [], activeEvent.scope || 'selected');
+  const previousSnapshot = activeEvent.current || null;
+  const previousMetricValue = Number(previousSnapshot?.metricValue || 0);
+  const nextMetricValue = Number(snapshot?.metricValue || 0);
+  const previousPlayers = previousSnapshot?.playerValues || {};
+  const nextPlayers = snapshot?.playerValues || {};
+  const previousKeys = Object.keys(previousPlayers).sort();
+  const nextKeys = Object.keys(nextPlayers).sort();
+  const sameKeyCount = previousKeys.length === nextKeys.length;
+  const sameKeys = sameKeyCount && previousKeys.every((key, idx) => key === nextKeys[idx]);
+  const samePlayerValues = sameKeys && previousKeys.every((key) => Number(previousPlayers[key] || 0) === Number(nextPlayers[key] || 0));
+  const snapshotChanged = previousMetricValue !== nextMetricValue || !samePlayerValues;
   activeEvent.current = snapshot;
   activeEvent.lastRefreshAt = Date.now();
   activeEvent.firstRefreshDone = true;
-  const saveResult = await updateUserData({ activeEvent });
-  if (!saveResult.ok) {
-    console.error('Failed to persist refreshed active event:', saveResult.error);
+  if (snapshotChanged) {
+    const saveResult = await updateUserData({ activeEvent });
+    if (!saveResult.ok) {
+      console.error('Failed to persist refreshed active event:', saveResult.error);
+    }
+    if (activeEvent.eventCode) {
+      const syncResult = await upsertEventCodeIndex(activeEvent);
+      if (!syncResult.ok) {
+        console.error('Failed to sync event code on refresh:', syncResult.error);
+      }
+    }
   }
   renderActiveEvent();
 }
@@ -701,10 +851,28 @@ async function endEvent() {
     alert(`Failed to end event: ${endResult.error}`);
     return;
   }
+  if (activeEvent.eventCode) {
+    await removeEventCodeIndex(activeEvent.eventCode);
+  }
   activeEvent = null;
   renderActiveEvent();
   stopCooldownTicker();
   await loadUserDashboard();
+}
+
+async function toggleActiveEventVisibility(isPublic) {
+  if (!activeEvent?.eventCode) return;
+  const result = await updateEventVisibility(activeEvent.eventCode, isPublic);
+  if (!result.ok) {
+    alert(`Failed to update event visibility: ${result.error || 'unknown error'}`);
+    return;
+  }
+  activeEvent.isPublic = Boolean(isPublic);
+  const saveResult = await updateUserData({ activeEvent });
+  if (!saveResult.ok) {
+    console.error('Failed to persist active event visibility:', saveResult.error);
+  }
+  renderActiveEvent();
 }
 
 function updateScopeUI() {
@@ -712,11 +880,11 @@ function updateScopeUI() {
   document.getElementById('playerSelectSection').classList.toggle('hidden', scope !== 'selected');
 }
 
-async function loadEventHistory() {
+async function loadEventHistory(prefetchedUserData = null) {
   const list = document.getElementById('eventHistoryList');
   const noEl = document.getElementById('noEventHistory');
   if (!list) return;
-  const userData = await loadUserData();
+  const userData = prefetchedUserData || await loadUserData({ includeEvents: true });
   const events = userData?.events || [];
   if (!events.length) {
     list.innerHTML = '<p class="text-gray-500 text-sm text-center py-4" id="noEventHistory">No events recorded yet.</p>';
@@ -736,8 +904,8 @@ async function loadEventHistory() {
   `).join('');
 }
 
-async function loadUserDashboard() {
-  const userData = await loadUserData();
+async function loadUserDashboard(prefetchedUserData = null) {
+  const userData = prefetchedUserData || await loadUserData({ includeEvents: false });
   if (!userData) return;
   const normalizedEvent = normalizeActiveEvent(userData.activeEvent, userData.trackedPlayers || []);
   activeEvent = normalizedEvent;
@@ -747,7 +915,9 @@ async function loadUserDashboard() {
   document.getElementById('trackedGuildDisplay').textContent = effectiveGuildName
     ? `Guild: ${effectiveGuildName}`
     : 'No guild tracked';
-  document.getElementById('userDashboard').classList.remove('hidden');
+  if (!isSearchPage) {
+    document.getElementById('userDashboard').classList.remove('hidden');
+  }
 
   if (!effectiveGuildName) {
     document.getElementById('noGuildTracked').classList.remove('hidden');
@@ -789,12 +959,42 @@ function updateTrackedGuildsList(name) {
   });
 }
 
+function configurePageMode() {
+  const searchSection = document.getElementById('searchSection');
+  const guildResult = document.getElementById('guildResult');
+  const noResult = document.getElementById('noResult');
+  const userDashboard = document.getElementById('userDashboard');
+  const trackedGuildsSection = document.getElementById('trackedGuildsSection');
+  const eventHistorySection = document.getElementById('eventHistorySection');
+  const dashboardOpenSearchBtn = document.getElementById('dashboardOpenSearchBtn');
+  const backToDashboardBtn = document.getElementById('backToDashboardBtn');
+
+  if (isSearchPage) {
+    searchSection?.classList.remove('hidden');
+    userDashboard?.classList.add('hidden');
+    trackedGuildsSection?.classList.add('hidden');
+    eventHistorySection?.classList.add('hidden');
+    backToDashboardBtn?.classList.remove('hidden');
+    dashboardOpenSearchBtn?.classList.add('hidden');
+    return;
+  }
+
+  searchSection?.classList.add('hidden');
+  guildResult?.classList.add('hidden');
+  noResult?.classList.add('hidden');
+  userDashboard?.classList.remove('hidden');
+  trackedGuildsSection?.classList.remove('hidden');
+  eventHistorySection?.classList.remove('hidden');
+  backToDashboardBtn?.classList.add('hidden');
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
   const headerLoginBtn = document.getElementById('headerLoginBtn');
   const headerUserBtn = document.getElementById('headerUserBtn');
   const userMenu = document.getElementById('userMenu');
   const userDisplayName = document.getElementById('userDisplayName');
 
+  configurePageMode();
   currentUser = getCurrentUser();
   if (currentUser) {
     headerLoginBtn.classList.add('hidden');
@@ -802,8 +1002,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     headerUserBtn.textContent = currentUser;
     userMenu.classList.remove('hidden');
     userDisplayName.textContent = currentUser;
-    await loadUserDashboard();
-    const userData = await loadUserData();
+    const userData = await loadUserData({ includeEvents: false });
+    await loadUserDashboard(userData);
     updateTrackedGuildsList(userData?.guildName || null);
   }
 
@@ -823,6 +1023,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (e.key === 'Enter') {
       searchGuild(document.getElementById('guildSearchInput').value);
     }
+  });
+  document.getElementById('dashboardOpenSearchBtn')?.addEventListener('click', () => {
+    window.location.href = '/guild/search';
+  });
+  document.getElementById('backToDashboardBtn')?.addEventListener('click', () => {
+    window.location.href = '/guild';
   });
   document.getElementById('toggleGuildResultBtn').addEventListener('click', () => {
     guildResultCollapsed = !guildResultCollapsed;
@@ -873,4 +1079,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('dashboardEndBtn').addEventListener('click', endEvent);
   document.getElementById('viewLeaderboardBtn').addEventListener('click', openLeaderboardPage);
   document.getElementById('dashboardViewLeaderboardBtn').addEventListener('click', openLeaderboardPage);
+  document.getElementById('activeEventPublicToggle')?.addEventListener('change', (e) => {
+    toggleActiveEventVisibility(Boolean(e.target.checked));
+  });
 });

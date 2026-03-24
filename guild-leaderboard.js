@@ -1,4 +1,5 @@
 const USER_API = '/api/user';
+const GUILD_EVENTS_API = '/api/guild/events';
 
 function getCurrentUser() {
   try {
@@ -54,8 +55,19 @@ function computeLeaderboard(event) {
 }
 
 async function loadUserData(username) {
-  const response = await fetch(`${USER_API}/data?username=${encodeURIComponent(username)}`);
+  const response = await fetch(`${USER_API}/data?username=${encodeURIComponent(username)}&includeEvents=false`);
   if (!response.ok) throw new Error(`Failed to load user data: ${response.status}`);
+  return response.json();
+}
+
+async function loadEventByCode(code, username) {
+  const query = new URLSearchParams({ code: code.toUpperCase() });
+  if (username) query.set('username', username);
+  const response = await fetch(`${GUILD_EVENTS_API}?${query.toString()}`);
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data?.error || `Failed to load event: ${response.status}`);
+  }
   return response.json();
 }
 
@@ -93,15 +105,34 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.location.href = '/guild';
   });
 
+  const codeInput = document.getElementById('eventCodeInput');
+  const viewCodeBtn = document.getElementById('viewEventCodeBtn');
+  const params = new URLSearchParams(window.location.search);
+  const codeFromUrl = (params.get('code') || '').trim().toUpperCase();
+  if (codeFromUrl) {
+    codeInput.value = codeFromUrl;
+  }
+  viewCodeBtn.addEventListener('click', () => {
+    const enteredCode = (codeInput.value || '').trim().toUpperCase();
+    if (!enteredCode) return;
+    window.location.href = `/guild/leaderboard?code=${encodeURIComponent(enteredCode)}`;
+  });
+
   const currentUser = getCurrentUser();
-  if (!currentUser) {
+  if (!currentUser && !codeFromUrl) {
     renderEmpty('Please log in to view leaderboard.');
     return;
   }
 
   try {
-    const userData = await loadUserData(currentUser);
-    const event = normalizeActiveEvent(userData.activeEvent, userData.trackedPlayers || []);
+    let event = null;
+    if (codeFromUrl) {
+      const eventFromCode = await loadEventByCode(codeFromUrl, currentUser || '');
+      event = normalizeActiveEvent(eventFromCode, eventFromCode?.trackedPlayers || []);
+    } else {
+      const userData = await loadUserData(currentUser);
+      event = normalizeActiveEvent(userData.activeEvent, userData.trackedPlayers || []);
+    }
     if (!event) {
       renderEmpty('No active event found for this user.');
       return;
