@@ -37,6 +37,7 @@ let currentGuild = null;
 let activeEvent = null;
 let cooldownTimerId = null;
 const memberWarsCache = new Map();
+let memberWarsHydrateSession = 0;
 let guildResultCollapsed = false;
 const isSearchPage = window.location.pathname.startsWith('/guild/search');
 
@@ -456,7 +457,7 @@ async function fetchMemberWars(uuid, forceRefresh = false) {
   }
 }
 
-async function hydrateVisibleMemberWars(guild, forceRefresh = false, usernames = null) {
+async function hydrateVisibleMemberWars(guild, forceRefresh = false, usernames = null, sessionId = null) {
   if (!guild) {
     warLog('hydrateVisibleMemberWars skipped', 'no guild');
     return;
@@ -493,6 +494,10 @@ async function hydrateVisibleMemberWars(guild, forceRefresh = false, usernames =
   }
   let idx = 0;
   for (const member of limitedTargets) {
+    if (sessionId != null && sessionId !== memberWarsHydrateSession) {
+      warLog('hydrateVisibleMemberWars aborted', { sessionId, reason: 'superseded by newer search' });
+      return;
+    }
     idx += 1;
     warLogVerbose(`hydrate fetch ${idx}/${limitedTargets.length}`, { user: member.username });
     await fetchMemberWars(member.uuid, forceRefresh);
@@ -875,9 +880,21 @@ async function searchGuild(name, mode = 'auto', options = {}) {
       displayGuild(currentGuild);
     }
     if (hydrateWars) {
-      await hydrateVisibleMemberWars(currentGuild);
-    }
-    if (shouldRender && currentGuild?.name === data?.name) {
+      memberWarsHydrateSession += 1;
+      const sid = memberWarsHydrateSession;
+      const guildRef = data;
+      void (async () => {
+        try {
+          await hydrateVisibleMemberWars(guildRef, false, null, sid);
+          if (sid !== memberWarsHydrateSession) return;
+          if (shouldRender && currentGuild && currentGuild.name === guildRef.name) {
+            displayGuild(currentGuild);
+          }
+        } catch (err) {
+          console.error('Background war hydrate error:', err);
+        }
+      })();
+    } else if (shouldRender && currentGuild?.name === data?.name) {
       displayGuild(currentGuild);
     }
   } catch (e) {
@@ -1233,9 +1250,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     headerUserBtn.textContent = currentUser;
     userMenu.classList.remove('hidden');
     userDisplayName.textContent = currentUser;
-    const userData = await loadUserData({ includeEvents: false });
-    await loadUserDashboard(userData);
-    updateTrackedGuildsList(userData?.guildName || null);
   }
 
   document.getElementById('logoutBtn').addEventListener('click', logout);
@@ -1335,4 +1349,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('dashboardActiveEventPublicToggle')?.addEventListener('change', (e) => {
     toggleActiveEventVisibility(Boolean(e.target.checked));
   });
+
+  if (currentUser) {
+    const userData = await loadUserData({ includeEvents: false });
+    await loadUserDashboard(userData);
+    updateTrackedGuildsList(userData?.guildName || null);
+  }
 });
