@@ -1566,6 +1566,10 @@ async function stopTrackingGuild() {
     alert(`Failed to stop tracking: ${result.error}`);
     return;
   }
+  // Clear UI selection checkboxes too (server clears trackedPlayers, but UI can remain checked).
+  document.querySelectorAll('#playerCheckboxes input[type="checkbox"]').forEach((el) => {
+    el.checked = false;
+  });
   currentGuild = null;
   activeEvent = null;
   renderActiveEvent();
