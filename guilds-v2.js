@@ -576,7 +576,8 @@ async function hydrateVisibleMemberWarsWorkerPool(
   sessionId = null,
   concurrency = 6,
   startSpacingMs = 150,
-  onProgress = null
+  onProgress = null,
+  maxTriesPerMember = 3
 ) {
   if (!guild) return;
   const members = collectGuildMembers(guild);
@@ -617,7 +618,7 @@ async function hydrateVisibleMemberWarsWorkerPool(
     inFlight += 1;
     const p = (async () => {
       try {
-        await fetchMemberWarsNoThrottle(member.uuid, forceRefresh, on429, 3);
+        await fetchMemberWarsNoThrottle(member.uuid, forceRefresh, on429, maxTriesPerMember);
       } finally {
         done += 1;
         if (!aborted && onProgress) {
@@ -737,7 +738,23 @@ function scheduleMemberWarHydrateAfterSearch(guildRef, renderAtEnd) {
             sid,
             6,
             150,
-            null
+            null,
+            6
+          );
+          if (sid !== memberWarsHydrateSession) return;
+        }
+        // Final quick retry for the last stragglers.
+        const finalMissing = collectGuildMembers(guildRef).filter((m) => m.uuid && !memberWarsCache.has(m.uuid)).length;
+        if (finalMissing > 0) {
+          await hydrateVisibleMemberWarsWorkerPool(
+            guildRef,
+            false,
+            null,
+            sid,
+            3,
+            250,
+            null,
+            8
           );
           if (sid !== memberWarsHydrateSession) return;
         }
@@ -1279,7 +1296,23 @@ async function refreshEvent() {
             null,
             6,
             150,
-            null
+            null,
+            6
+          );
+        }
+        const finalMissing = collectGuildMembers(currentGuild)
+          .filter((m) => (activeEvent.trackedPlayers || []).includes(m.username))
+          .filter((m) => m.uuid && !memberWarsCache.has(m.uuid)).length;
+        if (finalMissing > 0) {
+          await hydrateVisibleMemberWarsWorkerPool(
+            currentGuild,
+            false,
+            activeEvent.trackedPlayers || [],
+            null,
+            3,
+            250,
+            null,
+            8
           );
         }
         if (isGuildResultCardVisible() && currentGuild) {
