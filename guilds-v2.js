@@ -140,6 +140,28 @@ async function updateUserData(payload) {
   }
 }
 
+async function wipeUserData() {
+  if (!currentUser) return { ok: false, status: 0, error: 'No user logged in' };
+  try {
+    const response = await fetch(`${USER_API}/data?username=${encodeURIComponent(currentUser)}`, {
+      method: 'DELETE'
+    });
+    if (!response.ok) {
+      let errorData = {};
+      try {
+        errorData = await response.json();
+      } catch {
+        errorData = { error: 'unknown' };
+      }
+      return { ok: false, status: response.status, error: errorData?.error || 'unknown' };
+    }
+    return { ok: true };
+  } catch (e) {
+    console.error('Wipe user data error:', e);
+    return { ok: false, status: 0, error: e.message };
+  }
+}
+
 function collectGuildMembers(guild) {
   if (!guild?.members) return [];
   const ranks = ['owner', 'chief', 'strategist', 'captain', 'recruiter', 'recruit'];
@@ -1985,6 +2007,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     section.scrollIntoView({ behavior: 'smooth', block: 'center' });
   });
   document.getElementById('stopTrackingBtn')?.addEventListener('click', stopTrackingGuild);
+  document.getElementById('wipeUserDataBtn')?.addEventListener('click', async () => {
+    if (!currentUser) return;
+    const confirmed = confirm(`Delete all stored guild data for ${currentUser}? This cannot be undone.`);
+    if (!confirmed) return;
+    const result = await wipeUserData();
+    if (!result.ok) {
+      alert(`Failed to wipe user data: ${result.error || 'unknown error'}`);
+      return;
+    }
+    activeEvent = null;
+    currentGuild = null;
+    memberWarsCache.clear();
+    hideGuildWarsHydrationProgress();
+    hideDashboardWarsHydrationProgress();
+    await loadUserDashboard();
+    alert('User data wiped. You can now track a new guild.');
+  });
   document.getElementById('refreshEventBtn').addEventListener('click', refreshEvent);
   document.getElementById('dashboardRefreshBtn').addEventListener('click', refreshEvent);
   document.getElementById('endEventBtn').addEventListener('click', endEvent);

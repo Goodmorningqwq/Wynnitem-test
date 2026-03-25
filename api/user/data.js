@@ -57,6 +57,8 @@ function parseJsonSafe(value, fallback) {
 
 module.exports = async (req, res) => {
   const username = req.query.username;
+  const dataKey = `user:${username}:data`;
+  const eventsKey = `user:${username}:events`;
 
   if (!username) {
     return res.status(400).json({ error: 'Username required' });
@@ -64,8 +66,6 @@ module.exports = async (req, res) => {
 
   if (req.method === 'GET') {
     try {
-      const dataKey = `user:${username}:data`;
-      const eventsKey = `user:${username}:events`;
       const includeEvents = req.query.includeEvents === 'true';
 
       const userDataStr = await redis.get(dataKey);
@@ -93,9 +93,6 @@ module.exports = async (req, res) => {
   if (req.method === 'POST') {
     try {
       const { guildName, trackedPlayers, activeEvent, addEvent, addPlayer, removePlayer, clearPlayers } = req.body;
-
-      const dataKey = `user:${username}:data`;
-      const eventsKey = `user:${username}:events`;
 
       const userDataStr = await redis.get(dataKey);
       const userData = parseJsonSafe(userDataStr, getDefaultUserData());
@@ -159,6 +156,17 @@ module.exports = async (req, res) => {
       return res.json({ success: true, trackedPlayers: userData.trackedPlayers });
     } catch (e) {
       console.error('Update data error:', e);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+
+  if (req.method === 'DELETE') {
+    try {
+      await redis.del(dataKey);
+      await redis.del(eventsKey);
+      return res.json({ success: true });
+    } catch (e) {
+      console.error('Delete data error:', e);
       return res.status(500).json({ error: 'Internal server error' });
     }
   }
