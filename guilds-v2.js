@@ -726,8 +726,24 @@ function scheduleMemberWarHydrateAfterSearch(guildRef, renderAtEnd) {
       );
       if (sid !== memberWarsHydrateSession) return;
       hideGuildWarsHydrationProgress();
-      if (renderAtEnd && currentGuild && currentGuild.name === guildRef.name) {
-        displayGuild(currentGuild);
+      if (renderAtEnd) {
+        const members = collectGuildMembers(guildRef);
+        const missingCount = members.filter((m) => m.uuid && !memberWarsCache.has(m.uuid)).length;
+        if (missingCount > 0) {
+          await hydrateVisibleMemberWarsWorkerPool(
+            guildRef,
+            false,
+            null,
+            sid,
+            6,
+            150,
+            null
+          );
+          if (sid !== memberWarsHydrateSession) return;
+        }
+        if (currentGuild && currentGuild.name === guildRef.name) {
+          displayGuild(currentGuild);
+        }
       }
     } catch (err) {
       console.error('Background war hydrate error:', err);
@@ -1251,12 +1267,29 @@ async function refreshEvent() {
         150,
         ({ done, total }) => setDashboardWarsHydrationProgress(done, total)
       );
-      if (isGuildResultCardVisible() && currentGuild) {
-        const members = collectGuildMembers(currentGuild);
-        renderMembersList(members);
-        renderPlayerSelection(members);
+      if (activeEvent.metric === 'wars') {
+        const members = collectGuildMembers(currentGuild).filter((m) => (activeEvent.trackedPlayers || []).includes(m.username));
+        const missingCount = members.filter((m) => m.uuid && !memberWarsCache.has(m.uuid)).length;
+        hideDashboardWarsHydrationProgress();
+        if (missingCount > 0) {
+          await hydrateVisibleMemberWarsWorkerPool(
+            currentGuild,
+            false,
+            activeEvent.trackedPlayers || [],
+            null,
+            6,
+            150,
+            null
+          );
+        }
+        if (isGuildResultCardVisible() && currentGuild) {
+          const refreshedMembers = collectGuildMembers(currentGuild);
+          renderMembersList(refreshedMembers);
+          renderPlayerSelection(refreshedMembers);
+        }
+      } else {
+        hideDashboardWarsHydrationProgress();
       }
-      hideDashboardWarsHydrationProgress();
     }
     const snapshot = getSnapshot(activeEvent.metric, currentGuild, activeEvent.trackedPlayers || [], activeEvent.scope || 'selected');
     const previousSnapshot = activeEvent.current || null;
