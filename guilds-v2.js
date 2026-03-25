@@ -498,6 +498,160 @@ async function fetchMemberWars(uuid, forceRefresh = false, requestSpacingMs = nu
   }
 }
 
+function parseRetryAfterMs(retryAfterValue) {
+  const raw = retryAfterValue == null ? '' : String(retryAfterValue).trim();
+  if (!raw) return WYNN_PLAYER_WARS_429_BACKOFF_MS;
+  const num = Number(raw);
+  if (Number.isNaN(num) || num <= 0) return WYNN_PLAYER_WARS_429_BACKOFF_MS;
+  // Proxy sets Retry-After in seconds (ex: '60'), convert to ms.
+  return num * 1000;
+}
+
+async function fetchMemberWarsNoThrottle(uuid, forceRefresh = false, on429 = null, maxTries = 3) {
+  const uuidShort = typeof uuid === 'string' && uuid.length > 12 ? `${uuid.slice(0, 8)}…` : uuid;
+  if (!uuid) {
+    warLogVerbose('fetchMemberWarsNoThrottle skipped', 'missing uuid');
+    return null;
+  }
+  if (!forceRefresh && memberWarsCache.has(uuid)) {
+    warLogVerbose('fetchMemberWarsNoThrottle cache hit', { uuid: uuidShort });
+    return memberWarsCache.get(uuid);
+  }
+
+  let attempt = 0;
+  while (attempt < maxTries) {
+    attempt += 1;
+    try {
+      const response = await fetch(`/api/player/wars?uuid=${encodeURIComponent(uuid)}`);
+      warLogVerbose('fetchMemberWarsNoThrottle response', { uuid: uuidShort, status: response.status, ok: response.ok, attempt });
+
+      if (response.status === 429) {
+        if (on429) {
+          try {
+            on429(response);
+          } catch (e) {
+            // ignore callback errors
+          }
+        }
+        const retryAfter = parseRetryAfterMs(response.headers.get('Retry-After'));
+        await delay(retryAfter);
+        continue;
+      }
+
+      if (!response.ok) {
+        let errDetail = '';
+        try {
+          const errJson = await response.json();
+          errDetail = errJson?.error || JSON.stringify(errJson);
+        } catch {
+          try {
+            errDetail = (await response.text()).slice(0, 200);
+          } catch {
+            errDetail = '';
+          }
+        }
+        warLog('fetchMemberWarsNoThrottle failed', { uuid: uuidShort, status: response.status, detail: errDetail || '(no body)' });
+        return null;
+      }
+
+      const data = await response.json();
+      const wars = Number(data?.wars || 0);
+      memberWarsCache.set(uuid, wars);
+      warLogVerbose('fetchMemberWarsNoThrottle ok', { uuid: uuidShort, wars, attempt });
+      return wars;
+    } catch (err) {
+      warLogVerbose('fetchMemberWarsNoThrottle threw', { uuid: uuidShort, message: err?.message || String(err), attempt });
+      if (attempt >= maxTries) return null;
+      await delay(250 * attempt);
+    }
+  }
+
+  return null;
+}
+
+async function hydrateVisibleMemberWarsWorkerPool(
+  guild,
+  forceRefresh = false,
+  usernames = null,
+  sessionId = null,
+  concurrency = 6,
+  startSpacingMs = 150,
+  onProgress = null
+) {
+  if (!guild) return;
+  const members = collectGuildMembers(guild);
+  const wantedUsernames = Array.isArray(usernames) ? new Set(usernames) : null;
+  const targets = members.filter((member) => {
+    if (!member.uuid) return false;
+    if (wantedUsernames && !wantedUsernames.has(member.username)) return false;
+    if (forceRefresh) return true;
+    return !memberWarsCache.has(member.uuid);
+  });
+  if (!targets.length) return;
+
+  const total = targets.length;
+  let done = 0;
+
+  // Atomic request-start scheduler state.
+  let nextStartAt = Date.now();
+  let pauseUntil = 0;
+
+  let idx = 0;
+  let inFlight = 0;
+  let aborted = false;
+  const inFlightPromises = new Set();
+
+  function shouldAbort() {
+    if (sessionId == null) return false;
+    return sessionId !== memberWarsHydrateSession;
+  }
+
+  function on429(resp) {
+    // Pause starting any *new* request for a bit.
+    const retryAfter = parseRetryAfterMs(resp.headers.get('Retry-After'));
+    pauseUntil = Math.max(pauseUntil, Date.now() + retryAfter);
+  }
+
+  function startTask(member) {
+    if (shouldAbort()) aborted = true;
+    inFlight += 1;
+    const p = (async () => {
+      try {
+        await fetchMemberWarsNoThrottle(member.uuid, forceRefresh, on429, 3);
+      } finally {
+        done += 1;
+        if (!aborted && onProgress) {
+          onProgress({ done, total, user: member.username });
+        }
+        inFlight -= 1;
+        inFlightPromises.delete(p);
+      }
+    })();
+    inFlightPromises.add(p);
+  }
+
+  // Scheduler loop: launch up to `concurrency` tasks, but keep request starts
+  // spaced by `startSpacingMs` (and delayed by `pauseUntil` when 429 happens).
+  while ((idx < targets.length || inFlight > 0) && !aborted) {
+    while (inFlight < concurrency && idx < targets.length && !aborted) {
+      const now = Date.now();
+      const waitPause = Math.max(0, pauseUntil - now);
+      const waitStart = Math.max(0, nextStartAt - now);
+      const waitMs = Math.max(waitPause, waitStart);
+      if (waitMs > 0) {
+        await delay(waitMs);
+      }
+      nextStartAt = Date.now() + startSpacingMs;
+      startTask(targets[idx]);
+      idx += 1;
+    }
+
+    if (inFlight > 0) {
+      await Promise.race(Array.from(inFlightPromises));
+    }
+  }
+}
+
 async function hydrateVisibleMemberWars(guild, forceRefresh = false, usernames = null, sessionId = null, progressiveUi = false, requestSpacingMs = null, onProgress = null) {
   if (!guild) {
     warLog('hydrateVisibleMemberWars skipped', 'no guild');
@@ -559,13 +713,13 @@ function scheduleMemberWarHydrateAfterSearch(guildRef, renderAtEnd) {
       if (renderAtEnd) {
         setGuildWarsHydrationProgress(0, 1);
       }
-      await hydrateVisibleMemberWars(
+      await hydrateVisibleMemberWarsWorkerPool(
         guildRef,
         false,
         null,
         sid,
-        false,
-        WYNN_PLAYER_WARS_REFRESH_SPACING_MS,
+        6,
+        150,
         renderAtEnd
           ? ({ done, total }) => setGuildWarsHydrationProgress(done, total)
           : null
@@ -1088,13 +1242,13 @@ async function refreshEvent() {
     await searchGuild(activeEvent.guildName, 'auto', { render: isSearchPage, hydrateWars: false });
     if (activeEvent.metric === 'wars') {
       setDashboardWarsHydrationProgress(0, 1);
-      await hydrateVisibleMemberWars(
+      await hydrateVisibleMemberWarsWorkerPool(
         currentGuild,
         true,
         activeEvent.trackedPlayers || [],
         null,
-        false,
-        WYNN_PLAYER_WARS_REFRESH_SPACING_MS,
+        6,
+        150,
         ({ done, total }) => setDashboardWarsHydrationProgress(done, total)
       );
       if (isGuildResultCardVisible() && currentGuild) {
