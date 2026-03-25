@@ -2008,8 +2008,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   document.getElementById('stopTrackingBtn')?.addEventListener('click', stopTrackingGuild);
   document.getElementById('wipeUserDataBtn')?.addEventListener('click', async () => {
-    if (!currentUser) return;
-    const confirmed = confirm(`Delete all stored guild data for ${currentUser}? This cannot be undone.`);
+    const targetUser = currentUser || getCurrentUser();
+    if (!targetUser) {
+      alert('You must be logged in to wipe user data.');
+      return;
+    }
+    currentUser = targetUser;
+    const confirmed = confirm(`Delete all stored guild data for ${targetUser}? This cannot be undone.`);
     if (!confirmed) return;
     const result = await wipeUserData();
     if (!result.ok) {
