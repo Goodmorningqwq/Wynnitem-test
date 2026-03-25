@@ -426,26 +426,35 @@
   <!-- Header -->
   <header class="theme-header sticky top-0 z-50">
     <div class="container mx-auto px-4 py-3 flex items-center justify-between">
-      <button type="button" id="headerHomeBtn" class="flex items-center gap-3 hover:opacity-90 transition-opacity">
-        <svg class="w-8 h-8 text-violet-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M14.5 17.5L3 6V3h3l11.5 11.5M13 19l6-6M15 21l6-6M19 3l2 2-9.5 9.5-2-2L19 3z"/>
-        </svg>
-        <div class="text-left">
-          <h1 class="text-xl font-bold text-white tracking-tight">Wynncraft Database</h1>
-          <p class="text-xs text-gray-500 -mt-1">Item Browser</p>
-        </div>
-      </button>
-      <div class="flex items-center gap-4">
-        <a href="/item" class="text-sm text-gray-300 hover:text-violet-300 transition-colors">Items</a>
-        <a href="/guild" class="text-sm text-gray-300 hover:text-violet-300 transition-colors">Guilds</a>
-        <button type="button" id="headerItemUserBtn" class="theme-btn-primary px-3 py-1 rounded text-xs">login</button>
-        <span id="headerItemCount" class="hidden">
-          <span id="itemCountHeader" class="text-violet-400 font-semibold">0</span>
-          <span class="text-gray-500 text-sm"> items</span>
-        </span>
+      <div class="flex items-center gap-3">
+        <a href="/" class="flex items-center gap-3 cursor-pointer">
+          <svg class="w-8 h-8 text-violet-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14.5 17.5L3 6V3h3l11.5 11.5M13 19l6-6M15 21l6-6M19 3l2 2-9.5 9.5-2-2L19 3z"/>
+          </svg>
+          <div>
+            <h1 class="text-xl font-bold text-white tracking-tight">Wynncraft Database</h1>
+            <p class="text-xs text-gray-500 -mt-1">Item Browser</p>
+          </div>
+        </a>
       </div>
+      <nav class="flex items-center gap-4">
+        <a href="/item" class="text-white font-semibold text-sm font-medium">Items</a>
+        <a href="/guild" class="text-gray-400 hover:text-white transition-colors text-sm font-medium">Guilds</a>
+        <a href="/login" id="headerLoginBtn" class="theme-btn px-4 py-2 rounded-lg text-sm">Login</a>
+        <button type="button" id="headerUserBtn" class="hidden theme-btn-primary px-4 py-2 rounded-lg text-sm"></button>
+      </nav>
     </div>
   </header>
+  <div id="userMenu" class="hidden bg-[rgba(22,22,22,0.98)] border-b border-[rgba(50,50,50,0.5)]">
+    <div class="container mx-auto px-4 py-2 flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <span class="text-white font-medium" id="userDisplayName"></span>
+        <span class="text-gray-500 text-sm">|</span>
+        <span class="text-gray-400 text-sm">Item Browser</span>
+      </div>
+      <button type="button" id="logoutBtn" class="text-gray-400 hover:text-white text-sm py-2 px-2 rounded touch-manipulation">Logout</button>
+    </div>
+  </div>
 
   <!-- Main Content -->
   <main class="flex-1 container mx-auto px-4 py-8">

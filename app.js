@@ -968,32 +968,38 @@ function closeModal() {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
-  const headerHomeBtn = document.getElementById('headerHomeBtn');
-  const headerItemUserBtn = document.getElementById('headerItemUserBtn');
+  const headerLoginBtn = document.getElementById('headerLoginBtn');
+  const headerUserBtn = document.getElementById('headerUserBtn');
+  const userMenu = document.getElementById('userMenu');
+  const userDisplayName = document.getElementById('userDisplayName');
   let currentUser = null;
   try {
     currentUser = localStorage.getItem('currentUser');
   } catch {
     currentUser = null;
   }
-  if (headerHomeBtn) {
-    headerHomeBtn.addEventListener('click', () => {
-      window.location.href = '/';
-    });
-  }
-  if (headerItemUserBtn) {
-    if (currentUser) {
-      headerItemUserBtn.textContent = currentUser;
-      headerItemUserBtn.addEventListener('click', () => {
-        window.location.href = '/guild';
-      });
-    } else {
-      headerItemUserBtn.textContent = 'login';
-      headerItemUserBtn.addEventListener('click', () => {
-        window.location.href = '/login';
-      });
+  if (currentUser) {
+    headerLoginBtn?.classList.add('hidden');
+    if (headerUserBtn) {
+      headerUserBtn.classList.remove('hidden');
+      headerUserBtn.textContent = currentUser;
+    }
+    userMenu?.classList.remove('hidden');
+    if (userDisplayName) {
+      userDisplayName.textContent = currentUser;
     }
   }
+  document.getElementById('logoutBtn')?.addEventListener('click', () => {
+    localStorage.removeItem('currentUser');
+    localStorage.removeItem('userHash');
+    window.location.href = '/guild';
+  });
+  headerUserBtn?.addEventListener('click', () => {
+    window.location.href = '/guild';
+  });
+  headerLoginBtn?.addEventListener('click', () => {
+    window.location.href = '/login';
+  });
 
   // Initialize DOM elements
   searchPanelEl = document.getElementById('searchPanel');
