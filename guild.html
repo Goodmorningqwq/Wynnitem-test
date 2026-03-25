@@ -196,6 +196,12 @@
                 <span class="text-gray-400 text-sm" id="dashboardEventDuration">0h 0m</span>
               </div>
               <p id="dashboardEventLoadingText" class="hidden text-xs text-violet-300 mb-2">Loading event data...</p>
+                <div id="dashboardWarsHydrationProgressSection" class="hidden mt-2 mb-2">
+                  <div class="h-2 bg-gray-700/60 rounded overflow-hidden">
+                    <div id="dashboardWarsHydrationProgressBar" class="h-2 bg-violet-400 transition-[width] duration-200" style="width: 0%"></div>
+                  </div>
+                  <p id="dashboardWarsHydrationProgressText" class="text-xs text-gray-400 mt-1">Loading war counts...</p>
+                </div>
               <div class="grid grid-cols-2 gap-3 mb-3 text-sm">
                 <div>
                   <span class="text-gray-500">Metric</span>
@@ -346,6 +352,12 @@
               <input id="showMemberWarsToggle" type="checkbox" class="accent-purple-500">
               Show war count
             </label>
+          </div>
+          <div id="warsHydrationProgressSection" class="hidden mt-2 mb-3">
+            <div class="h-2 bg-gray-700/60 rounded overflow-hidden">
+              <div id="warsHydrationProgressBar" class="h-2 bg-violet-400 transition-[width] duration-200" style="width: 0%"></div>
+            </div>
+            <p id="warsHydrationProgressText" class="text-xs text-gray-400 mt-1">Loading wars...</p>
           </div>
           <div id="guildMembersList" class="max-h-48 overflow-y-auto space-y-1">
             <!-- Members will be listed here -->
