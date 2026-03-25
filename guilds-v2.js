@@ -1634,7 +1634,7 @@ async function stopTrackingGuild() {
   // Backend validation checks `guildName` changes before applying `trackedPlayers`,
   // so we must ensure trackedPlayers is empty before setting guildName=null.
   let lastError = null;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
     const clearResult = await updateUserData({ clearPlayers: true });
     if (!clearResult.ok) {
       lastError = clearResult.error || 'Failed to clear selected players';
@@ -1649,6 +1649,9 @@ async function stopTrackingGuild() {
       lastError = 'Tracked players still present after clear';
       continue;
     }
+
+    // Give the backend a moment to persist the clear, then update guildName.
+    await delay(250);
 
     const result = await updateUserData({ guildName: null, activeEvent: null });
     if (result.ok) {
