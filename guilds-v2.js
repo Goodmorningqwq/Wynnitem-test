@@ -5,6 +5,8 @@ const REFRESH_COOLDOWN_MS = 15 * 60 * 1000;
 const WYNN_PLAYER_WARS_SPACING_MS = 500;
 const WYNN_PLAYER_WARS_REFRESH_SPACING_MS = 280;
 const WYNN_PLAYER_WARS_429_BACKOFF_MS = 3200;
+const WYNN_PLAYER_WARS_429_WAVE_BATCH_SIZE = 50;
+const WYNN_PLAYER_WARS_429_WAVE_WAIT_MS = 5000;
 
 function isWarDebugVerbose() {
   try {
@@ -191,7 +193,7 @@ function showMemberWarsEnabled() {
   return Boolean(toggle?.checked);
 }
 
-function setGuildWarsHydrationProgress(done, total) {
+function setGuildWarsHydrationProgress(done, total, label = 'Loading wars...') {
   const section = document.getElementById('warsHydrationProgressSection');
   const bar = document.getElementById('warsHydrationProgressBar');
   const text = document.getElementById('warsHydrationProgressText');
@@ -200,7 +202,7 @@ function setGuildWarsHydrationProgress(done, total) {
   section.classList.remove('hidden');
   const pct = Math.max(0, Math.min(100, Math.round((done / total) * 100)));
   bar.style.width = `${pct}%`;
-  text.textContent = `Loading wars... (${done}/${total})`;
+  text.textContent = `${label} (${done}/${total})`;
 }
 
 function hideGuildWarsHydrationProgress() {
@@ -208,7 +210,7 @@ function hideGuildWarsHydrationProgress() {
   section?.classList.add('hidden');
 }
 
-function setDashboardWarsHydrationProgress(done, total) {
+function setDashboardWarsHydrationProgress(done, total, label = 'Loading war counts...') {
   const section = document.getElementById('dashboardWarsHydrationProgressSection');
   const bar = document.getElementById('dashboardWarsHydrationProgressBar');
   const text = document.getElementById('dashboardWarsHydrationProgressText');
@@ -217,7 +219,7 @@ function setDashboardWarsHydrationProgress(done, total) {
   section.classList.remove('hidden');
   const pct = Math.max(0, Math.min(100, Math.round((done / total) * 100)));
   bar.style.width = `${pct}%`;
-  text.textContent = `Loading war counts... (${done}/${total})`;
+  text.textContent = `${label} (${done}/${total})`;
 }
 
 function hideDashboardWarsHydrationProgress() {
@@ -653,6 +655,51 @@ async function hydrateVisibleMemberWarsWorkerPool(
   }
 }
 
+async function hydrateVisibleMemberWarsWaves(
+  guild,
+  forceRefresh = false,
+  usernames = null,
+  sessionId = null,
+  batchSize = WYNN_PLAYER_WARS_429_WAVE_BATCH_SIZE,
+  batchWaitMs = WYNN_PLAYER_WARS_429_WAVE_WAIT_MS,
+  onProgress = null,
+  maxTriesPerMember = 3
+) {
+  if (!guild) return;
+  const members = collectGuildMembers(guild);
+  const wantedUsernames = Array.isArray(usernames) ? new Set(usernames) : null;
+  const targets = members.filter((member) => {
+    if (!member.uuid) return false;
+    if (wantedUsernames && !wantedUsernames.has(member.username)) return false;
+    if (forceRefresh) return true;
+    return !memberWarsCache.has(member.uuid);
+  });
+  if (!targets.length) return;
+
+  const total = targets.length;
+  let done = 0;
+  const shouldAbort = () => sessionId != null && sessionId !== memberWarsHydrateSession;
+
+  for (let i = 0; i < targets.length; i += batchSize) {
+    if (shouldAbort()) return;
+    const waveTargets = targets.slice(i, i + batchSize);
+
+    await Promise.all(waveTargets.map(async (member) => {
+      await fetchMemberWarsNoThrottle(member.uuid, forceRefresh, null, maxTriesPerMember);
+      if (shouldAbort()) return;
+      done += 1;
+      if (onProgress) {
+        onProgress({ done, total, user: member.username });
+      }
+    }));
+
+    if (shouldAbort()) return;
+    if (i + batchSize < targets.length) {
+      await delay(batchWaitMs);
+    }
+  }
+}
+
 async function hydrateVisibleMemberWars(guild, forceRefresh = false, usernames = null, sessionId = null, progressiveUi = false, requestSpacingMs = null, onProgress = null) {
   if (!guild) {
     warLog('hydrateVisibleMemberWars skipped', 'no guild');
@@ -712,18 +759,17 @@ function scheduleMemberWarHydrateAfterSearch(guildRef, renderAtEnd) {
   void (async () => {
     try {
       if (renderAtEnd) {
-        setGuildWarsHydrationProgress(0, 1);
+        setGuildWarsHydrationProgress(0, 1, 'Loading wars...');
       }
-      await hydrateVisibleMemberWarsWorkerPool(
+      await hydrateVisibleMemberWarsWaves(
         guildRef,
         false,
         null,
         sid,
-        6,
-        150,
-        renderAtEnd
-          ? ({ done, total }) => setGuildWarsHydrationProgress(done, total)
-          : null
+        WYNN_PLAYER_WARS_429_WAVE_BATCH_SIZE,
+        WYNN_PLAYER_WARS_429_WAVE_WAIT_MS,
+        renderAtEnd ? ({ done, total }) => setGuildWarsHydrationProgress(done, total, 'Loading wars...') : null,
+        3
       );
       if (sid !== memberWarsHydrateSession) return;
       hideGuildWarsHydrationProgress();
@@ -731,28 +777,29 @@ function scheduleMemberWarHydrateAfterSearch(guildRef, renderAtEnd) {
         const members = collectGuildMembers(guildRef);
         const missingCount = members.filter((m) => m.uuid && !memberWarsCache.has(m.uuid)).length;
         if (missingCount > 0) {
-          await hydrateVisibleMemberWarsWorkerPool(
+          setGuildWarsHydrationProgress(0, missingCount, 'Checking missed players');
+          await hydrateVisibleMemberWarsWaves(
             guildRef,
             false,
             null,
             sid,
-            6,
-            150,
-            null,
-            6
+            WYNN_PLAYER_WARS_429_WAVE_BATCH_SIZE,
+            WYNN_PLAYER_WARS_429_WAVE_WAIT_MS,
+            ({ done, total }) => setGuildWarsHydrationProgress(done, total, 'Checking missed players'),
+            3
           );
           if (sid !== memberWarsHydrateSession) return;
         }
-        // Final quick retry for the last stragglers.
+        // Final quick retry for any remaining stragglers (no progress UI).
         const finalMissing = collectGuildMembers(guildRef).filter((m) => m.uuid && !memberWarsCache.has(m.uuid)).length;
         if (finalMissing > 0) {
-          await hydrateVisibleMemberWarsWorkerPool(
+          await hydrateVisibleMemberWarsWaves(
             guildRef,
             false,
             null,
             sid,
-            3,
-            250,
+            10,
+            0,
             null,
             8
           );
@@ -1274,54 +1321,56 @@ async function refreshEvent() {
   try {
     await searchGuild(activeEvent.guildName, 'auto', { render: isSearchPage, hydrateWars: false });
     if (activeEvent.metric === 'wars') {
-      setDashboardWarsHydrationProgress(0, 1);
-      await hydrateVisibleMemberWarsWorkerPool(
+      setDashboardWarsHydrationProgress(0, 1, 'Loading war counts...');
+      await hydrateVisibleMemberWarsWaves(
         currentGuild,
         true,
         activeEvent.trackedPlayers || [],
         null,
-        6,
-        150,
-        ({ done, total }) => setDashboardWarsHydrationProgress(done, total)
+        WYNN_PLAYER_WARS_429_WAVE_BATCH_SIZE,
+        WYNN_PLAYER_WARS_429_WAVE_WAIT_MS,
+        ({ done, total }) => setDashboardWarsHydrationProgress(done, total, 'Loading war counts...'),
+        3
       );
-      if (activeEvent.metric === 'wars') {
-        const members = collectGuildMembers(currentGuild).filter((m) => (activeEvent.trackedPlayers || []).includes(m.username));
-        const missingCount = members.filter((m) => m.uuid && !memberWarsCache.has(m.uuid)).length;
-        hideDashboardWarsHydrationProgress();
-        if (missingCount > 0) {
-          await hydrateVisibleMemberWarsWorkerPool(
-            currentGuild,
-            false,
-            activeEvent.trackedPlayers || [],
-            null,
-            6,
-            150,
-            null,
-            6
-          );
-        }
-        const finalMissing = collectGuildMembers(currentGuild)
-          .filter((m) => (activeEvent.trackedPlayers || []).includes(m.username))
-          .filter((m) => m.uuid && !memberWarsCache.has(m.uuid)).length;
-        if (finalMissing > 0) {
-          await hydrateVisibleMemberWarsWorkerPool(
-            currentGuild,
-            false,
-            activeEvent.trackedPlayers || [],
-            null,
-            3,
-            250,
-            null,
-            8
-          );
-        }
-        if (isGuildResultCardVisible() && currentGuild) {
-          const refreshedMembers = collectGuildMembers(currentGuild);
-          renderMembersList(refreshedMembers);
-          renderPlayerSelection(refreshedMembers);
-        }
-      } else {
-        hideDashboardWarsHydrationProgress();
+
+      const members = collectGuildMembers(currentGuild).filter((m) => (activeEvent.trackedPlayers || []).includes(m.username));
+      const missingCount = members.filter((m) => m.uuid && !memberWarsCache.has(m.uuid)).length;
+      if (missingCount > 0) {
+        setDashboardWarsHydrationProgress(0, missingCount, 'Checking missed players');
+        await hydrateVisibleMemberWarsWaves(
+          currentGuild,
+          false,
+          activeEvent.trackedPlayers || [],
+          null,
+          WYNN_PLAYER_WARS_429_WAVE_BATCH_SIZE,
+          WYNN_PLAYER_WARS_429_WAVE_WAIT_MS,
+          ({ done, total }) => setDashboardWarsHydrationProgress(done, total, 'Checking missed players'),
+          3
+        );
+      }
+
+      const finalMissing = collectGuildMembers(currentGuild)
+        .filter((m) => (activeEvent.trackedPlayers || []).includes(m.username))
+        .filter((m) => m.uuid && !memberWarsCache.has(m.uuid)).length;
+      if (finalMissing > 0) {
+        await hydrateVisibleMemberWarsWaves(
+          currentGuild,
+          false,
+          activeEvent.trackedPlayers || [],
+          null,
+          10,
+          0,
+          null,
+          8
+        );
+      }
+
+      hideDashboardWarsHydrationProgress();
+
+      if (isGuildResultCardVisible() && currentGuild) {
+        const refreshedMembers = collectGuildMembers(currentGuild);
+        renderMembersList(refreshedMembers);
+        renderPlayerSelection(refreshedMembers);
       }
     }
     const snapshot = getSnapshot(activeEvent.metric, currentGuild, activeEvent.trackedPlayers || [], activeEvent.scope || 'selected');
