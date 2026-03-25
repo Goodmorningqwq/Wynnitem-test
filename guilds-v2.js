@@ -1836,28 +1836,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     section.scrollIntoView({ behavior: 'smooth', block: 'center' });
   });
   document.getElementById('stopTrackingBtn')?.addEventListener('click', stopTrackingGuild);
-  document.getElementById('wipeUserDataBtn')?.addEventListener('click', async () => {
-    const targetUser = currentUser || getCurrentUser();
-    if (!targetUser) {
-      alert('You must be logged in to wipe user data.');
-      return;
-    }
-    currentUser = targetUser;
-    const confirmed = confirm(`Delete all stored guild data for ${targetUser}? This cannot be undone.`);
-    if (!confirmed) return;
-    const result = await wipeUserData();
-    if (!result.ok) {
-      alert(`Failed to wipe user data: ${result.error || 'unknown error'}`);
-      return;
-    }
-    activeEvent = null;
-    currentGuild = null;
-    memberWarsCache.clear();
-    hideGuildWarsHydrationProgress();
-    hideDashboardWarsHydrationProgress();
-    await loadUserDashboard();
-    alert('User data wiped. You can now track a new guild.');
-  });
   document.getElementById('refreshEventBtn').addEventListener('click', refreshEvent);
   document.getElementById('dashboardRefreshBtn').addEventListener('click', refreshEvent);
   document.getElementById('endEventBtn').addEventListener('click', endEvent);

@@ -57,6 +57,11 @@ function parseJsonSafe(value, fallback) {
 
 module.exports = async (req, res) => {
   const username = req.query.username;
+  const usernameTrimmed = typeof username === 'string' ? username.trim() : '';
+  const usernameLower = usernameTrimmed.toLowerCase();
+  const candidateUsernames = Array.from(new Set(
+    [username, usernameTrimmed, usernameLower].filter((value) => typeof value === 'string' && value.length > 0)
+  ));
   const dataKey = `user:${username}:data`;
   const eventsKey = `user:${username}:events`;
 
@@ -162,8 +167,14 @@ module.exports = async (req, res) => {
 
   if (req.method === 'DELETE') {
     try {
-      await redis.del(dataKey);
-      await redis.del(eventsKey);
+      const keysToDelete = [];
+      for (const candidate of candidateUsernames) {
+        keysToDelete.push(`user:${candidate}:data`);
+        keysToDelete.push(`user:${candidate}:events`);
+      }
+      if (keysToDelete.length) {
+        await redis.del(...keysToDelete);
+      }
       return res.json({ success: true });
     } catch (e) {
       console.error('Delete data error:', e);
