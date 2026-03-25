@@ -1781,7 +1781,8 @@ async function stopTrackingGuild() {
       lastError = null;
       break;
     }
-    lastError = result.error || 'Failed to stop tracking';
+    const verifiedLen = Array.isArray(userData?.trackedPlayers) ? userData.trackedPlayers.length : null;
+    lastError = `${result.error || 'Failed to stop tracking'} (verified trackedPlayers.len=${verifiedLen})`;
 
     // #region agent-debug
     fetch('http://127.0.0.1:7649/ingest/d9a33132-748f-4430-83b4-30759d15d7c7', {
