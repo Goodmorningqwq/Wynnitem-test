@@ -970,7 +970,12 @@ function closeModal() {
 document.addEventListener('DOMContentLoaded', () => {
   const headerHomeBtn = document.getElementById('headerHomeBtn');
   const headerItemUserBtn = document.getElementById('headerItemUserBtn');
-  const currentUser = localStorage.getItem('currentUser');
+  let currentUser = null;
+  try {
+    currentUser = localStorage.getItem('currentUser');
+  } catch {
+    currentUser = null;
+  }
   if (headerHomeBtn) {
     headerHomeBtn.addEventListener('click', () => {
       window.location.href = '/';
