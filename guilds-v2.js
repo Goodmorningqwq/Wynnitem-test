@@ -774,56 +774,42 @@ function scheduleMemberWarHydrateAfterSearch(guildRef, renderAtEnd) {
       if (sid !== memberWarsHydrateSession) return;
       hideGuildWarsHydrationProgress();
       if (renderAtEnd) {
-        const members = collectGuildMembers(guildRef);
-        const missingWarMembers = members.filter((m) => m.wars == null);
-        const fetchableMissing = missingWarMembers.filter((m) => m.uuid);
-        const stuckNoUuid = missingWarMembers.filter((m) => !m.uuid);
+        let phase2Rounds = 0;
+        const maxPhase2Rounds = 3;
+        while (phase2Rounds < maxPhase2Rounds) {
+          const members = collectGuildMembers(guildRef);
+          const missingWarMembers = members.filter((m) => m.wars == null);
+          if (!missingWarMembers.length) break;
 
-        const remainingIdList = missingWarMembers
-          .slice(0, 8)
-          .map((m) => (m.uuid ? `${m.uuid.slice(0, 8)}…` : m.username))
-          .join(', ');
-        const remainingSuffix = missingWarMembers.length > 8 ? '...' : '';
+          const fetchableMissing = missingWarMembers.filter((m) => m.uuid);
+          const remainingIdList = missingWarMembers
+            .slice(0, 8)
+            .map((m) => (m.uuid ? `${m.uuid.slice(0, 8)}…` : m.username))
+            .join(', ');
+          const remainingSuffix = missingWarMembers.length > 8 ? '...' : '';
 
-        if (missingWarMembers.length > 0) {
-          const baseLabel = fetchableMissing.length
-            ? `Checking missed players (${remainingIdList}${remainingSuffix})`
-            : `Remaining without UUID (${remainingIdList}${remainingSuffix})`;
-
-          if (fetchableMissing.length > 0) {
-            setGuildWarsHydrationProgress(0, fetchableMissing.length, baseLabel);
-            await hydrateVisibleMemberWarsWaves(
-              guildRef,
-              true,
-              fetchableMissing.map((m) => m.username),
-              sid,
-              WYNN_PLAYER_WARS_429_WAVE_BATCH_SIZE,
-              WYNN_PLAYER_WARS_429_WAVE_WAIT_MS,
-              ({ done, total }) => setGuildWarsHydrationProgress(done, total, baseLabel),
-              6
-            );
-            if (sid !== memberWarsHydrateSession) return;
-          } else {
-            // Nothing to fetch (no UUID). Keep progress visible so it’s obvious what remains.
+          if (!fetchableMissing.length) {
+            const baseLabel = `Remaining without UUID (${remainingIdList}${remainingSuffix})`;
             setGuildWarsHydrationProgress(missingWarMembers.length, missingWarMembers.length, baseLabel);
             await delay(2500);
+            break;
           }
-        }
 
-        // Final quick retry for any remaining stragglers (no progress UI).
-        const finalMissing = collectGuildMembers(guildRef).filter((m) => m.uuid && !memberWarsCache.has(m.uuid)).length;
-        if (finalMissing > 0) {
+          const label = `Checking missed players (${remainingIdList}${remainingSuffix})`;
+          setGuildWarsHydrationProgress(0, fetchableMissing.length, label);
           await hydrateVisibleMemberWarsWaves(
             guildRef,
-            false,
-            null,
+            true,
+            fetchableMissing.map((m) => m.username),
             sid,
-            10,
-            0,
-            null,
-            8
+            WYNN_PLAYER_WARS_429_WAVE_BATCH_SIZE,
+            WYNN_PLAYER_WARS_429_WAVE_WAIT_MS,
+            ({ done, total }) => setGuildWarsHydrationProgress(done, total, label),
+            10
           );
           if (sid !== memberWarsHydrateSession) return;
+
+          phase2Rounds += 1;
         }
         if (currentGuild && currentGuild.name === guildRef.name) {
           displayGuild(currentGuild);
