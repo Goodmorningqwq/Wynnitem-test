@@ -1557,16 +1557,36 @@ async function stopTrackingGuild() {
     return;
   }
   if (!confirm('Stop tracking this guild and clear selected players?')) return;
-  const result = await updateUserData({
-    guildName: null,
-    trackedPlayers: [],
-    activeEvent: null
-  });
-  if (!result.ok) {
-    alert(`Failed to stop tracking: ${result.error}`);
+
+  // Backend validation checks `guildName` changes before applying `trackedPlayers`,
+  // so we must ensure trackedPlayers is empty before setting guildName=null.
+  let lastError = null;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const clearResult = await updateUserData({ clearPlayers: true });
+    if (!clearResult.ok) {
+      lastError = clearResult.error || 'Failed to clear selected players';
+      continue;
+    }
+    const userData = await loadUserData({ includeEvents: false });
+    if (userData?.trackedPlayers?.length) {
+      lastError = 'Tracked players still present after clear';
+      continue;
+    }
+
+    const result = await updateUserData({ guildName: null, activeEvent: null });
+    if (result.ok) {
+      lastError = null;
+      break;
+    }
+    lastError = result.error || 'Failed to stop tracking';
+  }
+
+  if (lastError) {
+    alert(`Failed to stop tracking: ${lastError}`);
     return;
   }
-  // Clear UI selection checkboxes too (server clears trackedPlayers, but UI can remain checked).
+
+  // Clear UI selection checkboxes too.
   document.querySelectorAll('#playerCheckboxes input[type="checkbox"]').forEach((el) => {
     el.checked = false;
   });
