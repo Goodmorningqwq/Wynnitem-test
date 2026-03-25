@@ -968,6 +968,28 @@ function closeModal() {
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
+  const headerHomeBtn = document.getElementById('headerHomeBtn');
+  const headerItemUserBtn = document.getElementById('headerItemUserBtn');
+  const currentUser = localStorage.getItem('currentUser');
+  if (headerHomeBtn) {
+    headerHomeBtn.addEventListener('click', () => {
+      window.location.href = '/';
+    });
+  }
+  if (headerItemUserBtn) {
+    if (currentUser) {
+      headerItemUserBtn.textContent = currentUser;
+      headerItemUserBtn.addEventListener('click', () => {
+        window.location.href = '/guild';
+      });
+    } else {
+      headerItemUserBtn.textContent = 'login';
+      headerItemUserBtn.addEventListener('click', () => {
+        window.location.href = '/login';
+      });
+    }
+  }
+
   // Initialize DOM elements
   searchPanelEl = document.getElementById('searchPanel');
   loadingOverlayEl = document.getElementById('loadingOverlay');

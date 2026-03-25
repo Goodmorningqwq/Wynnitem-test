@@ -426,21 +426,24 @@
   <!-- Header -->
   <header class="theme-header sticky top-0 z-50">
     <div class="container mx-auto px-4 py-3 flex items-center justify-between">
-      <div class="flex items-center gap-3">
+      <button type="button" id="headerHomeBtn" class="flex items-center gap-3 hover:opacity-90 transition-opacity">
         <svg class="w-8 h-8 text-violet-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M14.5 17.5L3 6V3h3l11.5 11.5M13 19l6-6M15 21l6-6M19 3l2 2-9.5 9.5-2-2L19 3z"/>
         </svg>
-        <div>
-          <h1 class="text-xl font-bold text-white tracking-tight">
-            Wynncraft Database
-          </h1>
+        <div class="text-left">
+          <h1 class="text-xl font-bold text-white tracking-tight">Wynncraft Database</h1>
           <p class="text-xs text-gray-500 -mt-1">Item Browser</p>
         </div>
+      </button>
+      <div class="flex items-center gap-4">
+        <a href="/item" class="text-sm text-gray-300 hover:text-violet-300 transition-colors">Items</a>
+        <a href="/guild" class="text-sm text-gray-300 hover:text-violet-300 transition-colors">Guilds</a>
+        <button type="button" id="headerItemUserBtn" class="theme-btn-primary px-3 py-1 rounded text-xs">login</button>
+        <span id="headerItemCount" class="hidden">
+          <span id="itemCountHeader" class="text-violet-400 font-semibold">0</span>
+          <span class="text-gray-500 text-sm"> items</span>
+        </span>
       </div>
-      <span id="headerItemCount" class="hidden">
-        <span id="itemCountHeader" class="text-violet-400 font-semibold">0</span>
-        <span class="text-gray-500 text-sm"> items</span>
-      </span>
     </div>
   </header>
 
