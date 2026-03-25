@@ -1646,191 +1646,20 @@ async function loadUserDashboard(prefetchedUserData = null) {
 }
 
 async function stopTrackingGuild() {
-  if (!currentUser) return;
+  const targetUser = currentUser || getCurrentUser();
+  if (!targetUser) {
+    alert('You must be logged in to stop tracking.');
+    return;
+  }
+  currentUser = targetUser;
   if (activeEvent) {
     alert('You can only stop tracking when there is no active event.');
     return;
   }
   if (!confirm('Stop tracking this guild?')) return;
-
-  // #region agent-debug
-  fetch('http://127.0.0.1:7649/ingest/d9a33132-748f-4430-83b4-30759d15d7c7', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Debug-Session-Id': '0353be'
-    },
-    body: JSON.stringify({
-      sessionId: '0353be',
-      runId: 'stopTrackingGuild-pre',
-      hypothesisId: 'A',
-      location: 'guilds-v2.js:stopTrackingGuild:start',
-      message: 'stopTrackingGuild start',
-      data: {
-        hasActiveEvent: Boolean(activeEvent),
-        currentGuildName: currentGuild?.name || null
-      },
-      timestamp: Date.now()
-    })
-  }).catch(() => {});
-  // #endregion
-
-  // Backend validation checks `guildName` changes before applying `trackedPlayers`,
-  // so we must ensure trackedPlayers is empty before setting guildName=null.
-  let lastError = null;
-  for (let attempt = 0; attempt < 5; attempt += 1) {
-    // #region agent-debug
-    fetch('http://127.0.0.1:7649/ingest/d9a33132-748f-4430-83b4-30759d15d7c7', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Debug-Session-Id': '0353be'
-      },
-      body: JSON.stringify({
-        sessionId: '0353be',
-        runId: `stopTrackingGuild-pre-attempt-${attempt}`,
-        hypothesisId: 'A',
-        location: 'guilds-v2.js:stopTrackingGuild:beforeClearPlayers',
-        message: 'before clearPlayers',
-        data: {},
-        timestamp: Date.now()
-      })
-    }).catch(() => {});
-    // #endregion
-
-    const clearResult = await updateUserData({ clearPlayers: true });
-    if (!clearResult.ok) {
-      lastError = clearResult.error || 'Failed to clear selected players';
-      // #region agent-debug
-      fetch('http://127.0.0.1:7649/ingest/d9a33132-748f-4430-83b4-30759d15d7c7', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Debug-Session-Id': '0353be'
-        },
-        body: JSON.stringify({
-          sessionId: '0353be',
-          runId: `stopTrackingGuild-pre-attempt-${attempt}`,
-          hypothesisId: 'A',
-          location: 'guilds-v2.js:stopTrackingGuild:clearPlayersFailed',
-          message: 'clearPlayers updateUserData failed',
-          data: {
-            status: clearResult.status,
-            error: clearResult.error
-          },
-          timestamp: Date.now()
-        })
-      }).catch(() => {});
-      // #endregion
-      continue;
-    }
-    const userData = await loadUserData({ includeEvents: false });
-    if (!userData) {
-      lastError = 'Could not verify player clear on the server';
-      continue;
-    }
-    // #region agent-debug
-    fetch('http://127.0.0.1:7649/ingest/d9a33132-748f-4430-83b4-30759d15d7c7', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Debug-Session-Id': '0353be'
-      },
-      body: JSON.stringify({
-        sessionId: '0353be',
-        runId: `stopTrackingGuild-pre-attempt-${attempt}`,
-        hypothesisId: 'A',
-        location: 'guilds-v2.js:stopTrackingGuild:afterClearVerify',
-        message: 'after clearPlayers verification',
-        data: {
-          trackedPlayersLen: Array.isArray(userData.trackedPlayers) ? userData.trackedPlayers.length : null
-        },
-        timestamp: Date.now()
-      })
-    }).catch(() => {});
-    // #endregion
-    if (Array.isArray(userData.trackedPlayers) && userData.trackedPlayers.length > 0) {
-      lastError = 'Tracked players still present after clear';
-      // #region agent-debug
-      fetch('http://127.0.0.1:7649/ingest/d9a33132-748f-4430-83b4-30759d15d7c7', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Debug-Session-Id': '0353be'
-        },
-        body: JSON.stringify({
-          sessionId: '0353be',
-          runId: `stopTrackingGuild-pre-attempt-${attempt}`,
-          hypothesisId: 'A',
-          location: 'guilds-v2.js:stopTrackingGuild:trackedPlayersStillPresent',
-          message: 'trackedPlayers still present after clear',
-          data: {
-            trackedPlayersLen: userData.trackedPlayers.length
-          },
-          timestamp: Date.now()
-        })
-      }).catch(() => {});
-      // #endregion
-      continue;
-    }
-
-    // Give the backend a moment to persist the clear, then update guildName.
-    await delay(250);
-
-    // #region agent-debug
-    fetch('http://127.0.0.1:7649/ingest/d9a33132-748f-4430-83b4-30759d15d7c7', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Debug-Session-Id': '0353be'
-      },
-      body: JSON.stringify({
-        sessionId: '0353be',
-        runId: `stopTrackingGuild-pre-attempt-${attempt}`,
-        hypothesisId: 'B',
-        location: 'guilds-v2.js:stopTrackingGuild:beforeGuildNameNull',
-        message: 'before guildName null update',
-        data: {
-          trackedPlayersLenAtVerify: Array.isArray(userData?.trackedPlayers) ? userData.trackedPlayers.length : null
-        },
-        timestamp: Date.now()
-      })
-    }).catch(() => {});
-    // #endregion
-
-    const result = await updateUserData({ guildName: null, activeEvent: null });
-    if (result.ok) {
-      lastError = null;
-      break;
-    }
-    const verifiedLen = Array.isArray(userData?.trackedPlayers) ? userData.trackedPlayers.length : null;
-    lastError = `${result.error || 'Failed to stop tracking'} (verified trackedPlayers.len=${verifiedLen})`;
-
-    // #region agent-debug
-    fetch('http://127.0.0.1:7649/ingest/d9a33132-748f-4430-83b4-30759d15d7c7', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Debug-Session-Id': '0353be'
-      },
-      body: JSON.stringify({
-        sessionId: '0353be',
-        runId: `stopTrackingGuild-pre-attempt-${attempt}`,
-        hypothesisId: 'C',
-        location: 'guilds-v2.js:stopTrackingGuild:afterGuildNameNull',
-        message: 'guildName null update failed',
-        data: {
-          status: result.status,
-          error: result.error
-        },
-        timestamp: Date.now()
-      })
-    }).catch(() => {});
-    // #endregion
-  }
-
-  if (lastError) {
-    alert(`Failed to stop tracking: ${lastError}`);
+  const wipeResult = await wipeUserData();
+  if (!wipeResult.ok) {
+    alert(`Failed to stop tracking: ${wipeResult.error || 'Failed to wipe user data'}`);
     return;
   }
 
