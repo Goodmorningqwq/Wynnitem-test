@@ -756,64 +756,137 @@ async function hydrateVisibleMemberWars(guild, forceRefresh = false, usernames =
 function scheduleMemberWarHydrateAfterSearch(guildRef, renderAtEnd) {
   memberWarsHydrateSession += 1;
   const sid = memberWarsHydrateSession;
+
+  const allMembersForMode = collectGuildMembers(guildRef);
+  const fetchableCountForMode = allMembersForMode.filter((m) => m.uuid).length;
+  const preciseMode = fetchableCountForMode >= 100;
+
   void (async () => {
     try {
-      if (renderAtEnd) {
-        setGuildWarsHydrationProgress(0, 1, 'Loading wars...');
-      }
-      await hydrateVisibleMemberWarsWaves(
-        guildRef,
-        false,
-        null,
-        sid,
-        WYNN_PLAYER_WARS_429_WAVE_BATCH_SIZE,
-        WYNN_PLAYER_WARS_429_WAVE_WAIT_MS,
-        renderAtEnd ? ({ done, total }) => setGuildWarsHydrationProgress(done, total, 'Loading wars...') : null,
-        3
-      );
-      if (sid !== memberWarsHydrateSession) return;
-      hideGuildWarsHydrationProgress();
-      if (renderAtEnd) {
-        let phase2Rounds = 0;
-        const maxPhase2Rounds = 3;
-        while (phase2Rounds < maxPhase2Rounds) {
-          const members = collectGuildMembers(guildRef);
-          const missingWarMembers = members.filter((m) => m.wars == null);
-          if (!missingWarMembers.length) break;
+      if (renderAtEnd) setGuildWarsHydrationProgress(0, 1, 'Loading wars...');
 
-          const fetchableMissing = missingWarMembers.filter((m) => m.uuid);
-          const remainingIdList = missingWarMembers
-            .slice(0, 8)
-            .map((m) => (m.uuid ? `${m.uuid.slice(0, 8)}…` : m.username))
-            .join(', ');
-          const remainingSuffix = missingWarMembers.length > 8 ? '...' : '';
+      if (preciseMode) {
+        // For large guilds (100+), prioritize precision over speed:
+        // sequential fetch with standard 429 retry/backoff, plus a retry loop
+        // until `wars == null` users are resolved.
+        await hydrateVisibleMemberWars(
+          guildRef,
+          false,
+          null,
+          sid,
+          false,
+          850,
+          renderAtEnd ? ({ done, total }) => setGuildWarsHydrationProgress(done, total, 'Loading wars...') : null
+        );
+        if (sid !== memberWarsHydrateSession) return;
+        hideGuildWarsHydrationProgress();
 
-          if (!fetchableMissing.length) {
-            const baseLabel = `Remaining without UUID (${remainingIdList}${remainingSuffix})`;
-            setGuildWarsHydrationProgress(missingWarMembers.length, missingWarMembers.length, baseLabel);
-            await delay(2500);
-            break;
+        if (renderAtEnd) {
+          let phase2Rounds = 0;
+          const maxPhase2Rounds = 3;
+          while (phase2Rounds < maxPhase2Rounds) {
+            const members = collectGuildMembers(guildRef);
+            const missingWarMembers = members.filter((m) => m.wars == null);
+            if (!missingWarMembers.length) break;
+
+            const fetchableMissing = missingWarMembers.filter((m) => m.uuid);
+            const remainingIdList = missingWarMembers
+              .slice(0, 8)
+              .map((m) => (m.uuid ? `${m.uuid.slice(0, 8)}…` : m.username))
+              .join(', ');
+            const remainingSuffix = missingWarMembers.length > 8 ? '...' : '';
+
+            if (!fetchableMissing.length) {
+              const baseLabel = `Remaining without UUID (${remainingIdList}${remainingSuffix})`;
+              setGuildWarsHydrationProgress(missingWarMembers.length, missingWarMembers.length, baseLabel);
+              await delay(2000);
+              break;
+            }
+
+            const label = `Checking missed players (${remainingIdList}${remainingSuffix})`;
+            setGuildWarsHydrationProgress(0, 1, label);
+            await hydrateVisibleMemberWars(
+              guildRef,
+              false,
+              null,
+              sid,
+              false,
+              850,
+              ({ done, total }) => setGuildWarsHydrationProgress(done, total, label)
+            );
+            if (sid !== memberWarsHydrateSession) return;
+            hideGuildWarsHydrationProgress();
+            phase2Rounds += 1;
           }
-
-          const label = `Checking missed players (${remainingIdList}${remainingSuffix})`;
-          setGuildWarsHydrationProgress(0, fetchableMissing.length, label);
-          await hydrateVisibleMemberWarsWaves(
-            guildRef,
-            true,
-            fetchableMissing.map((m) => m.username),
-            sid,
-            WYNN_PLAYER_WARS_429_WAVE_BATCH_SIZE,
-            WYNN_PLAYER_WARS_429_WAVE_WAIT_MS,
-            ({ done, total }) => setGuildWarsHydrationProgress(done, total, label),
-            10
-          );
-          if (sid !== memberWarsHydrateSession) return;
-
-          phase2Rounds += 1;
         }
-        if (currentGuild && currentGuild.name === guildRef.name) {
-          displayGuild(currentGuild);
+      } else {
+        // Existing fast wave logic for smaller guilds.
+        await hydrateVisibleMemberWarsWaves(
+          guildRef,
+          false,
+          null,
+          sid,
+          WYNN_PLAYER_WARS_429_WAVE_BATCH_SIZE,
+          WYNN_PLAYER_WARS_429_WAVE_WAIT_MS,
+          renderAtEnd ? ({ done, total }) => setGuildWarsHydrationProgress(done, total, 'Loading wars...') : null,
+          3
+        );
+        if (sid !== memberWarsHydrateSession) return;
+        hideGuildWarsHydrationProgress();
+        if (renderAtEnd) {
+          let phase2Rounds = 0;
+          const maxPhase2Rounds = 3;
+          while (phase2Rounds < maxPhase2Rounds) {
+            const members = collectGuildMembers(guildRef);
+            const missingWarMembers = members.filter((m) => m.wars == null);
+            if (!missingWarMembers.length) break;
+
+            const fetchableMissing = missingWarMembers.filter((m) => m.uuid);
+            const remainingIdList = missingWarMembers
+              .slice(0, 8)
+              .map((m) => (m.uuid ? `${m.uuid.slice(0, 8)}…` : m.username))
+              .join(', ');
+            const remainingSuffix = missingWarMembers.length > 8 ? '...' : '';
+
+            if (!fetchableMissing.length) {
+              const baseLabel = `Remaining without UUID (${remainingIdList}${remainingSuffix})`;
+              setGuildWarsHydrationProgress(missingWarMembers.length, missingWarMembers.length, baseLabel);
+              await delay(2500);
+              break;
+            }
+
+            const label = `Checking missed players (${remainingIdList}${remainingSuffix})`;
+            setGuildWarsHydrationProgress(0, fetchableMissing.length, label);
+            await hydrateVisibleMemberWarsWaves(
+              guildRef,
+              true,
+              fetchableMissing.map((m) => m.username),
+              sid,
+              WYNN_PLAYER_WARS_429_WAVE_BATCH_SIZE,
+              WYNN_PLAYER_WARS_429_WAVE_WAIT_MS,
+              ({ done, total }) => setGuildWarsHydrationProgress(done, total, label),
+              10
+            );
+            if (sid !== memberWarsHydrateSession) return;
+            phase2Rounds += 1;
+          }
         }
+      }
+
+      const finalMissing = collectGuildMembers(guildRef).filter((m) => m.uuid && m.wars == null).length;
+      if (finalMissing > 0) {
+        await hydrateVisibleMemberWars(
+          guildRef,
+          false,
+          null,
+          sid,
+          false,
+          preciseMode ? 850 : WYNN_PLAYER_WARS_SPACING_MS,
+          null
+        );
+      }
+      if (currentGuild && currentGuild.name === guildRef.name) {
+        displayGuild(currentGuild);
       }
     } catch (err) {
       console.error('Background war hydrate error:', err);
@@ -1556,7 +1629,7 @@ async function stopTrackingGuild() {
     alert('You can only stop tracking when there is no active event.');
     return;
   }
-  if (!confirm('Stop tracking this guild and clear selected players?')) return;
+  if (!confirm('Stop tracking this guild?')) return;
 
   // Backend validation checks `guildName` changes before applying `trackedPlayers`,
   // so we must ensure trackedPlayers is empty before setting guildName=null.
@@ -1568,7 +1641,11 @@ async function stopTrackingGuild() {
       continue;
     }
     const userData = await loadUserData({ includeEvents: false });
-    if (userData?.trackedPlayers?.length) {
+    if (!userData) {
+      lastError = 'Could not verify player clear on the server';
+      continue;
+    }
+    if (Array.isArray(userData.trackedPlayers) && userData.trackedPlayers.length > 0) {
       lastError = 'Tracked players still present after clear';
       continue;
     }
