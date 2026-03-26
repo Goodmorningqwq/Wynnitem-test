@@ -42,6 +42,7 @@ const memberWarsCache = new Map();
 let memberWarsHydrateSession = 0;
 let guildResultCollapsed = false;
 let eventRefreshInFlight = false;
+let guildWarsHydrating = false;
 const isSearchPage = window.location.pathname.startsWith('/guild/search');
 
 function getCurrentUser() {
@@ -259,6 +260,33 @@ function hideDashboardWarsHydrationProgress() {
   section?.classList.add('hidden');
 }
 
+function setEventWarsHydrationProgress(done, total, label = 'Loading war counts...') {
+  const section = document.getElementById('eventWarsHydrationProgressSection');
+  const bar = document.getElementById('eventWarsHydrationProgressBar');
+  const text = document.getElementById('eventWarsHydrationProgressText');
+  if (!section || !bar || !text) return;
+  if (!total || total <= 0) return;
+  section.classList.remove('hidden');
+  const pct = Math.max(0, Math.min(100, Math.round((done / total) * 100)));
+  bar.style.width = `${pct}%`;
+  text.textContent = `${label} (${done}/${total})`;
+}
+
+function hideEventWarsHydrationProgress() {
+  const section = document.getElementById('eventWarsHydrationProgressSection');
+  section?.classList.add('hidden');
+}
+
+function setRefreshWarsHydrationProgress(done, total, label = 'Loading war counts...') {
+  setDashboardWarsHydrationProgress(done, total, label);
+  setEventWarsHydrationProgress(done, total, label);
+}
+
+function hideRefreshWarsHydrationProgress() {
+  hideDashboardWarsHydrationProgress();
+  hideEventWarsHydrationProgress();
+}
+
 function isGuildResultCardVisible() {
   const el = document.getElementById('guildResult');
   return Boolean(el && !el.classList.contains('hidden'));
@@ -309,7 +337,19 @@ function normalizeActiveEvent(rawEvent, fallbackTrackedPlayers = []) {
   };
 }
 
-function displayGuild(guild) {
+function showMemberLeaderboardLoadingState() {
+  const membersListEl = document.getElementById('guildMembersList');
+  const selectionEl = document.getElementById('playerCheckboxes');
+  if (membersListEl) {
+    membersListEl.innerHTML = '<p class="text-gray-500 text-sm">Loading wars...</p>';
+  }
+  if (selectionEl) {
+    selectionEl.innerHTML = '<p class="text-gray-500 text-sm">Loading wars...</p>';
+  }
+}
+
+function displayGuild(guild, options = {}) {
+  const renderMemberLeaderboard = options.renderMemberLeaderboard !== false;
   const guildResult = document.getElementById('guildResult');
   const noResult = document.getElementById('noResult');
   document.getElementById('guildName').textContent = guild.name || 'Unknown';
@@ -321,8 +361,12 @@ function displayGuild(guild) {
   document.getElementById('guildXp').textContent = `${guild.xpPercent || 0}%`;
 
   const members = collectGuildMembers(guild);
-  renderMembersList(members);
-  renderPlayerSelection(members);
+  if (renderMemberLeaderboard) {
+    renderMembersList(members);
+    renderPlayerSelection(members);
+  } else {
+    showMemberLeaderboardLoadingState();
+  }
 
   guildResult.classList.remove('hidden');
   noResult.classList.add('hidden');
@@ -936,12 +980,17 @@ function scheduleMemberWarHydrateAfterSearch(guildRef, renderAtEnd) {
           null
         );
       }
+      if (sid !== memberWarsHydrateSession) return;
       if (currentGuild && currentGuild.name === guildRef.name) {
         displayGuild(currentGuild);
       }
     } catch (err) {
       console.error('Background war hydrate error:', err);
       hideGuildWarsHydrationProgress();
+    } finally {
+      if (renderAtEnd && sid === memberWarsHydrateSession) {
+        guildWarsHydrating = false;
+      }
     }
   })();
 }
@@ -1332,16 +1381,21 @@ async function searchGuild(name, mode = 'auto', options = {}) {
       throw new Error(`API Error: ${response.status}`);
     }
     currentGuild = data;
-    if (shouldRender) {
-      displayGuild(currentGuild);
-    }
     if (hydrateWars) {
+      guildWarsHydrating = shouldRender;
+      if (shouldRender) {
+        displayGuild(currentGuild, { renderMemberLeaderboard: false });
+      }
       scheduleMemberWarHydrateAfterSearch(data, shouldRender);
     } else if (shouldRender && currentGuild?.name === data?.name) {
+      guildWarsHydrating = false;
       displayGuild(currentGuild);
     }
   } catch (e) {
     console.error('Search error:', e);
+    if (shouldRender) {
+      guildWarsHydrating = false;
+    }
     if (shouldRender) {
       alert(`Error searching guild: ${e.message}`);
     }
@@ -1353,8 +1407,13 @@ async function startEvent() {
     alert('Please log in first.');
     return;
   }
+  const metric = document.getElementById('trackMetricSelect').value;
   if (!currentGuild?.name) {
     alert('Search and load a guild first.');
+    return;
+  }
+  if (metric === 'wars' && guildWarsHydrating) {
+    alert('Please wait until wars loading is complete before starting a Wars event.');
     return;
   }
   if (activeEvent) {
@@ -1362,7 +1421,6 @@ async function startEvent() {
     return;
   }
 
-  const metric = document.getElementById('trackMetricSelect').value;
   const scope = document.getElementById('trackScopeSelect').value;
   const eventPublicToggle = document.getElementById('eventPublicToggle');
   const isPublic = Boolean(eventPublicToggle?.checked);
@@ -1458,7 +1516,7 @@ async function refreshEvent() {
   try {
     await searchGuild(activeEvent.guildName, 'auto', { render: isSearchPage, hydrateWars: false });
     if (activeEvent.metric === 'wars') {
-      setDashboardWarsHydrationProgress(0, 1, 'Loading war counts...');
+      setRefreshWarsHydrationProgress(0, 1, 'Loading war counts...');
       await hydrateVisibleMemberWarsWaves(
         currentGuild,
         true,
@@ -1466,7 +1524,7 @@ async function refreshEvent() {
         null,
         WYNN_PLAYER_WARS_429_WAVE_BATCH_SIZE,
         WYNN_PLAYER_WARS_429_WAVE_WAIT_MS,
-        ({ done, total }) => setDashboardWarsHydrationProgress(done, total, 'Loading war counts...'),
+        ({ done, total }) => setRefreshWarsHydrationProgress(done, total, 'Loading war counts...'),
         3
       );
       const members = collectGuildMembers(currentGuild).filter((m) => (activeEvent.trackedPlayers || []).includes(m.username));
@@ -1482,7 +1540,7 @@ async function refreshEvent() {
         const remainingSuffix = missingWarMembers.length > 8 ? '...' : '';
         const label = `Checking missed players (${remainingIdList}${remainingSuffix})`;
 
-        setDashboardWarsHydrationProgress(0, fetchableMissing.length, label);
+        setRefreshWarsHydrationProgress(0, fetchableMissing.length, label);
         await hydrateVisibleMemberWarsWaves(
           currentGuild,
           true,
@@ -1490,7 +1548,7 @@ async function refreshEvent() {
           null,
           WYNN_PLAYER_WARS_429_WAVE_BATCH_SIZE,
           WYNN_PLAYER_WARS_429_WAVE_WAIT_MS,
-          ({ done, total }) => setDashboardWarsHydrationProgress(done, total, label),
+          ({ done, total }) => setRefreshWarsHydrationProgress(done, total, label),
           6
         );
       } else if (missingWarMembers.length > 0) {
@@ -1500,7 +1558,7 @@ async function refreshEvent() {
           .join(', ');
         const remainingSuffix = missingWarMembers.length > 8 ? '...' : '';
         const label = `Remaining without UUID (${remainingIdList}${remainingSuffix})`;
-        setDashboardWarsHydrationProgress(missingWarMembers.length, missingWarMembers.length, label);
+        setRefreshWarsHydrationProgress(missingWarMembers.length, missingWarMembers.length, label);
         await delay(2500);
       }
 
@@ -1520,7 +1578,7 @@ async function refreshEvent() {
         );
       }
 
-      hideDashboardWarsHydrationProgress();
+      hideRefreshWarsHydrationProgress();
 
       if (isGuildResultCardVisible() && currentGuild) {
         const refreshedMembers = collectGuildMembers(currentGuild);
@@ -1559,7 +1617,7 @@ async function refreshEvent() {
     console.error('Refresh event error:', err);
   } finally {
     eventRefreshInFlight = false;
-    hideDashboardWarsHydrationProgress();
+    hideRefreshWarsHydrationProgress();
     setDashboardEventLoading(false);
     renderActiveEvent();
   }
@@ -1831,6 +1889,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   document.getElementById('showMemberWarsToggle')?.addEventListener('change', () => {
     if (!currentGuild) return;
+    if (guildWarsHydrating) return;
     const members = collectGuildMembers(currentGuild);
     renderMembersList(members);
     renderPlayerSelection(members);
@@ -1861,7 +1920,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     result.classList.remove('hidden');
     result.scrollIntoView({ behavior: 'smooth', block: 'start' });
     if (!currentGuild) return;
-    displayGuild(currentGuild);
+    guildWarsHydrating = true;
+    displayGuild(currentGuild, { renderMemberLeaderboard: false });
     scheduleMemberWarHydrateAfterSearch(currentGuild, true);
   });
   document.getElementById('changeGuildBtn').addEventListener('click', () => {
