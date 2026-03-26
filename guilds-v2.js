@@ -209,7 +209,9 @@ function formatMetric(metric) {
 }
 
 function formatRaidsSuffix(guildRaids) {
-  return ` · ${Number(guildRaids || 0).toLocaleString()} raids`;
+  const n = Number(guildRaids || 0);
+  const label = n === 1 ? 'Graid' : 'Graids';
+  return ` · ${n.toLocaleString()} ${label}`;
 }
 
 function formatWarsSuffix(showWars, wars) {
