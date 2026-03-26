@@ -337,19 +337,7 @@ function normalizeActiveEvent(rawEvent, fallbackTrackedPlayers = []) {
   };
 }
 
-function showMemberLeaderboardLoadingState() {
-  const membersListEl = document.getElementById('guildMembersList');
-  const selectionEl = document.getElementById('playerCheckboxes');
-  if (membersListEl) {
-    membersListEl.innerHTML = '<p class="text-gray-500 text-sm">Loading wars...</p>';
-  }
-  if (selectionEl) {
-    selectionEl.innerHTML = '<p class="text-gray-500 text-sm">Loading wars...</p>';
-  }
-}
-
-function displayGuild(guild, options = {}) {
-  const renderMemberLeaderboard = options.renderMemberLeaderboard !== false;
+function displayGuild(guild) {
   const guildResult = document.getElementById('guildResult');
   const noResult = document.getElementById('noResult');
   document.getElementById('guildName').textContent = guild.name || 'Unknown';
@@ -361,12 +349,8 @@ function displayGuild(guild, options = {}) {
   document.getElementById('guildXp').textContent = `${guild.xpPercent || 0}%`;
 
   const members = collectGuildMembers(guild);
-  if (renderMemberLeaderboard) {
-    renderMembersList(members);
-    renderPlayerSelection(members);
-  } else {
-    showMemberLeaderboardLoadingState();
-  }
+  renderMembersList(members);
+  renderPlayerSelection(members);
 
   guildResult.classList.remove('hidden');
   noResult.classList.add('hidden');
