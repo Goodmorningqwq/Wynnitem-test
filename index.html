@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Wynncraft Database</title>
   
-  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -33,6 +32,7 @@
       --game-text: #e8e4ef;
       --game-accent: #8f5fd8;
       --game-accent-strong: #a774ff;
+      --game-cyan: #2ce8ff;
     }
 
     body {
@@ -44,81 +44,442 @@
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
     }
 
+    .theme-btn {
+      background: linear-gradient(180deg, rgba(60, 60, 60, 0.95), rgba(45, 45, 45, 0.95));
+      border: 1px solid rgba(80, 80, 80, 0.5);
+      color: var(--game-text);
+      transition: border-color 180ms ease, transform 180ms ease;
+      touch-action: manipulation;
+      cursor: pointer;
+    }
+
+    .theme-btn:hover {
+      border-color: var(--game-accent);
+      transform: translateY(-2px);
+    }
+
+    .theme-btn-primary {
+      background: linear-gradient(180deg, rgba(130, 75, 206, 0.95), rgba(96, 52, 165, 0.95));
+      border: 1px solid rgba(180, 132, 255, 0.6);
+      color: #fff;
+      touch-action: manipulation;
+      cursor: pointer;
+    }
+
+    .theme-btn-primary:hover {
+      background: linear-gradient(180deg, rgba(147, 93, 224, 1), rgba(109, 62, 181, 1));
+      border-color: rgba(200, 160, 255, 0.8);
+      transform: translateY(-2px);
+    }
+
+    .home-hero-wrap {
+      position: relative;
+      min-height: 70vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .home-mesh {
+      pointer-events: none;
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      z-index: 0;
+    }
+
+    .home-blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.35;
+    }
+
+    .home-blob--1 {
+      width: min(420px, 70vw);
+      height: min(420px, 70vw);
+      background: rgba(143, 95, 216, 0.5);
+      top: -10%;
+      left: -15%;
+    }
+
+    .home-blob--2 {
+      width: min(360px, 60vw);
+      height: min(360px, 60vw);
+      background: rgba(44, 232, 255, 0.25);
+      bottom: 5%;
+      right: -10%;
+    }
+
+    .home-blob--3 {
+      width: min(280px, 50vw);
+      height: min(280px, 50vw);
+      background: rgba(236, 72, 153, 0.2);
+      top: 40%;
+      left: 40%;
+    }
+
+    .hero-title-shell {
+      line-height: 1.15;
+      display: block;
+      width: 100%;
+      max-width: 100%;
+      overflow: hidden;
+      text-align: center;
+      box-sizing: border-box;
+      padding: 0 0.25rem;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
     .hero-title {
-      font-size: 2.5rem;
+      font-size: clamp(1.15rem, 3.6vw + 0.55rem, 3.75rem);
       font-weight: 800;
-      background: linear-gradient(135deg, #fff 0%, #a78bfa 50%, #818cf8 100%);
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+      display: inline-block;
+      max-width: 100%;
+      white-space: nowrap;
+      background: linear-gradient(135deg, #fff 0%, #a78bfa 45%, #818cf8 70%, #2ce8ff 100%);
+      background-size: 200% auto;
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
-      letter-spacing: -0.02em;
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+      .hero-title--anim {
+        animation: heroGradientShift 14s ease-in-out infinite alternate, heroTitleGradientPulse 2.8s ease-in-out infinite;
+      }
+    }
+
+    @keyframes heroGradientShift {
+      0% { background-position: 0% 50%; }
+      100% { background-position: 100% 50%; }
+    }
+
+    @keyframes heroTitleGradientPulse {
+      0%, 100% {
+        background-size: 200% auto;
+      }
+      50% {
+        background-size: 238% auto;
+      }
+    }
+
+    .tier-dots {
+      display: flex;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .tier-dot {
+      width: 0.5rem;
+      height: 0.5rem;
+      border-radius: 9999px;
+      box-shadow: 0 0 10px currentColor;
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      .tier-dot {
+        animation: tierDotFlash 2.8s ease-in-out infinite;
+      }
+      .tier-dot:nth-child(1) { animation-delay: 0s; }
+      .tier-dot:nth-child(2) { animation-delay: 0.12s; }
+      .tier-dot:nth-child(3) { animation-delay: 0.24s; }
+      .tier-dot:nth-child(4) { animation-delay: 0.36s; }
+      .tier-dot:nth-child(5) { animation-delay: 0.48s; }
+      .tier-dot:nth-child(6) { animation-delay: 0.6s; }
+      .home-card-title--flash {
+        animation: homeCardTitleFlash 4.5s ease-in-out infinite;
+      }
+      .menu-card--guild .home-card-title--flash {
+        animation-delay: 0.35s;
+      }
+    }
+
+    @keyframes tierDotFlash {
+      0%, 100% {
+        opacity: 0.45;
+        transform: scale(1);
+        box-shadow: 0 0 6px currentColor;
+      }
+      35% {
+        opacity: 1;
+        transform: scale(1.35);
+        box-shadow: 0 0 16px currentColor, 0 0 24px currentColor;
+      }
+      55% {
+        opacity: 0.75;
+        transform: scale(1.08);
+        box-shadow: 0 0 10px currentColor;
+      }
+    }
+
+    @keyframes homeCardTitleFlash {
+      0%, 38%, 100% {
+        opacity: 1;
+        text-shadow: none;
+      }
+      42% {
+        opacity: 1;
+        text-shadow: 0 0 12px rgba(255, 255, 255, 0.55), 0 0 24px rgba(167, 139, 250, 0.4);
+      }
+      46% {
+        text-shadow: none;
+      }
+      50% {
+        text-shadow: 0 0 10px rgba(255, 255, 255, 0.45), 0 0 20px rgba(44, 232, 255, 0.35);
+      }
+      54% {
+        text-shadow: none;
+      }
+    }
+
+    .feature-chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.35rem 0.85rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      background: rgba(39, 18, 57, 0.85);
+      border: 1px solid var(--game-border-soft);
+      color: var(--game-text);
     }
 
     .menu-card {
+      position: relative;
       background: linear-gradient(180deg, rgba(39, 18, 57, 0.95), rgba(27, 12, 42, 0.95));
       border: 1px solid var(--game-border-soft);
       box-shadow: inset 0 0 0 1px rgba(73, 38, 102, 0.55);
-      transition: all 200ms ease;
+      transition: border-color 200ms ease, box-shadow 200ms ease, transform 200ms ease;
+    }
+
+    .menu-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      border-radius: 0.75rem 0.75rem 0 0;
+      opacity: 0.95;
+    }
+
+    .menu-card--items::before {
+      background: linear-gradient(90deg, #EC4899, #A855F7);
+    }
+
+    .menu-card--guild::before {
+      background: linear-gradient(90deg, #2ce8ff, #818cf8);
     }
 
     .menu-card:hover {
-      transform: translateY(-4px);
+      transform: translateY(-6px);
       border-color: var(--game-accent);
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4), 0 0 30px rgba(143, 95, 216, 0.2);
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45), 0 0 36px rgba(143, 95, 216, 0.25);
     }
 
     .menu-card:active {
-      transform: translateY(-2px) scale(0.98);
+      transform: translateY(-3px);
+    }
+
+    .menu-card:focus-visible {
+      outline: 2px solid var(--game-accent-strong);
+      outline-offset: 3px;
+    }
+
+    .menu-card-icon {
+      width: 5rem;
+      height: 5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.5rem;
+      border-radius: 1rem;
+      flex-shrink: 0;
+      border: 1px solid rgba(143, 95, 216, 0.35);
+      background: rgba(21, 10, 33, 0.6);
+    }
+
+    .menu-card--items .menu-card-icon {
+      box-shadow: 0 0 24px rgba(168, 85, 247, 0.2);
+    }
+
+    .menu-card--guild .menu-card-icon {
+      box-shadow: 0 0 24px rgba(44, 232, 255, 0.15);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .menu-card,
+      .theme-btn,
+      .theme-btn-primary {
+        transition: none;
+      }
+      .menu-card:hover,
+      .menu-card:active {
+        transform: none;
+      }
+      .theme-btn:hover,
+      .theme-btn-primary:hover {
+        transform: none;
+      }
+      .menu-card .menu-card-icon {
+        transition: none !important;
+      }
+      .group:hover .group-hover\:scale-105 {
+        transform: none !important;
+      }
+      .group:hover .group-hover\:translate-x-0\.5 {
+        transform: none !important;
+      }
     }
   </style>
 </head>
 <body class="text-gray-100 min-h-screen flex flex-col">
   
-  <!-- Header -->
   <header class="bg-[rgba(22,22,22,0.98)] border-b border-[rgba(50,50,50,0.5)] sticky top-0 z-50">
     <div class="container mx-auto px-4 py-3 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <svg class="w-8 h-8 text-violet-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M14.5 17.5L3 6V3h3l11.5 11.5M13 19l6-6M15 21l6-6M19 3l2 2-9.5 9.5-2-2L19 3z"/>
-        </svg>
-        <h1 class="text-xl font-bold text-white tracking-tight">Wynncraft Database</h1>
+        <a href="/" class="flex items-center gap-3 cursor-pointer">
+          <svg class="w-8 h-8 text-violet-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14.5 17.5L3 6V3h3l11.5 11.5M13 19l6-6M15 21l6-6M19 3l2 2-9.5 9.5-2-2L19 3z"/>
+          </svg>
+          <div>
+            <h1 class="text-xl font-bold text-white tracking-tight">Wynncraft Database</h1>
+            <p class="text-xs text-gray-500 -mt-1">Home</p>
+          </div>
+        </a>
       </div>
+      <nav class="flex items-center gap-4">
+        <a href="/item" class="text-gray-400 hover:text-white transition-colors text-sm font-medium">Items</a>
+        <a href="/guild" class="text-gray-400 hover:text-white transition-colors text-sm font-medium">Guilds</a>
+        <a href="/login" id="headerLoginBtn" class="theme-btn px-4 py-2 rounded-lg text-sm">Login</a>
+        <button type="button" id="headerUserBtn" class="hidden theme-btn-primary px-4 py-2 rounded-lg text-sm"></button>
+      </nav>
     </div>
   </header>
 
-  <!-- Main Content -->
-  <main class="flex-1 container mx-auto px-4 py-16">
-    <div class="max-w-3xl mx-auto">
-      <!-- Hero -->
-      <div class="text-center mb-12">
-        <h2 class="hero-title mb-4">Welcome to Wynncraft Database</h2>
-        <p class="text-gray-400 text-lg">Browse items, track guilds, and explore the Wynncraft world</p>
+  <div id="userMenu" class="hidden bg-[rgba(22,22,22,0.98)] border-b border-[rgba(50,50,50,0.5)]">
+    <div class="container mx-auto px-4 py-2 flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <span class="text-white font-medium" id="userDisplayName"></span>
+        <span class="text-gray-500 text-sm">|</span>
+        <span class="text-gray-400 text-sm">Home</span>
       </div>
-      
-      <!-- Menu Cards -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <!-- Items -->
-        <a href="/item" class="menu-card p-8 rounded-xl text-center block">
-          <div class="text-6xl mb-4">⚔️</div>
-          <div class="text-2xl font-bold text-white mb-2">Items</div>
-          <div class="text-gray-400">Browse weapons, armor, accessories and more</div>
-        </a>
-        
-        <!-- Guilds -->
-        <a href="/guild" class="menu-card p-8 rounded-xl text-center block">
-          <div class="text-6xl mb-4">🏰</div>
-          <div class="text-2xl font-bold text-white mb-2">Guilds</div>
-          <div class="text-gray-400">Track guilds and monitor war events</div>
-        </a>
+      <button type="button" id="logoutBtn" class="text-gray-400 hover:text-white text-sm py-2 px-2 rounded touch-manipulation">Logout</button>
+    </div>
+  </div>
+
+  <main class="flex-1 relative">
+    <div class="home-hero-wrap">
+      <div class="home-mesh" aria-hidden="true">
+        <div class="home-blob home-blob--1"></div>
+        <div class="home-blob home-blob--2"></div>
+        <div class="home-blob home-blob--3"></div>
+      </div>
+
+      <div class="container mx-auto px-4 py-12 relative z-10">
+        <div class="max-w-4xl mx-auto text-center mb-14 md:mb-16">
+          <div class="tier-dots">
+            <span class="tier-dot text-gray-300"></span>
+            <span class="tier-dot text-green-400"></span>
+            <span class="tier-dot text-blue-400"></span>
+            <span class="tier-dot text-violet-400"></span>
+            <span class="tier-dot text-orange-400"></span>
+            <span class="tier-dot text-pink-400"></span>
+          </div>
+          <h2 class="hero-title-shell mb-6">
+            <span class="hero-title hero-title--anim">Browse smarter. Track deeper.</span>
+          </h2>
+          <p class="text-gray-400 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed mb-8">
+            One place for the item database and guild tracking—wars, XP, raids, and event leaderboards built for active guilds.
+          </p>
+          <div class="flex flex-wrap justify-center gap-2 md:gap-3">
+            <span class="feature-chip">Item database</span>
+            <span class="feature-chip">Guild tracker</span>
+            <span class="feature-chip">Event leaderboards</span>
+          </div>
+        </div>
+
+        <div class="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+          <a href="/item" class="menu-card menu-card--items group rounded-xl flex flex-col md:flex-row md:items-center gap-6 p-8 md:p-10 overflow-hidden">
+            <div class="menu-card-icon mx-auto md:mx-0 group-hover:scale-105 transition-transform duration-200">⚔️</div>
+            <div class="flex-1 text-center md:text-left">
+              <div class="text-2xl font-bold text-white mb-2 home-card-title--flash">Items</div>
+              <div class="text-gray-400 text-sm md:text-base leading-relaxed">Weapons, armor, accessories, and more from the Wynncraft item API.</div>
+            </div>
+            <span class="flex items-center justify-center md:justify-start gap-1 text-violet-300 text-sm font-semibold opacity-90 group-hover:opacity-100 whitespace-nowrap">
+              Open
+              <svg class="w-4 h-4 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+            </span>
+          </a>
+
+          <a href="/guild" class="menu-card menu-card--guild group rounded-xl flex flex-col md:flex-row md:items-center gap-6 p-8 md:p-10 overflow-hidden">
+            <div class="menu-card-icon mx-auto md:mx-0 group-hover:scale-105 transition-transform duration-200">🏰</div>
+            <div class="flex-1 text-center md:text-left">
+              <div class="text-2xl font-bold text-white mb-2 home-card-title--flash">Guilds</div>
+              <div class="text-gray-400 text-sm md:text-base leading-relaxed">Search guilds, track members, wars, Graids, and run timed events.</div>
+            </div>
+            <span class="flex items-center justify-center md:justify-start gap-1 text-cyan-300 text-sm font-semibold opacity-90 group-hover:opacity-100 whitespace-nowrap">
+              Open
+              <svg class="w-4 h-4 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+            </span>
+          </a>
+        </div>
       </div>
     </div>
   </main>
 
-  <!-- Footer -->
   <footer class="bg-[rgba(22,22,22,0.98)] border-t border-[rgba(50,50,50,0.5)] mt-auto">
-    <div class="container mx-auto px-4 py-6 text-center">
+    <div class="container mx-auto px-4 py-8 text-center">
+      <div class="flex flex-wrap justify-center gap-x-6 gap-y-2 mb-3 text-sm">
+        <a href="/item" class="text-gray-400 hover:text-violet-300 transition-colors">Items</a>
+        <a href="/guild" class="text-gray-400 hover:text-violet-300 transition-colors">Guilds</a>
+        <a href="/login" class="text-gray-400 hover:text-violet-300 transition-colors">Login</a>
+      </div>
       <p class="text-gray-500 text-sm">Not affiliated with Wynncraft Industries.</p>
     </div>
   </footer>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      var headerLoginBtn = document.getElementById('headerLoginBtn');
+      var headerUserBtn = document.getElementById('headerUserBtn');
+      var userMenu = document.getElementById('userMenu');
+      var userDisplayName = document.getElementById('userDisplayName');
+      var currentUser = null;
+      try {
+        currentUser = localStorage.getItem('currentUser');
+      } catch (e) {
+        currentUser = null;
+      }
+      if (currentUser) {
+        if (headerLoginBtn) headerLoginBtn.classList.add('hidden');
+        if (headerUserBtn) {
+          headerUserBtn.classList.remove('hidden');
+          headerUserBtn.textContent = currentUser;
+        }
+        if (userMenu) userMenu.classList.remove('hidden');
+        if (userDisplayName) userDisplayName.textContent = currentUser;
+      }
+      var logoutBtn = document.getElementById('logoutBtn');
+      if (logoutBtn) {
+        logoutBtn.addEventListener('click', function() {
+          localStorage.removeItem('currentUser');
+          localStorage.removeItem('userHash');
+          window.location.href = '/';
+        });
+      }
+      if (headerUserBtn) {
+        headerUserBtn.addEventListener('click', function() {
+          window.location.href = '/guild';
+        });
+      }
+    });
+  </script>
 </body>
 </html>
