@@ -383,7 +383,7 @@ function updateGuildResultCollapseUI() {
 
 function renderMembersList(players) {
   const listEl = document.getElementById('guildMembersList');
-  const showWars = showMemberWarsEnabled();
+  const showWars = showMemberWarsEnabled() && !guildWarsHydrating;
   if (!players.length) {
     listEl.innerHTML = '<p class="text-gray-500 text-sm">No members</p>';
     return;
@@ -398,7 +398,7 @@ function renderMembersList(players) {
 
 function renderPlayerSelection(players) {
   const container = document.getElementById('playerCheckboxes');
-  const showWars = showMemberWarsEnabled();
+  const showWars = showMemberWarsEnabled() && !guildWarsHydrating;
   // #region agent log
   debugLog('pre-fix', 'H5', 'guilds-v2.js:renderPlayerSelection', 'rendering player selection wars state', { players: players.length, showWars, resolvedWars: players.filter((p) => p.wars != null).length, placeholderWars: players.filter((p) => p.wars == null).length });
   // #endregion
@@ -1384,7 +1384,7 @@ async function searchGuild(name, mode = 'auto', options = {}) {
     if (hydrateWars) {
       guildWarsHydrating = shouldRender;
       if (shouldRender) {
-        displayGuild(currentGuild, { renderMemberLeaderboard: false });
+        displayGuild(currentGuild);
       }
       scheduleMemberWarHydrateAfterSearch(data, shouldRender);
     } else if (shouldRender && currentGuild?.name === data?.name) {
@@ -1889,7 +1889,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   document.getElementById('showMemberWarsToggle')?.addEventListener('change', () => {
     if (!currentGuild) return;
-    if (guildWarsHydrating) return;
     const members = collectGuildMembers(currentGuild);
     renderMembersList(members);
     renderPlayerSelection(members);
@@ -1921,7 +1920,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     result.scrollIntoView({ behavior: 'smooth', block: 'start' });
     if (!currentGuild) return;
     guildWarsHydrating = true;
-    displayGuild(currentGuild, { renderMemberLeaderboard: false });
+    displayGuild(currentGuild);
     scheduleMemberWarHydrateAfterSearch(currentGuild, true);
   });
   document.getElementById('changeGuildBtn').addEventListener('click', () => {
