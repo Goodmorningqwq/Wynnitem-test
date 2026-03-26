@@ -15,7 +15,9 @@ function escapeHtml(value) {
 }
 
 function formatMetric(metric) {
-  return metric === 'wars' ? 'Wars' : 'Guild XP';
+  if (metric === 'wars') return 'Wars';
+  if (metric === 'guildRaids') return 'Guild Raids';
+  return 'Guild XP';
 }
 
 function formatScope(scope) {

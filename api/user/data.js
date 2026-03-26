@@ -15,7 +15,8 @@ function getDefaultUserData() {
 
 function sanitizeActiveEvent(value) {
   if (!value || typeof value !== 'object') return null;
-  const metric = value.metric === 'wars' ? 'wars' : 'xp';
+  const allowedMetrics = ['xp', 'wars', 'guildRaids'];
+  const metric = allowedMetrics.includes(value.metric) ? value.metric : 'xp';
   const scope = value.scope === 'guild' ? 'guild' : 'selected';
   const trackedPlayers = Array.isArray(value.trackedPlayers)
     ? value.trackedPlayers.filter((p) => typeof p === 'string').slice(0, 100)

@@ -173,6 +173,7 @@ function collectGuildMembers(guild) {
         uuid: member.uuid || memberUuid || null,
         username: member.username,
         contributed: Number(member.contributed || 0),
+        guildRaids: Number(member.guildRaids?.total ?? 0),
         wars: memberWarsCache.get(member.uuid || memberUuid || '') ?? null
       });
     }
@@ -185,7 +186,8 @@ function buildPlayerMap(players) {
   for (const player of players) {
     map[player.username] = {
       xp: Number(player.contributed || 0),
-      wars: Number(player.wars || 0)
+      wars: Number(player.wars || 0),
+      guildRaids: Number(player.guildRaids || 0)
     };
   }
   return map;
@@ -201,7 +203,13 @@ function formatScope(scope) {
 }
 
 function formatMetric(metric) {
-  return metric === 'wars' ? 'Wars' : 'Guild XP';
+  if (metric === 'wars') return 'Wars';
+  if (metric === 'guildRaids') return 'Guild Raids';
+  return 'Guild XP';
+}
+
+function formatRaidsSuffix(guildRaids) {
+  return ` · ${Number(guildRaids || 0).toLocaleString()} raids`;
 }
 
 function formatWarsSuffix(showWars, wars) {
@@ -261,7 +269,9 @@ function normalizeActiveEvent(rawEvent, fallbackTrackedPlayers = []) {
     return rawEvent;
   }
 
-  const metric = rawEvent.type === 'wars' ? 'wars' : 'xp';
+  let metric = 'xp';
+  if (rawEvent.type === 'wars') metric = 'wars';
+  else if (rawEvent.type === 'guildRaids') metric = 'guildRaids';
   const startedAt = Number(rawEvent.startTime || Date.now());
   const startValue = Number(rawEvent.startValue || 0);
   const updates = Array.isArray(rawEvent.updates) ? rawEvent.updates : [];
@@ -335,7 +345,7 @@ function renderMembersList(players) {
   listEl.innerHTML = players.map((player) => `
     <div class="flex justify-between items-center bg-gray-800/30 px-3 py-2 rounded text-sm">
       <span class="text-white font-medium">${escapeHtml(player.username)}</span>
-      <span class="text-gray-400">${Number(player.contributed).toLocaleString()} XP${formatWarsSuffix(showWars, player.wars)}</span>
+      <span class="text-gray-400">${Number(player.contributed).toLocaleString()} XP${formatRaidsSuffix(player.guildRaids)}${formatWarsSuffix(showWars, player.wars)}</span>
     </div>
   `).join('');
 }
@@ -354,7 +364,7 @@ function renderPlayerSelection(players) {
     <label class="flex items-center gap-2 p-2 hover:bg-gray-800/50 rounded cursor-pointer">
       <input type="checkbox" value="${escapeHtml(player.username)}" class="accent-purple-500">
       <span class="text-white text-sm">${escapeHtml(player.username)}</span>
-      <span class="text-gray-500 text-xs ml-auto">${Number(player.contributed).toLocaleString()} XP${formatWarsSuffix(showWars, player.wars)}</span>
+      <span class="text-gray-500 text-xs ml-auto">${Number(player.contributed).toLocaleString()} XP${formatRaidsSuffix(player.guildRaids)}${formatWarsSuffix(showWars, player.wars)}</span>
     </label>
   `).join('');
 }
@@ -427,19 +437,36 @@ function getSelectedPlayers() {
   return Array.from(checked).map((el) => el.value);
 }
 
+function snapshotPlayerValueForMetric(entry, metric) {
+  if (metric === 'wars') return Number(entry.wars || 0);
+  if (metric === 'guildRaids') return Number(entry.guildRaids || 0);
+  return Number(entry.xp || 0);
+}
+
+function sumGuildRaidsAcrossMembers(guild) {
+  return collectGuildMembers(guild).reduce((sum, p) => sum + Number(p.guildRaids || 0), 0);
+}
+
 function getSnapshot(metric, guild, trackedPlayers, scope = 'selected') {
   const players = collectGuildMembers(guild);
   const playerMap = buildPlayerMap(players);
   const selected = trackedPlayers.length ? trackedPlayers : players.map((p) => p.username);
   const snapshotPlayers = {};
   for (const username of selected) {
-    const entry = playerMap[username] || { xp: 0, wars: 0 };
-    snapshotPlayers[username] = Number(metric === 'wars' ? entry.wars : entry.xp);
+    const entry = playerMap[username] || { xp: 0, wars: 0, guildRaids: 0 };
+    snapshotPlayers[username] = snapshotPlayerValueForMetric(entry, metric);
   }
   const selectedTotal = Object.values(snapshotPlayers).reduce((sum, value) => sum + Number(value || 0), 0);
-  const metricValue = metric === 'wars'
-    ? (scope === 'selected' ? selectedTotal : Number(guild.wars || 0))
-    : (scope === 'selected' ? selectedTotal : Number(guild.xpPercent || 0));
+  let metricValue;
+  if (scope === 'selected') {
+    metricValue = selectedTotal;
+  } else if (metric === 'wars') {
+    metricValue = Number(guild.wars || 0);
+  } else if (metric === 'guildRaids') {
+    metricValue = sumGuildRaidsAcrossMembers(guild);
+  } else {
+    metricValue = Number(guild.xpPercent || 0);
+  }
   if (metric === 'wars') {
     // #region agent log
     console.log('[wars-snapshot]', {
@@ -1125,7 +1152,7 @@ function renderEventPlayerBreakdown(event, idPrefix = '') {
     return;
   }
 
-  const metricLabel = event.metric === 'wars' ? 'Wars' : 'XP';
+  const metricLabel = event.metric === 'wars' ? 'Wars' : event.metric === 'guildRaids' ? 'Raids' : 'XP';
   meta.textContent = `${rows.length} players · ${metricLabel}`;
   list.innerHTML = rows.map((row, index) => `
     <div class="grid grid-cols-12 gap-2 items-center text-xs bg-gray-800/40 rounded px-2 py-1">
@@ -1204,6 +1231,13 @@ function renderActiveEvent() {
       if (dashboardStartLabelEl && dashboardCurrentLabelEl) {
         dashboardStartLabelEl.textContent = activeEvent.scope === 'selected' ? 'Total Player XP (Start)' : 'Guild XP % (Start)';
         dashboardCurrentLabelEl.textContent = activeEvent.scope === 'selected' ? 'Total Player XP (Now)' : 'Guild XP % (Now)';
+      }
+    } else if (activeEvent.metric === 'guildRaids') {
+      startLabelEl.textContent = activeEvent.scope === 'selected' ? 'Total Player Raids (Start)' : 'Total Guild Raids (Start)';
+      currentLabelEl.textContent = activeEvent.scope === 'selected' ? 'Total Player Raids (Now)' : 'Total Guild Raids (Now)';
+      if (dashboardStartLabelEl && dashboardCurrentLabelEl) {
+        dashboardStartLabelEl.textContent = activeEvent.scope === 'selected' ? 'Total Player Raids (Start)' : 'Total Guild Raids (Start)';
+        dashboardCurrentLabelEl.textContent = activeEvent.scope === 'selected' ? 'Total Player Raids (Now)' : 'Total Guild Raids (Now)';
       }
     } else {
       startLabelEl.textContent = 'Start Value';

@@ -10,7 +10,9 @@ function getCurrentUser() {
 }
 
 function formatMetric(metric) {
-  return metric === 'wars' ? 'Wars' : 'Guild XP';
+  if (metric === 'wars') return 'Wars';
+  if (metric === 'guildRaids') return 'Guild Raids';
+  return 'Guild XP';
 }
 
 function formatScope(scope) {
@@ -26,7 +28,9 @@ function normalizeActiveEvent(rawEvent, fallbackTrackedPlayers = []) {
   if (!rawEvent || typeof rawEvent !== 'object') return null;
   if (rawEvent.metric && rawEvent.startedAt && rawEvent.baseline) return rawEvent;
 
-  const metric = rawEvent.type === 'wars' ? 'wars' : 'xp';
+  let metric = 'xp';
+  if (rawEvent.type === 'wars') metric = 'wars';
+  else if (rawEvent.type === 'guildRaids') metric = 'guildRaids';
   const startedAt = Number(rawEvent.startTime || Date.now());
   const startValue = Number(rawEvent.startValue || 0);
   const updates = Array.isArray(rawEvent.updates) ? rawEvent.updates : [];
