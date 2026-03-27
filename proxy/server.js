@@ -1,6 +1,7 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const { getEventRecord, normalizeEventCode, notifyLinkedChannels, upsertWebhookLink, getWebhookLink } = require('./discord-links');
 
 const app = express();
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3000;
@@ -291,6 +292,101 @@ app.get('/api/item/clear-cache', (req, res) => {
     res.json({ success: true, message: 'Cache cleared' });
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/api/discord/notify', async (req, res) => {
+  try {
+    const notifySecret = process.env.DISCORD_NOTIFY_SECRET;
+    if (notifySecret) {
+      const provided = String(req.headers['x-notify-secret'] || '');
+      if (provided !== notifySecret) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+    }
+
+    const eventCode = normalizeEventCode(req.body?.eventCode);
+    const kind = req.body?.kind === 'end' ? 'end' : 'refresh';
+    const username = String(req.body?.username || '').trim();
+    const snapshot = req.body?.snapshot && typeof req.body.snapshot === 'object' ? req.body.snapshot : null;
+    if (!eventCode) {
+      return res.status(400).json({ error: 'eventCode is required' });
+    }
+    const event = await getEventRecord(eventCode);
+    if (!event) {
+      return res.status(404).json({ error: 'Event not found' });
+    }
+    if (username && event.owner && username !== event.owner) {
+      return res.status(403).json({ error: 'Only event owner may trigger notifications' });
+    }
+
+    const result = await notifyLinkedChannels({
+      eventCode,
+      kind,
+      event,
+      snapshot
+    });
+    if (!result.ok) {
+      return res.status(500).json(result);
+    }
+    return res.json(result);
+  } catch (e) {
+    console.error('Discord notify error:', e.message);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.post('/api/discord/webhook-link', async (req, res) => {
+  try {
+    const eventCode = normalizeEventCode(req.body?.eventCode);
+    const webhookUrl = String(req.body?.webhookUrl || '').trim();
+    const username = String(req.body?.username || '').trim();
+    const linkedByDisplay = String(req.body?.linkedByDisplay || '').trim();
+    if (!eventCode || !webhookUrl || !username) {
+      return res.status(400).json({ error: 'eventCode, webhookUrl, and username are required' });
+    }
+
+    const result = await upsertWebhookLink(eventCode, {
+      webhookUrl,
+      username,
+      linkedByDisplay
+    });
+    if (!result.ok) {
+      const status = result.error === 'Event code does not exist' ? 404 : result.error.includes('owner') ? 403 : 400;
+      return res.status(status).json(result);
+    }
+    return res.json({
+      success: true,
+      eventCode,
+      linkedBy: result.link?.linkedBy || username
+    });
+  } catch (e) {
+    console.error('Discord webhook link error:', e.message);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/api/discord/webhook-link', async (req, res) => {
+  try {
+    const eventCode = normalizeEventCode(req.query?.eventCode);
+    const username = String(req.query?.username || '').trim();
+    if (!eventCode || !username) {
+      return res.status(400).json({ error: 'eventCode and username are required' });
+    }
+    const event = await getEventRecord(eventCode);
+    if (!event) return res.status(404).json({ error: 'Event not found' });
+    if (event.owner && username !== event.owner) {
+      return res.status(403).json({ error: 'Only event owner may view webhook link status' });
+    }
+    const link = await getWebhookLink(eventCode);
+    return res.json({
+      linked: Boolean(link?.webhookUrl),
+      linkedAt: link?.linkedAt || null,
+      linkedBy: link?.linkedBy || null
+    });
+  } catch (e) {
+    console.error('Discord webhook link GET error:', e.message);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 

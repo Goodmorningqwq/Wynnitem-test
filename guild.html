@@ -461,6 +461,14 @@
                     </label>
                   </div>
                 </div>
+                <div class="bg-gray-900/40 border border-gray-700 rounded-lg p-3 mb-3">
+                  <p class="text-xs text-gray-500 mb-2">Discord Webhook URL (per event code)</p>
+                  <div class="flex flex-col md:flex-row gap-2">
+                    <input id="eventWebhookUrlInput" type="url" placeholder="https://discord.com/api/webhooks/..." class="flex-1 bg-[rgba(26,12,40,0.95)] border border-[rgba(143,95,216,0.45)] rounded-lg px-3 py-2 text-white text-sm">
+                    <button type="button" id="saveEventWebhookBtn" class="theme-btn px-4 py-2 rounded-lg text-sm whitespace-nowrap">Save Webhook</button>
+                  </div>
+                  <p id="eventWebhookStatusText" class="text-xs text-gray-400 mt-2">Not linked</p>
+                </div>
                 <div id="eventPlayerBreakdownSection" class="hidden mt-3 bg-gray-900/40 border border-gray-700 rounded-lg p-3">
                   <div class="flex items-center justify-between mb-2">
                     <span class="text-gray-300 text-xs uppercase tracking-widest font-semibold">Player Breakdown</span>
@@ -528,6 +536,6 @@
     </div>
   </footer>
 
-  <script type="module" src="/guilds-v2.js?v=20260326c"></script>
+  <script type="module" src="/guilds-v2.js?v=20260326d"></script>
 </body>
 </html>

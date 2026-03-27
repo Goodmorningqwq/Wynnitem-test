@@ -1034,6 +1034,97 @@ async function updateEventVisibility(eventCode, isPublic) {
   }
 }
 
+async function notifyDiscordLeaderboardUpdate(kind, event, snapshot = null) {
+  if (!event?.eventCode || !currentUser) return;
+  try {
+    const body = {
+      eventCode: event.eventCode,
+      kind,
+      username: currentUser
+    };
+    if (snapshot && typeof snapshot === 'object') {
+      body.snapshot = snapshot;
+    }
+    const response = await fetch('/api/discord/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      console.error('Discord notify failed:', data?.error || response.status);
+    }
+  } catch (e) {
+    console.error('Discord notify request failed:', e.message);
+  }
+}
+
+async function loadEventWebhookLinkStatus() {
+  if (!activeEvent?.eventCode || !currentUser) return;
+  const statusEl = document.getElementById('eventWebhookStatusText');
+  const inputEl = document.getElementById('eventWebhookUrlInput');
+  if (statusEl) statusEl.textContent = 'Checking webhook link...';
+  try {
+    const response = await fetch(`/api/discord/webhook-link?eventCode=${encodeURIComponent(activeEvent.eventCode)}&username=${encodeURIComponent(currentUser)}`);
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      if (statusEl) statusEl.textContent = `Webhook status unavailable: ${data?.error || response.status}`;
+      return;
+    }
+    const data = await response.json();
+    if (data.linked) {
+      if (statusEl) {
+        const linkedAt = data.linkedAt ? new Date(data.linkedAt).toLocaleString() : 'unknown time';
+        statusEl.textContent = `Linked (${data.linkedBy || 'unknown'}) at ${linkedAt}`;
+      }
+      if (inputEl && !inputEl.value) {
+        inputEl.placeholder = 'Webhook linked (URL hidden)';
+      }
+    } else if (statusEl) {
+      statusEl.textContent = 'Not linked';
+    }
+  } catch {
+    if (statusEl) statusEl.textContent = 'Webhook status check failed';
+  }
+}
+
+async function saveEventWebhookLink() {
+  if (!activeEvent?.eventCode || !currentUser) {
+    alert('Start an event first before linking a webhook.');
+    return;
+  }
+  const inputEl = document.getElementById('eventWebhookUrlInput');
+  const statusEl = document.getElementById('eventWebhookStatusText');
+  const webhookUrl = String(inputEl?.value || '').trim();
+  if (!webhookUrl) {
+    alert('Please paste a Discord webhook URL.');
+    return;
+  }
+  if (statusEl) statusEl.textContent = 'Saving webhook link...';
+  try {
+    const response = await fetch('/api/discord/webhook-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        eventCode: activeEvent.eventCode,
+        webhookUrl,
+        username: currentUser,
+        linkedByDisplay: currentUser
+      })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      if (statusEl) statusEl.textContent = `Save failed: ${data?.error || response.status}`;
+      return;
+    }
+    if (inputEl) inputEl.value = '';
+    if (statusEl) statusEl.textContent = 'Webhook linked successfully.';
+    await loadEventWebhookLinkStatus();
+  } catch {
+    if (statusEl) statusEl.textContent = 'Save failed: network error';
+  }
+}
+
 async function removeEventCodeIndex(eventCode) {
   if (!currentUser || !eventCode) return { ok: true };
   try {
@@ -1312,6 +1403,7 @@ function renderActiveEvent() {
   }
   renderEventPlayerBreakdown(activeEvent);
   renderEventPlayerBreakdown(activeEvent, 'dashboard');
+  loadEventWebhookLinkStatus().catch(() => {});
 
   updateCooldownText();
   updateStopTrackingState();
@@ -1596,6 +1688,7 @@ async function refreshEvent() {
           console.error('Failed to sync event code on refresh:', syncResult.error);
         }
       }
+      await notifyDiscordLeaderboardUpdate('refresh', activeEvent, snapshot);
     }
   } catch (err) {
     console.error('Refresh event error:', err);
@@ -1629,6 +1722,8 @@ async function endEvent() {
     alert(`Failed to end event: ${endResult.error}`);
     return;
   }
+  await notifyDiscordLeaderboardUpdate('end', activeEvent, activeEvent.current || activeEvent.baseline || null);
+
   if (activeEvent.eventCode) {
     await removeEventCodeIndex(activeEvent.eventCode);
   }
@@ -1893,6 +1988,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   document.getElementById('startEventBtn').addEventListener('click', startEvent);
+  document.getElementById('saveEventWebhookBtn')?.addEventListener('click', saveEventWebhookLink);
   document.getElementById('trackGuildBtn').addEventListener('click', () => {
     const section = document.getElementById('playerSelectSection');
     section.classList.remove('hidden');
