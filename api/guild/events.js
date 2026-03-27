@@ -48,13 +48,19 @@ function buildEmbed({ event, kind, snapshot }) {
   const baseline = Number(event.baseline?.metricValue || 0);
   const current = Number(snapshot?.metricValue ?? event.current?.metricValue ?? baseline);
   const delta = current - baseline;
-  const playerValues = snapshot?.playerValues || event.current?.playerValues || {};
-  const top = Object.entries(playerValues)
-    .map(([name, value]) => ({ name, value: Number(value || 0) }))
+  const baselinePlayers = event.baseline?.playerValues || {};
+  const currentPlayers = snapshot?.playerValues || event.current?.playerValues || {};
+  const allNames = Array.from(new Set([...Object.keys(baselinePlayers), ...Object.keys(currentPlayers)]));
+  const top = allNames
+    .map((name) => {
+      const start = Number(baselinePlayers[name] || 0);
+      const currentValue = Number(currentPlayers[name] || 0);
+      return { name, value: currentValue - start };
+    })
     .sort((a, b) => b.value - a.value)
     .slice(0, 5);
   const topText = top.length
-    ? top.map((row, idx) => `#${idx + 1} ${row.name} - ${row.value.toLocaleString()}`).join('\n')
+    ? top.map((row, idx) => `#${idx + 1} ${row.name} - ${row.value >= 0 ? '+' : ''}${row.value.toLocaleString()}`).join('\n')
     : 'No player values';
 
   return {
