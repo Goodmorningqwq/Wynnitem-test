@@ -43,6 +43,8 @@ let memberWarsHydrateSession = 0;
 let guildResultCollapsed = false;
 let eventRefreshInFlight = false;
 let guildWarsHydrating = false;
+let webhookStatusLastEventCode = '';
+let webhookStatusRequestInFlight = false;
 const isSearchPage = window.location.pathname.startsWith('/guild/search');
 
 function getCurrentUser() {
@@ -1059,16 +1061,26 @@ async function notifyDiscordLeaderboardUpdate(kind, event, snapshot = null) {
   }
 }
 
-async function loadEventWebhookLinkStatus() {
+async function loadEventWebhookLinkStatus(options = {}) {
   if (!activeEvent?.eventCode || !currentUser) return;
+  const force = Boolean(options.force);
+  const eventCode = String(activeEvent.eventCode || '').trim().toUpperCase();
+  if (!eventCode) return;
+  if (!force && webhookStatusLastEventCode === eventCode) return;
+  if (webhookStatusRequestInFlight) return;
+
   const statusEl = document.getElementById('eventWebhookStatusText');
   const inputEl = document.getElementById('eventWebhookUrlInput');
-  if (statusEl) statusEl.textContent = 'Checking webhook link...';
+  webhookStatusRequestInFlight = true;
+  if (statusEl && (force || webhookStatusLastEventCode !== eventCode)) {
+    statusEl.textContent = 'Checking webhook link...';
+  }
   try {
-    const response = await fetch(`/api/discord/webhook-link?eventCode=${encodeURIComponent(activeEvent.eventCode)}&username=${encodeURIComponent(currentUser)}`);
+    const response = await fetch(`/api/discord/webhook-link?eventCode=${encodeURIComponent(eventCode)}&username=${encodeURIComponent(currentUser)}`);
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
       if (statusEl) statusEl.textContent = `Webhook status unavailable: ${data?.error || response.status}`;
+      webhookStatusLastEventCode = eventCode;
       return;
     }
     const data = await response.json();
@@ -1085,6 +1097,9 @@ async function loadEventWebhookLinkStatus() {
     }
   } catch {
     if (statusEl) statusEl.textContent = 'Webhook status check failed';
+  } finally {
+    webhookStatusLastEventCode = eventCode;
+    webhookStatusRequestInFlight = false;
   }
 }
 
@@ -1119,7 +1134,7 @@ async function saveEventWebhookLink() {
     }
     if (inputEl) inputEl.value = '';
     if (statusEl) statusEl.textContent = 'Webhook linked successfully.';
-    await loadEventWebhookLinkStatus();
+    await loadEventWebhookLinkStatus({ force: true });
   } catch {
     if (statusEl) statusEl.textContent = 'Save failed: network error';
   }
@@ -1403,7 +1418,7 @@ function renderActiveEvent() {
   }
   renderEventPlayerBreakdown(activeEvent);
   renderEventPlayerBreakdown(activeEvent, 'dashboard');
-  loadEventWebhookLinkStatus().catch(() => {});
+  loadEventWebhookLinkStatus({ force: false }).catch(() => {});
 
   updateCooldownText();
   updateStopTrackingState();
