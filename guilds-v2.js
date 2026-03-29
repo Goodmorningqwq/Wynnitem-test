@@ -479,6 +479,42 @@ function sumGuildRaidsAcrossMembers(guild) {
   return collectGuildMembers(guild).reduce((sum, p) => sum + Number(p.guildRaids || 0), 0);
 }
 
+function getLiveRosterUsernames(event, guild) {
+  if (!guild || !event) return [];
+  if (event.scope === 'guild') {
+    return collectGuildMembers(guild).map((m) => m.username);
+  }
+  return Array.isArray(event.trackedPlayers) ? event.trackedPlayers.slice() : [];
+}
+
+function mergeGuildScopeBaselineForNewMembers(event, guild, snapshot) {
+  if (!event || event.scope !== 'guild' || !snapshot || typeof snapshot.playerValues !== 'object') {
+    return false;
+  }
+  if (!event.baseline) {
+    event.baseline = { metricValue: 0, playerValues: {} };
+  }
+  if (!event.baseline.playerValues || typeof event.baseline.playerValues !== 'object') {
+    event.baseline.playerValues = {};
+  }
+  const roster = collectGuildMembers(guild).map((m) => m.username);
+  let mutated = false;
+  const metric = event.metric;
+  for (let i = 0; i < roster.length; i += 1) {
+    const username = roster[i];
+    if (Object.prototype.hasOwnProperty.call(event.baseline.playerValues, username)) {
+      continue;
+    }
+    const v = Number(snapshot.playerValues[username] ?? 0);
+    event.baseline.playerValues[username] = v;
+    if (metric === 'guildRaids') {
+      event.baseline.metricValue = Number(event.baseline.metricValue || 0) + v;
+    }
+    mutated = true;
+  }
+  return mutated;
+}
+
 function getSnapshot(metric, guild, trackedPlayers, scope = 'selected') {
   const players = collectGuildMembers(guild);
   const playerMap = buildPlayerMap(players);
@@ -495,7 +531,9 @@ function getSnapshot(metric, guild, trackedPlayers, scope = 'selected') {
   } else if (metric === 'wars') {
     metricValue = Number(guild.wars || 0);
   } else if (metric === 'guildRaids') {
-    metricValue = sumGuildRaidsAcrossMembers(guild);
+    metricValue = scope === 'guild'
+      ? selectedTotal
+      : sumGuildRaidsAcrossMembers(guild);
   } else {
     metricValue = Number(guild.xpPercent || 0);
   }
@@ -1416,6 +1454,7 @@ function renderActiveEvent() {
     dashboardActiveEventPublicToggle.checked = Boolean(activeEvent.isPublic);
     dashboardActiveEventPublicToggle.disabled = !activeEvent.eventCode;
   }
+  renderTrackedPlayersInfo(activeEvent.trackedPlayers || []);
   renderEventPlayerBreakdown(activeEvent);
   renderEventPlayerBreakdown(activeEvent, 'dashboard');
   loadEventWebhookLinkStatus({ force: false }).catch(() => {});
@@ -1606,19 +1645,22 @@ async function refreshEvent() {
   updateCooldownText();
   try {
     await searchGuild(activeEvent.guildName, 'auto', { render: isSearchPage, hydrateWars: false });
+    const eventScope = activeEvent.scope || 'selected';
+    let liveRoster = getLiveRosterUsernames(activeEvent, currentGuild);
+
     if (activeEvent.metric === 'wars') {
       setRefreshWarsHydrationProgress(0, 1, 'Loading war counts...');
       await hydrateVisibleMemberWarsWaves(
         currentGuild,
         true,
-        activeEvent.trackedPlayers || [],
+        liveRoster,
         null,
         WYNN_PLAYER_WARS_429_WAVE_BATCH_SIZE,
         WYNN_PLAYER_WARS_429_WAVE_WAIT_MS,
         ({ done, total }) => setRefreshWarsHydrationProgress(done, total, 'Loading war counts...'),
         3
       );
-      const members = collectGuildMembers(currentGuild).filter((m) => (activeEvent.trackedPlayers || []).includes(m.username));
+      const members = collectGuildMembers(currentGuild).filter((m) => liveRoster.includes(m.username));
       const missingWarMembers = members.filter((m) => m.wars == null);
       const fetchableMissing = missingWarMembers.filter((m) => m.uuid);
       const stuckNoUuid = missingWarMembers.filter((m) => !m.uuid);
@@ -1654,13 +1696,13 @@ async function refreshEvent() {
       }
 
       const finalMissing = collectGuildMembers(currentGuild)
-        .filter((m) => (activeEvent.trackedPlayers || []).includes(m.username))
+        .filter((m) => liveRoster.includes(m.username))
         .filter((m) => m.uuid && !memberWarsCache.has(m.uuid)).length;
       if (finalMissing > 0) {
         await hydrateVisibleMemberWarsWaves(
           currentGuild,
           false,
-          activeEvent.trackedPlayers || [],
+          liveRoster,
           null,
           10,
           0,
@@ -1677,7 +1719,14 @@ async function refreshEvent() {
         renderPlayerSelection(refreshedMembers);
       }
     }
-    const snapshot = getSnapshot(activeEvent.metric, currentGuild, activeEvent.trackedPlayers || [], activeEvent.scope || 'selected');
+
+    liveRoster = getLiveRosterUsernames(activeEvent, currentGuild);
+    const snapshot = getSnapshot(activeEvent.metric, currentGuild, liveRoster, eventScope);
+    const baselineMutated = mergeGuildScopeBaselineForNewMembers(activeEvent, currentGuild, snapshot);
+    if (eventScope === 'guild') {
+      activeEvent.trackedPlayers = liveRoster.slice();
+    }
+
     const previousSnapshot = activeEvent.current || null;
     const previousMetricValue = Number(previousSnapshot?.metricValue || 0);
     const nextMetricValue = Number(snapshot?.metricValue || 0);
@@ -1692,7 +1741,7 @@ async function refreshEvent() {
     activeEvent.current = snapshot;
     activeEvent.lastRefreshAt = Date.now();
     activeEvent.firstRefreshDone = true;
-    if (snapshotChanged) {
+    if (snapshotChanged || baselineMutated) {
       const saveResult = await updateUserData({ activeEvent });
       if (!saveResult.ok) {
         console.error('Failed to persist refreshed active event:', saveResult.error);
@@ -1703,7 +1752,9 @@ async function refreshEvent() {
           console.error('Failed to sync event code on refresh:', syncResult.error);
         }
       }
-      await notifyDiscordLeaderboardUpdate('refresh', activeEvent, snapshot);
+      if (snapshotChanged) {
+        await notifyDiscordLeaderboardUpdate('refresh', activeEvent, snapshot);
+      }
     }
   } catch (err) {
     console.error('Refresh event error:', err);

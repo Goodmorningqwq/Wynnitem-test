@@ -50,10 +50,18 @@ function normalizeActiveEvent(rawEvent, fallbackTrackedPlayers = []) {
 
 function computeLeaderboard(event) {
   const baselinePlayers = event.baseline?.playerValues || {};
-  const currentPlayers = event.current?.playerValues || baselinePlayers;
-  return Object.keys(baselinePlayers).map((username) => {
+  const currentPlayers = event.current?.playerValues || {};
+  const names = Array.from(new Set([
+    ...Object.keys(baselinePlayers),
+    ...Object.keys(currentPlayers)
+  ]));
+  return names.map((username) => {
     const startValue = Number(baselinePlayers[username] || 0);
-    const currentValue = Number(currentPlayers[username] || 0);
+    const currentValue = Number(
+      Object.prototype.hasOwnProperty.call(currentPlayers, username)
+        ? currentPlayers[username]
+        : startValue
+    );
     return { username, startValue, currentValue, delta: currentValue - startValue };
   }).sort((a, b) => b.delta - a.delta);
 }
