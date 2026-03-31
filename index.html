@@ -132,6 +132,40 @@
       margin-right: auto;
     }
 
+    .hero-intro {
+      position: relative;
+    }
+
+    .hero-sparkles {
+      pointer-events: none;
+      position: absolute;
+      inset: -1.2rem 4% auto;
+      height: 4.8rem;
+      z-index: 0;
+      opacity: 0.65;
+    }
+
+    .hero-sparkle {
+      position: absolute;
+      width: 0.24rem;
+      height: 0.24rem;
+      border-radius: 9999px;
+      background: rgba(167, 139, 250, 0.78);
+      box-shadow: 0 0 10px rgba(167, 139, 250, 0.42);
+    }
+
+    .hero-sparkle:nth-child(2n) {
+      background: rgba(44, 232, 255, 0.68);
+      box-shadow: 0 0 11px rgba(44, 232, 255, 0.36);
+    }
+
+    .hero-sparkle--1 { top: 0.6rem; left: 8%; }
+    .hero-sparkle--2 { top: 0.15rem; left: 16%; width: 0.16rem; height: 0.16rem; }
+    .hero-sparkle--3 { top: 1.1rem; left: 28%; }
+    .hero-sparkle--4 { top: 0.3rem; right: 31%; width: 0.18rem; height: 0.18rem; }
+    .hero-sparkle--5 { top: 1.5rem; right: 19%; }
+    .hero-sparkle--6 { top: 0.4rem; right: 9%; width: 0.14rem; height: 0.14rem; }
+
     .hero-title {
       font-size: clamp(1.15rem, 3.6vw + 0.55rem, 3.75rem);
       font-weight: 800;
@@ -140,17 +174,29 @@
       display: inline-block;
       max-width: 100%;
       white-space: nowrap;
-      background: linear-gradient(135deg, #fff 0%, #a78bfa 45%, #818cf8 70%, #2ce8ff 100%);
+      background: linear-gradient(140deg, #ede9fe 0%, #c4b5fd 36%, #a78bfa 62%, #67e8f9 100%);
       background-size: 200% auto;
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
     }
 
+    .hero-subtitle {
+      color: #bfc7df;
+    }
+
     @media (prefers-reduced-motion: no-preference) {
       .hero-title--anim {
         animation: heroGradientShift 14s ease-in-out infinite alternate, heroTitleGradientPulse 2.8s ease-in-out infinite;
       }
+      .hero-sparkle {
+        animation: heroSparkleTwinkle 4.6s ease-in-out infinite;
+      }
+      .hero-sparkle--2 { animation-delay: 0.65s; }
+      .hero-sparkle--3 { animation-delay: 1.1s; }
+      .hero-sparkle--4 { animation-delay: 1.75s; }
+      .hero-sparkle--5 { animation-delay: 2.25s; }
+      .hero-sparkle--6 { animation-delay: 2.9s; }
     }
 
     @keyframes heroGradientShift {
@@ -164,6 +210,21 @@
       }
       50% {
         background-size: 238% auto;
+      }
+    }
+
+    @keyframes heroSparkleTwinkle {
+      0%, 100% {
+        opacity: 0.25;
+        transform: scale(0.95);
+      }
+      45% {
+        opacity: 0.88;
+        transform: scale(1.3);
+      }
+      65% {
+        opacity: 0.52;
+        transform: scale(1.06);
       }
     }
 
@@ -245,9 +306,9 @@
       font-weight: 600;
       letter-spacing: 0.04em;
       text-transform: uppercase;
-      background: rgba(39, 18, 57, 0.85);
-      border: 1px solid var(--game-border-soft);
-      color: var(--game-text);
+      background: rgba(34, 22, 57, 0.75);
+      border: 1px solid rgba(141, 111, 210, 0.5);
+      color: #d6def8;
     }
 
     .menu-card {
@@ -314,6 +375,9 @@
     }
 
     @media (prefers-reduced-motion: reduce) {
+      .hero-sparkle {
+        animation: none !important;
+      }
       .menu-card,
       .theme-btn,
       .theme-btn-primary {
@@ -383,7 +447,15 @@
       </div>
 
       <div class="container mx-auto px-4 py-12 relative z-10">
-        <div class="max-w-4xl mx-auto text-center mb-14 md:mb-16">
+        <div class="max-w-4xl mx-auto text-center mb-14 md:mb-16 hero-intro">
+          <div class="hero-sparkles" aria-hidden="true">
+            <span class="hero-sparkle hero-sparkle--1"></span>
+            <span class="hero-sparkle hero-sparkle--2"></span>
+            <span class="hero-sparkle hero-sparkle--3"></span>
+            <span class="hero-sparkle hero-sparkle--4"></span>
+            <span class="hero-sparkle hero-sparkle--5"></span>
+            <span class="hero-sparkle hero-sparkle--6"></span>
+          </div>
           <div class="tier-dots">
             <span class="tier-dot text-gray-300"></span>
             <span class="tier-dot text-green-400"></span>
@@ -395,7 +467,7 @@
           <h2 class="hero-title-shell mb-6">
             <span class="hero-title hero-title--anim">Browse smarter. Track deeper.</span>
           </h2>
-          <p class="text-gray-400 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed mb-8">
+          <p class="hero-subtitle text-lg md:text-xl max-w-2xl mx-auto leading-relaxed mb-8">
             One place for the item database and guild tracking—wars, XP, raids, and event leaderboards built for active guilds.
           </p>
           <div class="flex flex-wrap justify-center gap-2 md:gap-3">
