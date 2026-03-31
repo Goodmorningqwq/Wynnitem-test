@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<!--
+  Guild territory map – setup / calibration
+  - Place main-map.webp at site root as /main-map.webp (same folder as this file).
+  - If polygons misalign the art, open territories-map.js and tune:
+      MAP_X_MIN, MAP_X_MAX, MAP_Z_MIN, MAP_Z_MAX (world coordinates), or
+      FLIP_Z (vertical flip) and WORLD_PADDING_RATIO.
+  - Wynncraft world X/Z from API Location.start/end match jakematt123 JSON.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Territories - Wynncraft Database</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            common: '#FFFFFF',
+            uncommon: '#22C55E',
+            rare: '#3B82F6',
+            epic: '#A855F7',
+            legendary: '#F97316',
+            fabled: '#EF4444',
+            mythic: '#EC4899'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    :root {
+      --game-border: rgba(120, 68, 190, 0.7);
+      --game-border-soft: rgba(120, 68, 190, 0.35);
+      --game-text: #e8e4ef;
+      --game-accent: #8f5fd8;
+      --game-accent-strong: #a774ff;
+      --game-cyan: #2ce8ff;
+    }
+
+    body {
+      background:
+        radial-gradient(circle at 15% 15%, rgba(118, 63, 186, 0.12), transparent 36%),
+        radial-gradient(circle at 85% 10%, rgba(44, 232, 255, 0.08), transparent 30%),
+        linear-gradient(180deg, #1a1a1a 0%, #111 100%);
+      color: var(--game-text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    }
+
+    .theme-btn {
+      background: linear-gradient(180deg, rgba(60, 60, 60, 0.95), rgba(45, 45, 45, 0.95));
+      border: 1px solid rgba(80, 80, 80, 0.5);
+      color: var(--game-text);
+      transition: border-color 180ms ease, transform 180ms ease;
+      touch-action: manipulation;
+      cursor: pointer;
+    }
+
+    .theme-btn:hover {
+      border-color: var(--game-accent);
+      transform: translateY(-1px);
+    }
+
+    .theme-btn-primary {
+      background: linear-gradient(180deg, rgba(130, 75, 206, 0.95), rgba(96, 52, 165, 0.95));
+      border: 1px solid rgba(180, 132, 255, 0.6);
+      color: #fff;
+      touch-action: manipulation;
+      cursor: pointer;
+    }
+
+    .theme-btn-primary:hover {
+      background: linear-gradient(180deg, rgba(147, 93, 224, 1), rgba(109, 62, 181, 1));
+      border-color: rgba(200, 160, 255, 0.8);
+      transform: translateY(-1px);
+    }
+
+    .theme-panel {
+      background: linear-gradient(180deg, rgba(39, 18, 57, 0.92), rgba(27, 12, 42, 0.92));
+      border: 1px solid var(--game-border-soft);
+      box-shadow: inset 0 0 0 1px rgba(73, 38, 102, 0.45);
+    }
+
+    #map {
+      background: #0d0d12;
+      z-index: 1;
+    }
+
+    .leaflet-container {
+      font-family: inherit;
+    }
+
+    .leaflet-tooltip.territory-tip {
+      background: rgba(22, 14, 32, 0.95);
+      color: var(--game-text);
+      border: 1px solid var(--game-border-soft);
+      border-radius: 6px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    }
+
+    .leaflet-tooltip.territory-tip::before {
+      border-top-color: rgba(22, 14, 32, 0.95);
+    }
+
+    #territoryTableWrap {
+      max-height: min(55vh, 520px);
+    }
+
+    #territoryModal[open] {
+      display: flex;
+    }
+
+    th.sortable {
+      cursor: pointer;
+      user-select: none;
+    }
+
+    th.sortable:hover {
+      color: var(--game-cyan);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .theme-btn:hover,
+      .theme-btn-primary:hover {
+        transform: none;
+      }
+    }
+  </style>
+</head>
+<body class="text-gray-100 min-h-screen flex flex-col">
+
+  <header class="bg-[rgba(22,22,22,0.98)] border-b border-[rgba(50,50,50,0.5)] sticky top-0 z-[1000]">
+    <div class="container mx-auto px-4 py-3 flex items-center justify-between gap-2">
+      <div class="flex items-center gap-3 min-w-0">
+        <a href="/" class="flex items-center gap-3 cursor-pointer shrink-0">
+          <svg class="w-8 h-8 text-violet-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14.5 17.5L3 6V3h3l11.5 11.5M13 19l6-6M15 21l6-6M19 3l2 2-9.5 9.5-2-2L19 3z"/>
+          </svg>
+          <div class="hidden sm:block min-w-0">
+            <div class="text-xl font-bold text-white tracking-tight truncate">Wynncraft Database</div>
+            <p class="text-xs text-gray-500 -mt-1">Territories</p>
+          </div>
+        </a>
+      </div>
+      <nav class="flex items-center gap-2 sm:gap-4 shrink-0 text-sm">
+        <a href="/item" class="text-gray-400 hover:text-white transition-colors hidden sm:inline font-medium">Items</a>
+        <a href="/guild" class="text-gray-400 hover:text-white transition-colors font-medium">Guilds</a>
+        <a href="/territories" class="text-white font-semibold font-medium">Map</a>
+        <a href="/login" id="headerLoginBtn" class="theme-btn px-3 py-2 rounded-lg text-sm">Login</a>
+        <button type="button" id="headerUserBtn" class="hidden theme-btn-primary px-3 py-2 rounded-lg text-sm"></button>
+      </nav>
+    </div>
+  </header>
+
+  <div id="userMenu" class="hidden bg-[rgba(22,22,22,0.98)] border-b border-[rgba(50,50,50,0.5)]">
+    <div class="container mx-auto px-4 py-2 flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <span class="text-white font-medium" id="userDisplayName"></span>
+        <span class="text-gray-500 text-sm">|</span>
+        <span class="text-gray-400 text-sm">Territories</span>
+      </div>
+      <button type="button" id="logoutBtn" class="text-gray-400 hover:text-white text-sm py-2 px-2 rounded touch-manipulation">Logout</button>
+    </div>
+  </div>
+
+  <div id="statusBanner" class="hidden px-4 py-2 text-sm text-center border-b border-[rgba(50,50,50,0.5)]" role="status"></div>
+
+  <main class="flex-1 flex flex-col lg:flex-row min-h-0 overflow-hidden">
+    <div class="relative flex-1 min-h-[45vh] lg:min-h-[calc(100vh-7.5rem)] order-2 lg:order-1">
+      <div id="map" class="absolute inset-0 w-full h-full rounded-none lg:rounded-lg border-0 lg:border border-[rgba(50,50,50,0.5)]" aria-label="Guild territory map"></div>
+      <button type="button" id="sidebarToggle" class="lg:hidden absolute bottom-4 right-4 z-[500] theme-btn-primary px-4 py-2 rounded-lg text-sm shadow-lg">List / filters</button>
+    </div>
+
+    <aside id="territorySidebar" class="theme-panel order-1 lg:order-2 w-full lg:w-96 flex flex-col border-b lg:border-b-0 lg:border-l border-[rgba(50,50,50,0.5)] max-h-[50vh] lg:max-h-none lg:h-auto overflow-hidden hidden lg:flex lg:flex-col">
+      <div class="p-3 border-b border-[rgba(50,50,50,0.45)] space-y-2 shrink-0">
+        <div class="flex flex-wrap items-center gap-2">
+          <button type="button" id="refreshBtn" class="theme-btn px-3 py-1.5 rounded-lg text-xs font-medium">Refresh data</button>
+          <span id="mergedMeta" class="text-xs text-gray-500"></span>
+        </div>
+        <input type="search" id="searchInput" placeholder="Search by name…" class="w-full px-3 py-2 rounded-lg bg-[rgba(18,12,28,0.9)] border border-[rgba(80,80,90,0.5)] text-sm text-white placeholder-gray-500">
+        <div class="grid grid-cols-2 gap-2">
+          <label class="text-xs text-gray-400 col-span-2">Highlight resource</label>
+          <select id="resourceFilter" class="col-span-2 w-full px-2 py-1.5 rounded-lg bg-[rgba(18,12,28,0.9)] border border-[rgba(80,80,90,0.5)] text-sm">
+            <option value="">None</option>
+            <option value="emeralds">Emeralds (dominant)</option>
+            <option value="wood">Wood</option>
+            <option value="ore">Ore</option>
+            <option value="crops">Crops</option>
+            <option value="fish">Fish</option>
+          </select>
+          <label class="text-xs text-gray-400">Guild</label>
+          <select id="guildFilter" class="w-full px-2 py-1.5 rounded-lg bg-[rgba(18,12,28,0.9)] border border-[rgba(80,80,90,0.5)] text-sm">
+            <option value="">All</option>
+          </select>
+          <label class="text-xs text-gray-400 col-span-2">Min emeralds / hr</label>
+          <input type="number" id="emeraldMinInput" class="col-span-2 w-full px-2 py-1.5 rounded-lg bg-[rgba(18,12,28,0.9)] border border-[rgba(80,80,90,0.5)] text-sm" value="0" min="0" step="500">
+          <label class="text-xs text-gray-400">Name contains</label>
+          <select id="specialFilter" class="w-full px-2 py-1.5 rounded-lg bg-[rgba(18,12,28,0.9)] border border-[rgba(80,80,90,0.5)] text-sm">
+            <option value="">Any</option>
+            <option value="oasis">Oasis (name)</option>
+            <option value="rainbow">Rainbow (name)</option>
+          </select>
+        </div>
+        <div class="flex flex-wrap gap-3 text-xs">
+          <label class="inline-flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="toggleRoutes" class="rounded border-gray-600"> Trade routes
+          </label>
+          <label class="inline-flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="toggleHeatmap" class="rounded border-gray-600"> Eco heatmap
+          </label>
+          <label class="inline-flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="toggleSimulate" class="rounded border-gray-600"> Simulate ownership
+          </label>
+        </div>
+        <div id="simulatePanel" class="hidden text-xs text-gray-300 theme-panel px-2 py-2 rounded-lg border border-[rgba(50,50,50,0.4)]">
+          <div class="font-semibold text-white mb-1">Selected production (static rates)</div>
+          <div id="simulateTotals">None selected.</div>
+          <button type="button" id="clearSimulateBtn" class="mt-2 theme-btn px-2 py-1 rounded text-xs">Clear selection</button>
+        </div>
+      </div>
+      <div id="territoryTableWrap" class="flex-1 overflow-auto min-h-0">
+        <table class="w-full text-left text-xs">
+          <thead class="sticky top-0 bg-[rgba(22,14,32,0.98)] border-b border-[rgba(50,50,50,0.6)] z-10">
+            <tr class="text-gray-400">
+              <th class="sortable px-2 py-2 font-medium" data-sort="name">Name</th>
+              <th class="sortable px-2 py-2 font-medium text-right" data-sort="emeralds">Em</th>
+              <th class="sortable px-2 py-2 font-medium text-right hidden sm:table-cell" data-sort="wood">Wd</th>
+              <th class="sortable px-2 py-2 font-medium text-right hidden sm:table-cell" data-sort="ore">Or</th>
+              <th class="sortable px-2 py-2 font-medium text-right hidden md:table-cell" data-sort="crops">Cr</th>
+              <th class="sortable px-2 py-2 font-medium text-right hidden md:table-cell" data-sort="fish">Fi</th>
+              <th class="sortable px-2 py-2 font-medium truncate max-w-[4rem]" data-sort="owner">Owner</th>
+            </tr>
+          </thead>
+          <tbody id="territoryTableBody" class="text-gray-200"></tbody>
+        </table>
+      </div>
+    </aside>
+  </main>
+
+  <dialog id="territoryModal" class="fixed inset-0 max-w-lg w-[calc(100%-2rem)] max-h-[85vh] overflow-y-auto p-0 rounded-xl border border-[rgba(120,68,190,0.45)] bg-[rgba(18,10,28,0.98)] text-gray-100 shadow-2xl backdrop:bg-black backdrop:bg-opacity-60 z-[2000] m-auto open:flex open:flex-col">
+    <div class="flex items-center justify-between gap-2 px-4 py-3 border-b border-[rgba(50,50,50,0.5)] shrink-0">
+      <h2 id="modalTitle" class="text-lg font-bold text-white pr-4"></h2>
+      <button type="button" id="modalCloseBtn" class="theme-btn px-3 py-1.5 rounded-lg text-sm shrink-0">Close</button>
+    </div>
+    <div id="modalBody" class="px-4 py-3 text-sm space-y-3 flex-1 overflow-y-auto"></div>
+  </dialog>
+
+  <footer class="bg-[rgba(22,22,22,0.98)] border-t border-[rgba(50,50,50,0.5)] shrink-0">
+    <div class="container mx-auto px-4 py-3 text-center text-xs text-gray-500">
+      Not affiliated with Wynncraft Industries. Live ownership from Wynncraft API; static data from community JSON.
+    </div>
+  </footer>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script type="module">
+    import { initTerritoryMap } from './territories-map.js';
+    initTerritoryMap();
+  </script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      var headerLoginBtn = document.getElementById('headerLoginBtn');
+      var headerUserBtn = document.getElementById('headerUserBtn');
+      var userMenu = document.getElementById('userMenu');
+      var userDisplayName = document.getElementById('userDisplayName');
+      var currentUser = null;
+      try {
+        currentUser = localStorage.getItem('currentUser');
+      } catch (e) {
+        currentUser = null;
+      }
+      if (currentUser) {
+        if (headerLoginBtn) headerLoginBtn.classList.add('hidden');
+        if (headerUserBtn) {
+          headerUserBtn.classList.remove('hidden');
+          headerUserBtn.textContent = currentUser;
+        }
+        if (userMenu) userMenu.classList.remove('hidden');
+        if (userDisplayName) userDisplayName.textContent = currentUser;
+      }
+      var logoutBtn = document.getElementById('logoutBtn');
+      if (logoutBtn) {
+        logoutBtn.addEventListener('click', function() {
+          localStorage.removeItem('currentUser');
+          localStorage.removeItem('userHash');
+          window.location.href = '/';
+        });
+      }
+      if (headerUserBtn) {
+        headerUserBtn.addEventListener('click', function() {
+          window.location.href = '/guild';
+        });
+      }
+    });
+  </script>
+</body>
+</html>
