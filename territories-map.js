@@ -3,7 +3,8 @@
 
 const STATIC_TERRITORIES_URL =
   'https://raw.githubusercontent.com/jakematt123/Wynncraft-Territory-Info/main/territories.json';
-const LIVE_TERRITORIES_URL = 'https://api.wynncraft.com/v3/guild/list/territory';
+/** Same-origin proxy on Vercel (api/guild/territories.js) — avoids browser CORS on wynncraft.com */
+const LIVE_TERRITORIES_URL = '/api/guild/territories';
 const MAP_IMAGE_URL = '/main-map.webp';
 
 /** @type {number | null} Manual override; null = derive from territory geometry */
