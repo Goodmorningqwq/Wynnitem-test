@@ -1,6 +1,6 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: ['./index.html', './territories-map.js', './script.js'],
+  content: ['./public/index.html', './public/war.html', './public/territories-map.js', './public/script.js'],
   theme: {
     extend: {
       colors: {

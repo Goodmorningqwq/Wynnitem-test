@@ -1,5 +1,7 @@
 {
   "buildCommand": "npm run build",
+  "installCommand": "npm install",
+  "outputDirectory": "public",
   "rewrites": [
     { "source": "/territories", "destination": "/index.html" },
     { "source": "/map", "destination": "/index.html" }
