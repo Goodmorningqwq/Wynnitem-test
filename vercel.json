@@ -1,4 +1,5 @@
 {
+  "buildCommand": "npm run build",
   "rewrites": [
     { "source": "/", "destination": "/index.html" },
     { "source": "/item", "destination": "/item.html" },
@@ -6,8 +7,6 @@
     { "source": "/guild/event_history", "destination": "/guild-event-history.html" },
     { "source": "/guild/search", "destination": "/guild.html" },
     { "source": "/guild", "destination": "/guild.html" },
-    { "source": "/territories", "destination": "/territories.html" },
-    { "source": "/map", "destination": "/territories.html" },
     { "source": "/login", "destination": "/login.html" },
     { "source": "/api/item(.*)", "destination": "/api/item$1" },
     { "source": "/api/guild(.*)", "destination": "/api/guild$1" },

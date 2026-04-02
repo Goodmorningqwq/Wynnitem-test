@@ -1,0 +1,7 @@
+{
+  "buildCommand": "npm run build",
+  "rewrites": [
+    { "source": "/territories", "destination": "/index.html" },
+    { "source": "/map", "destination": "/index.html" }
+  ]
+}

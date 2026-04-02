@@ -1,36 +1,17 @@
 <!DOCTYPE html>
 <!--
-  Guild territory map – setup / calibration
-  - Place main-map.webp at site root as /main-map.webp (same folder as this file).
-  - If polygons misalign the art, open territories-map.js and tune:
-      MAP_X_MIN, MAP_X_MAX, MAP_Z_MIN, MAP_Z_MAX (world coordinates), or
-      FLIP_Z (vertical flip) and WORLD_PADDING_RATIO.
-  - Wynncraft world X/Z from API Location.start/end match jakematt123 JSON.
+  Standalone Wynncraft guild territory map (deploy as its own Vercel project).
+  - main-map.webp and territories-map.js live beside this file.
+  - Tune MAP_* / FLIP_Z in territories-map.js if polygons misalign the art.
+  - Nav links below use MAIN_SITE for the main Wynnitem app; change if your primary domain differs.
 -->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Territories - Wynncraft Database</title>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/output.css">
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            common: '#FFFFFF',
-            uncommon: '#22C55E',
-            rare: '#3B82F6',
-            epic: '#A855F7',
-            legendary: '#F97316',
-            fabled: '#EF4444',
-            mythic: '#EC4899'
-          }
-        }
-      }
-    }
-  </script>
   <style>
     :root {
       --game-border: rgba(120, 68, 190, 0.7);
@@ -135,7 +116,7 @@
   <header class="bg-[rgba(22,22,22,0.98)] border-b border-[rgba(50,50,50,0.5)] sticky top-0 z-[1000]">
     <div class="container mx-auto px-4 py-3 flex items-center justify-between gap-2">
       <div class="flex items-center gap-3 min-w-0">
-        <a href="/" class="flex items-center gap-3 cursor-pointer shrink-0">
+        <a href="https://wynnitem-test.vercel.app/" class="flex items-center gap-3 cursor-pointer shrink-0">
           <svg class="w-8 h-8 text-violet-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M14.5 17.5L3 6V3h3l11.5 11.5M13 19l6-6M15 21l6-6M19 3l2 2-9.5 9.5-2-2L19 3z"/>
           </svg>
@@ -146,10 +127,10 @@
         </a>
       </div>
       <nav class="flex items-center gap-2 sm:gap-4 shrink-0 text-sm">
-        <a href="/item" class="text-gray-400 hover:text-white transition-colors hidden sm:inline font-medium">Items</a>
-        <a href="/guild" class="text-gray-400 hover:text-white transition-colors font-medium">Guilds</a>
-        <a href="/territories" class="text-white font-semibold font-medium">Map</a>
-        <a href="/login" id="headerLoginBtn" class="theme-btn px-3 py-2 rounded-lg text-sm">Login</a>
+        <a href="https://wynnitem-test.vercel.app/item" class="text-gray-400 hover:text-white transition-colors hidden sm:inline font-medium">Items</a>
+        <a href="https://wynnitem-test.vercel.app/guild" class="text-gray-400 hover:text-white transition-colors font-medium">Guilds</a>
+        <a href="/" class="text-white font-semibold font-medium">Map</a>
+        <a href="https://wynnitem-test.vercel.app/login" id="headerLoginBtn" class="theme-btn px-3 py-2 rounded-lg text-sm">Login</a>
         <button type="button" id="headerUserBtn" class="hidden theme-btn-primary px-3 py-2 rounded-lg text-sm"></button>
       </nav>
     </div>
@@ -206,7 +187,7 @@
         </div>
         <div class="flex flex-wrap gap-3 text-xs">
           <label class="inline-flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" id="toggleRoutes" class="rounded border-gray-600"> Trade routes
+            <input type="checkbox" id="toggleRoutes" class="rounded border-gray-600" checked> Trade routes
           </label>
           <label class="inline-flex items-center gap-2 cursor-pointer">
             <input type="checkbox" id="toggleHeatmap" class="rounded border-gray-600"> Eco heatmap
@@ -219,6 +200,57 @@
           <div class="font-semibold text-white mb-1">Selected production (static rates)</div>
           <div id="simulateTotals">None selected.</div>
           <button type="button" id="clearSimulateBtn" class="mt-2 theme-btn px-2 py-1 rounded text-xs">Clear selection</button>
+        </div>
+        <div id="calibrationPanel" class="text-xs text-gray-300 theme-panel px-2 py-2 rounded-lg border border-[rgba(50,50,50,0.4)]">
+          <div class="font-semibold text-white mb-1">Overlay calibration</div>
+          <div class="text-[11px] text-gray-400 mb-2">Shift all territory blocks and copy exact offsets.</div>
+          <label class="inline-flex items-center gap-2 cursor-pointer mb-2">
+            <input type="checkbox" id="calAutoFitBounds" class="rounded border-gray-600">
+            Auto-fit bounds (recommended)
+          </label>
+          <label class="block mb-1 text-gray-400">Horizontal (X): <span id="calOffsetXValue" class="text-white">0</span> px</label>
+          <input type="range" id="calOffsetX" min="-300" max="300" step="1" value="0" class="w-full mb-2">
+          <label class="block mb-1 text-gray-400">Vertical (Y): <span id="calOffsetYValue" class="text-white">0</span> px</label>
+          <input type="range" id="calOffsetY" min="-300" max="300" step="1" value="0" class="w-full mb-2">
+          <label class="block mb-1 text-gray-400">Scale X: <span id="calScaleXValue" class="text-white">1.000</span></label>
+          <input type="range" id="calScaleX" min="700" max="1300" step="1" value="1000" class="w-full mb-2">
+          <label class="block mb-1 text-gray-400">Scale Y: <span id="calScaleYValue" class="text-white">1.000</span></label>
+          <input type="range" id="calScaleY" min="700" max="1300" step="1" value="1000" class="w-full mb-2">
+          <label class="block mb-1 text-gray-400">BG Scale X: <span id="calBgScaleXValue" class="text-white">0.803</span></label>
+          <input type="range" id="calBgScaleX" min="700" max="1300" step="1" value="803" class="w-full mb-2">
+          <label class="block mb-1 text-gray-400">BG Scale Y: <span id="calBgScaleYValue" class="text-white">0.966</span></label>
+          <input type="range" id="calBgScaleY" min="700" max="1300" step="1" value="966" class="w-full mb-2">
+          <div class="mb-2 p-2 rounded border border-[rgba(80,80,90,0.45)] bg-[rgba(18,12,28,0.55)]">
+            <label class="inline-flex items-center gap-2 cursor-pointer mb-2">
+              <input type="checkbox" id="calMultiSelect" class="rounded border-gray-600">
+              Multi-select territories
+            </label>
+            <div class="text-gray-400 mb-1">Selected: <span id="calTerritoryName" class="text-white">None</span></div>
+            <label class="block mb-1 text-gray-400">Selection Move X: <span id="calTerrOffsetXValue" class="text-white">0</span> px</label>
+            <input type="range" id="calTerrOffsetX" min="-400" max="400" step="1" value="0" class="w-full mb-2">
+            <label class="block mb-1 text-gray-400">Selection Move Y: <span id="calTerrOffsetYValue" class="text-white">0</span> px</label>
+            <input type="range" id="calTerrOffsetY" min="-400" max="400" step="1" value="0" class="w-full mb-2">
+            <label class="block mb-1 text-gray-400">Selection Scale X: <span id="calTerrScaleXValue" class="text-white">1.000</span></label>
+            <input type="range" id="calTerrScaleX" min="700" max="1300" step="1" value="1000" class="w-full mb-2">
+            <label class="block mb-1 text-gray-400">Selection Scale Y: <span id="calTerrScaleYValue" class="text-white">1.000</span></label>
+            <input type="range" id="calTerrScaleY" min="700" max="1300" step="1" value="1000" class="w-full mb-2">
+            <div class="flex gap-1">
+              <button type="button" id="calSelectionClear" class="theme-btn px-2 py-1 rounded">Clear selection</button>
+              <button type="button" id="calTerrScaleReset" class="theme-btn px-2 py-1 rounded">Reset selected transforms</button>
+            </div>
+          </div>
+          <div class="grid grid-cols-4 gap-1 mb-2">
+            <button type="button" id="calNudgeLeft" class="theme-btn px-2 py-1 rounded">Left</button>
+            <button type="button" id="calNudgeRight" class="theme-btn px-2 py-1 rounded">Right</button>
+            <button type="button" id="calNudgeUp" class="theme-btn px-2 py-1 rounded">Up</button>
+            <button type="button" id="calNudgeDown" class="theme-btn px-2 py-1 rounded">Down</button>
+          </div>
+          <div class="flex gap-1 mb-2">
+            <button type="button" id="calDragToggle" class="theme-btn px-2 py-1 rounded">Drag territories: Off</button>
+            <button type="button" id="calReset" class="theme-btn px-2 py-1 rounded">Reset</button>
+            <button type="button" id="calCopy" class="theme-btn-primary px-2 py-1 rounded">Copy values</button>
+          </div>
+          <code id="calOutput" class="block text-[11px] text-cyan-300 break-all"></code>
         </div>
       </div>
       <div id="territoryTableWrap" class="flex-1 overflow-auto min-h-0">
@@ -251,6 +283,7 @@
   <footer class="bg-[rgba(22,22,22,0.98)] border-t border-[rgba(50,50,50,0.5)] shrink-0">
     <div class="container mx-auto px-4 py-3 text-center text-xs text-gray-500">
       Not affiliated with Wynncraft Industries. Live ownership from Wynncraft API; static data from community JSON.
+      <span class="block mt-1"><a href="https://wynnitem-test.vercel.app/" class="text-violet-400 hover:text-violet-300">Main site</a></span>
     </div>
   </footer>
 
@@ -261,40 +294,43 @@
   </script>
 
   <script>
-    document.addEventListener('DOMContentLoaded', function() {
-      var headerLoginBtn = document.getElementById('headerLoginBtn');
-      var headerUserBtn = document.getElementById('headerUserBtn');
-      var userMenu = document.getElementById('userMenu');
-      var userDisplayName = document.getElementById('userDisplayName');
-      var currentUser = null;
-      try {
-        currentUser = localStorage.getItem('currentUser');
-      } catch (e) {
-        currentUser = null;
-      }
-      if (currentUser) {
-        if (headerLoginBtn) headerLoginBtn.classList.add('hidden');
-        if (headerUserBtn) {
-          headerUserBtn.classList.remove('hidden');
-          headerUserBtn.textContent = currentUser;
+    (function() {
+      var MAIN_SITE = 'https://wynnitem-test.vercel.app';
+      document.addEventListener('DOMContentLoaded', function() {
+        var headerLoginBtn = document.getElementById('headerLoginBtn');
+        var headerUserBtn = document.getElementById('headerUserBtn');
+        var userMenu = document.getElementById('userMenu');
+        var userDisplayName = document.getElementById('userDisplayName');
+        var currentUser = null;
+        try {
+          currentUser = localStorage.getItem('currentUser');
+        } catch (e) {
+          currentUser = null;
         }
-        if (userMenu) userMenu.classList.remove('hidden');
-        if (userDisplayName) userDisplayName.textContent = currentUser;
-      }
-      var logoutBtn = document.getElementById('logoutBtn');
-      if (logoutBtn) {
-        logoutBtn.addEventListener('click', function() {
-          localStorage.removeItem('currentUser');
-          localStorage.removeItem('userHash');
-          window.location.href = '/';
-        });
-      }
-      if (headerUserBtn) {
-        headerUserBtn.addEventListener('click', function() {
-          window.location.href = '/guild';
-        });
-      }
-    });
+        if (currentUser) {
+          if (headerLoginBtn) headerLoginBtn.classList.add('hidden');
+          if (headerUserBtn) {
+            headerUserBtn.classList.remove('hidden');
+            headerUserBtn.textContent = currentUser;
+          }
+          if (userMenu) userMenu.classList.remove('hidden');
+          if (userDisplayName) userDisplayName.textContent = currentUser;
+        }
+        var logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+          logoutBtn.addEventListener('click', function() {
+            localStorage.removeItem('currentUser');
+            localStorage.removeItem('userHash');
+            window.location.href = MAIN_SITE + '/';
+          });
+        }
+        if (headerUserBtn) {
+          headerUserBtn.addEventListener('click', function() {
+            window.location.href = MAIN_SITE + '/guild';
+          });
+        }
+      });
+    })();
   </script>
 </body>
 </html>

@@ -3,20 +3,40 @@
 
 const STATIC_TERRITORIES_URL =
   'https://raw.githubusercontent.com/jakematt123/Wynncraft-Territory-Info/main/territories.json';
-/** Same-origin proxy on Vercel (api/guild/territories.js) — avoids browser CORS on wynncraft.com */
-const LIVE_TERRITORIES_URL = '/api/guild/territories';
+/** Same-origin proxy (api/territories.js) — avoids browser CORS on wynncraft.com */
+const LIVE_TERRITORIES_URL = '/api/territories';
 const MAP_IMAGE_URL = '/main-map.webp';
 
-/** @type {number | null} Manual override; null = derive from territory geometry */
-const MAP_X_MIN = null;
-const MAP_X_MAX = null;
-const MAP_Z_MIN = null;
-const MAP_Z_MAX = null;
+/**
+ * Fixed world bounds for bottom-middle origin projection.
+ * Calibration guide:
+ * - x=0 maps to horizontal center.
+ * - z=0 maps near the bottom edge.
+ * - Tune these four values until known territory corners align.
+ */
+const MAP_X_MIN = -2500;
+const MAP_X_MAX = 2500;
+const MAP_Z_MIN = -6635;
+const MAP_Z_MAX = 0;
+const AUTO_FIT_WORLD_BOUNDS = false;
+const AUTO_FIT_PADDING_RATIO = 0.04;
+
+/** Optional pixel nudges after world projection. */
+const MAP_OFFSET_X_PX = 75;
+const MAP_OFFSET_Y_PX = -15;
+const MAP_SCALE_X = 1;
+const MAP_SCALE_Y = 1;
+const MAP_BG_SCALE_X = 0.803;
+const MAP_BG_SCALE_Y = 0.966;
+let runtimeOffsetXPx = MAP_OFFSET_X_PX;
+let runtimeOffsetYPx = MAP_OFFSET_Y_PX;
+let runtimeScaleX = MAP_SCALE_X;
+let runtimeScaleY = MAP_SCALE_Y;
+let runtimeBgScaleX = MAP_BG_SCALE_X;
+let runtimeBgScaleY = MAP_BG_SCALE_Y;
 
 /** Set true if the map appears vertically mirrored vs territories */
-const FLIP_Z = false;
-
-const WORLD_PADDING_RATIO = 0.05;
+const FLIP_Z = true;
 
 const RESOURCE_KEYS = ['emeralds', 'wood', 'ore', 'crops', 'fish'];
 const HIGHLIGHT_COLORS = {
@@ -237,12 +257,17 @@ async function fetchLiveTerritories() {
   return res.json();
 }
 
+function clamp01(value) {
+  return Math.max(0, Math.min(1, value));
+}
+
 /**
- * Compute world axis bounds from merged list plus padding.
+ * Build world bounds from territory rectangles with optional padding.
  * @param {MergedTerritory[]} list
- * @returns {{ xMin: number, xMax: number, zMin: number, zMax: number }}
+ * @returns {{ xMin: number, xMax: number, zMin: number, zMax: number } | null}
  */
-function worldBoundsFromList(list) {
+function worldBoundsFromTerritories(list) {
+  if (!Array.isArray(list) || list.length === 0) return null;
   let xMin = Infinity;
   let xMax = -Infinity;
   let zMin = Infinity;
@@ -253,13 +278,18 @@ function worldBoundsFromList(list) {
     zMin = Math.min(zMin, t.minZ);
     zMax = Math.max(zMax, t.maxZ);
   });
-  const padX = (xMax - xMin) * WORLD_PADDING_RATIO || 50;
-  const padZ = (zMax - zMin) * WORLD_PADDING_RATIO || 50;
+  if (!Number.isFinite(xMin) || !Number.isFinite(xMax) || !Number.isFinite(zMin) || !Number.isFinite(zMax)) {
+    return null;
+  }
+  const xSpan = Math.max(1, xMax - xMin);
+  const zSpan = Math.max(1, zMax - zMin);
+  const xPad = Math.round(xSpan * AUTO_FIT_PADDING_RATIO);
+  const zPad = Math.round(zSpan * AUTO_FIT_PADDING_RATIO);
   return {
-    xMin: xMin - padX,
-    xMax: xMax + padX,
-    zMin: zMin - padZ,
-    zMax: zMax + padZ
+    xMin: xMin - xPad,
+    xMax: xMax + xPad,
+    zMin: zMin - zPad,
+    zMax: zMax + zPad
   };
 }
 
@@ -275,10 +305,34 @@ function worldBoundsFromList(list) {
  * @returns {object} Leaflet LatLng
  */
 function worldToLayer(x, z, xMin, xMax, zMin, zMax, imgW, imgH) {
-  const nx = (x - xMin) / (xMax - xMin);
-  let nz = (z - zMin) / (zMax - zMin);
-  if (FLIP_Z) nz = 1 - nz;
-  return L.latLng(nz * imgH, nx * imgW);
+  const westSpan = Math.abs(xMin) || 1;
+  const eastSpan = Math.abs(xMax) || 1;
+  const northSpan = Math.abs(zMin) || 1;
+  const southSpan = Math.abs(zMax) || 1;
+
+  let nx;
+  if (x < 0) {
+    nx = 0.5 - 0.5 * (Math.abs(x) / westSpan);
+  } else {
+    nx = 0.5 + 0.5 * (Math.abs(x) / eastSpan);
+  }
+
+  let ny;
+  if (z <= 0) {
+    ny = 1 - (Math.abs(z) / northSpan);
+  } else {
+    ny = 1 + (Math.abs(z) / southSpan);
+  }
+
+  nx = clamp01(nx);
+  ny = clamp01(ny);
+  if (FLIP_Z) ny = 1 - ny;
+  const scaledNx = 0.5 + (nx - 0.5) * runtimeScaleX;
+  const scaledNy = 0.5 + (ny - 0.5) * runtimeScaleY;
+  return L.latLng(
+    scaledNy * imgH + runtimeOffsetYPx,
+    scaledNx * imgW + runtimeOffsetXPx
+  );
 }
 
 /**
@@ -385,6 +439,39 @@ export async function initTerritoryMap() {
   const modalCloseBtn = document.getElementById('modalCloseBtn');
   const sidebar = document.getElementById('territorySidebar');
   const sidebarToggle = document.getElementById('sidebarToggle');
+  const calOffsetX = document.getElementById('calOffsetX');
+  const calOffsetY = document.getElementById('calOffsetY');
+  const calOffsetXValue = document.getElementById('calOffsetXValue');
+  const calOffsetYValue = document.getElementById('calOffsetYValue');
+  const calNudgeLeft = document.getElementById('calNudgeLeft');
+  const calNudgeRight = document.getElementById('calNudgeRight');
+  const calNudgeUp = document.getElementById('calNudgeUp');
+  const calNudgeDown = document.getElementById('calNudgeDown');
+  const calDragToggle = document.getElementById('calDragToggle');
+  const calReset = document.getElementById('calReset');
+  const calCopy = document.getElementById('calCopy');
+  const calOutput = document.getElementById('calOutput');
+  const calAutoFitBounds = document.getElementById('calAutoFitBounds');
+  const calScaleX = document.getElementById('calScaleX');
+  const calScaleY = document.getElementById('calScaleY');
+  const calScaleXValue = document.getElementById('calScaleXValue');
+  const calScaleYValue = document.getElementById('calScaleYValue');
+  const calBgScaleX = document.getElementById('calBgScaleX');
+  const calBgScaleY = document.getElementById('calBgScaleY');
+  const calBgScaleXValue = document.getElementById('calBgScaleXValue');
+  const calBgScaleYValue = document.getElementById('calBgScaleYValue');
+  const calTerritoryName = document.getElementById('calTerritoryName');
+  const calTerrScaleX = document.getElementById('calTerrScaleX');
+  const calTerrScaleY = document.getElementById('calTerrScaleY');
+  const calTerrScaleXValue = document.getElementById('calTerrScaleXValue');
+  const calTerrScaleYValue = document.getElementById('calTerrScaleYValue');
+  const calTerrScaleReset = document.getElementById('calTerrScaleReset');
+  const calTerrOffsetX = document.getElementById('calTerrOffsetX');
+  const calTerrOffsetY = document.getElementById('calTerrOffsetY');
+  const calTerrOffsetXValue = document.getElementById('calTerrOffsetXValue');
+  const calTerrOffsetYValue = document.getElementById('calTerrOffsetYValue');
+  const calMultiSelect = document.getElementById('calMultiSelect');
+  const calSelectionClear = document.getElementById('calSelectionClear');
 
   /** @type {{ xMin: number, xMax: number, zMin: number, zMax: number, imgW: number, imgH: number } | null} */
   let geo = null;
@@ -404,6 +491,137 @@ export async function initTerritoryMap() {
   const simulateSelected = new Set();
   let sortKey = 'name';
   let sortDir = 1;
+  let useAutoFitBounds = AUTO_FIT_WORLD_BOUNDS;
+  let dragTerritoriesEnabled = false;
+  let isDraggingTerritories = false;
+  let dragStartClientX = 0;
+  let dragStartClientY = 0;
+  let dragStartOffsetX = 0;
+  let dragStartOffsetY = 0;
+  let multiSelectEnabled = false;
+  /** @type {Set<string>} */
+  const selectedTerritoryNames = new Set();
+  /** @type {Map<string, { scaleX: number, scaleY: number, offsetX: number, offsetY: number }>} */
+  const territoryTransformByName = new Map();
+
+  function getPrimarySelectedTerritory() {
+    const first = selectedTerritoryNames.values().next();
+    return first.done ? '' : first.value;
+  }
+
+  function getSelectedTerritoriesLabel() {
+    if (selectedTerritoryNames.size === 0) return 'None';
+    const all = Array.from(selectedTerritoryNames);
+    if (all.length <= 3) return all.join(', ');
+    return all.slice(0, 3).join(', ') + ' +' + (all.length - 3) + ' more';
+  }
+
+  function getTerritoryTransform(name) {
+    if (!name || !territoryTransformByName.has(name)) {
+      return { scaleX: 1, scaleY: 1, offsetX: 0, offsetY: 0 };
+    }
+    const t = territoryTransformByName.get(name);
+    return {
+      scaleX: Number.isFinite(t && t.scaleX) ? t.scaleX : 1,
+      scaleY: Number.isFinite(t && t.scaleY) ? t.scaleY : 1,
+      offsetX: Number.isFinite(t && t.offsetX) ? t.offsetX : 0,
+      offsetY: Number.isFinite(t && t.offsetY) ? t.offsetY : 0
+    };
+  }
+
+  function getSelectionTransformBaseline() {
+    return getTerritoryTransform(getPrimarySelectedTerritory());
+  }
+
+  function getScaledTerritoryRect(t) {
+    const transform = getTerritoryTransform(t.name);
+    const cx = (t.minX + t.maxX) / 2;
+    const cz = (t.minZ + t.maxZ) / 2;
+    const halfW = ((t.maxX - t.minX) / 2) * transform.scaleX;
+    const halfH = ((t.maxZ - t.minZ) / 2) * transform.scaleY;
+    return {
+      minX: cx - halfW,
+      maxX: cx + halfW,
+      minZ: cz - halfH,
+      maxZ: cz + halfH
+    };
+  }
+
+  function applyTerritoryOffset(bounds, territoryName) {
+    const transform = getTerritoryTransform(territoryName);
+    const sw = bounds.getSouthWest();
+    const ne = bounds.getNorthEast();
+    return L.latLngBounds(
+      [sw.lat + transform.offsetY, sw.lng + transform.offsetX],
+      [ne.lat + transform.offsetY, ne.lng + transform.offsetX]
+    );
+  }
+
+  function updateTerritorySelection(name, additive) {
+    if (!name) return;
+    if (additive) {
+      if (selectedTerritoryNames.has(name)) selectedTerritoryNames.delete(name);
+      else selectedTerritoryNames.add(name);
+    } else {
+      selectedTerritoryNames.clear();
+      selectedTerritoryNames.add(name);
+    }
+    updateCalibrationReadout();
+    applyLayerStyles();
+  }
+
+  function applyTransformToSelection(mutator) {
+    selectedTerritoryNames.forEach(function (name) {
+      const current = getTerritoryTransform(name);
+      const next = mutator(current);
+      territoryTransformByName.set(name, {
+        scaleX: Number.isFinite(next.scaleX) ? next.scaleX : 1,
+        scaleY: Number.isFinite(next.scaleY) ? next.scaleY : 1,
+        offsetX: Number.isFinite(next.offsetX) ? next.offsetX : 0,
+        offsetY: Number.isFinite(next.offsetY) ? next.offsetY : 0
+      });
+    });
+  }
+
+  function findTerritoryByName(name) {
+    return mergedList.find(function (t) {
+      return t.name === name;
+    }) || null;
+  }
+
+  function applyScaleSpacingToSelection(scaleX, scaleY) {
+    if (!geo || selectedTerritoryNames.size === 0) return;
+    const selected = Array.from(selectedTerritoryNames);
+    const primaryName = getPrimarySelectedTerritory();
+    const primaryTransform = getTerritoryTransform(primaryName);
+    const centers = new Map();
+    let sumLng = 0;
+    let sumLat = 0;
+    selected.forEach(function (name) {
+      const t = findTerritoryByName(name);
+      if (!t) return;
+      const center = territoryCenter(t, geo);
+      centers.set(name, center);
+      sumLng += center.lng;
+      sumLat += center.lat;
+    });
+    const count = Math.max(1, centers.size);
+    const centerLng = sumLng / count;
+    const centerLat = sumLat / count;
+    selected.forEach(function (name) {
+      const c = centers.get(name);
+      const dx = c ? c.lng - centerLng : 0;
+      const dy = c ? c.lat - centerLat : 0;
+      const spreadX = count > 1 ? dx * (scaleX - 1) : 0;
+      const spreadY = count > 1 ? dy * (scaleY - 1) : 0;
+      territoryTransformByName.set(name, {
+        scaleX,
+        scaleY,
+        offsetX: primaryTransform.offsetX + spreadX,
+        offsetY: primaryTransform.offsetY + spreadY
+      });
+    });
+  }
 
   function setStatus(kind, message) {
     if (!statusBanner) return;
@@ -490,12 +708,17 @@ export async function initTerritoryMap() {
 
   function styleForTerritory(t, fs, maxScore) {
     const baseColor = guildColor(t.ownerLabel === 'Unclaimed' ? '' : t.guild.name);
-    let fillOpacity = 0.22;
+    let fillOpacity = 0.34;
     let color = baseColor;
     let weight = 1;
     if (simulateSelected.has(t.name)) {
       weight = 3;
       color = '#facc15';
+    }
+    if (selectedTerritoryNames.has(t.name)) {
+      weight = Math.max(weight, 3);
+      color = '#2ce8ff';
+      fillOpacity = Math.max(fillOpacity, 0.32);
     }
     if (fs.heatmap) {
       const ratio = maxScore > 0 ? t.productionScore / maxScore : 0;
@@ -560,9 +783,8 @@ export async function initTerritoryMap() {
         drawn.add(key);
         const latlngs = [centers.get(a), centers.get(b)];
         L.polyline(latlngs, {
-          color: 'rgba(167,139,250,0.35)',
-          weight: 1,
-          dashArray: '6 6'
+          color: 'rgba(255,255,255,0.85)',
+          weight: 1.4
         }).addTo(routeLayer);
       });
     });
@@ -672,11 +894,12 @@ export async function initTerritoryMap() {
 
   function flyToTerritory(t) {
     if (!map || !geo) return;
-    const b = boundsFromWorldRect(
-      t.minX,
-      t.maxX,
-      t.minZ,
-      t.maxZ,
+    const rect = getScaledTerritoryRect(t);
+    const worldBounds = boundsFromWorldRect(
+      rect.minX,
+      rect.maxX,
+      rect.minZ,
+      rect.maxZ,
       geo.xMin,
       geo.xMax,
       geo.zMin,
@@ -684,11 +907,14 @@ export async function initTerritoryMap() {
       geo.imgW,
       geo.imgH
     );
+    const b = applyTerritoryOffset(worldBounds, t.name);
     map.fitBounds(b, { padding: [24, 24], maxZoom: 5, animate: true });
   }
 
   function attachLayerClick(layer, t) {
     layer.on('click', function (ev) {
+      const additive = !!(multiSelectEnabled || (ev.originalEvent && ev.originalEvent.shiftKey));
+      updateTerritorySelection(t.name, additive);
       const fs = getFilterState();
       if (fs.simulate) {
         L.DomEvent.stopPropagation(ev);
@@ -708,11 +934,12 @@ export async function initTerritoryMap() {
     layersByName.clear();
     const fs0 = getFilterState();
     mergedList.forEach(function (t) {
-      const rectBounds = boundsFromWorldRect(
-        t.minX,
-        t.maxX,
-        t.minZ,
-        t.maxZ,
+      const rect = getScaledTerritoryRect(t);
+      const worldBounds = boundsFromWorldRect(
+        rect.minX,
+        rect.maxX,
+        rect.minZ,
+        rect.maxZ,
         geo.xMin,
         geo.xMax,
         geo.zMin,
@@ -720,6 +947,7 @@ export async function initTerritoryMap() {
         geo.imgW,
         geo.imgH
       );
+      const rectBounds = applyTerritoryOffset(worldBounds, t.name);
       const layer = L.rectangle(rectBounds, styleForTerritory(t, fs0, 1));
       attachLayerClick(layer, t);
       layer.bindTooltip(t.name, { sticky: true, direction: 'auto', className: 'territory-tip' });
@@ -792,6 +1020,121 @@ export async function initTerritoryMap() {
       .join('');
   }
 
+  function updateCalibrationReadout() {
+    if (calOffsetXValue) calOffsetXValue.textContent = String(runtimeOffsetXPx);
+    if (calOffsetYValue) calOffsetYValue.textContent = String(runtimeOffsetYPx);
+    const selectedTransform = getSelectionTransformBaseline();
+    const hasSelection = selectedTerritoryNames.size > 0;
+    if (calOutput) {
+      calOutput.textContent =
+        'MAP_OFFSET_X_PX = ' +
+        runtimeOffsetXPx +
+        ', MAP_OFFSET_Y_PX = ' +
+        runtimeOffsetYPx +
+        ', MAP_SCALE_X = ' +
+        runtimeScaleX.toFixed(3) +
+        ', MAP_SCALE_Y = ' +
+        runtimeScaleY.toFixed(3) +
+        ', MAP_BG_SCALE_X = ' +
+        runtimeBgScaleX.toFixed(3) +
+        ', MAP_BG_SCALE_Y = ' +
+        runtimeBgScaleY.toFixed(3) +
+        ', SELECTED = ' +
+        selectedTerritoryNames.size +
+        ', SEL_MOVE_X = ' +
+        selectedTransform.offsetX +
+        ', SEL_MOVE_Y = ' +
+        selectedTransform.offsetY +
+        ', SEL_SCALE_X = ' +
+        selectedTransform.scaleX.toFixed(3) +
+        ', SEL_SCALE_Y = ' +
+        selectedTransform.scaleY.toFixed(3) +
+        ', BOUNDS = ' +
+        (useAutoFitBounds ? 'AUTO' : 'FIXED');
+    }
+    if (calOffsetX) calOffsetX.value = String(runtimeOffsetXPx);
+    if (calOffsetY) calOffsetY.value = String(runtimeOffsetYPx);
+    if (calScaleXValue) calScaleXValue.textContent = runtimeScaleX.toFixed(3);
+    if (calScaleYValue) calScaleYValue.textContent = runtimeScaleY.toFixed(3);
+    if (calScaleX) calScaleX.value = String(Math.round(runtimeScaleX * 1000));
+    if (calScaleY) calScaleY.value = String(Math.round(runtimeScaleY * 1000));
+    if (calBgScaleXValue) calBgScaleXValue.textContent = runtimeBgScaleX.toFixed(3);
+    if (calBgScaleYValue) calBgScaleYValue.textContent = runtimeBgScaleY.toFixed(3);
+    if (calBgScaleX) calBgScaleX.value = String(Math.round(runtimeBgScaleX * 1000));
+    if (calBgScaleY) calBgScaleY.value = String(Math.round(runtimeBgScaleY * 1000));
+    if (calTerritoryName) calTerritoryName.textContent = getSelectedTerritoriesLabel();
+    if (calTerrOffsetXValue) calTerrOffsetXValue.textContent = String(selectedTransform.offsetX);
+    if (calTerrOffsetYValue) calTerrOffsetYValue.textContent = String(selectedTransform.offsetY);
+    if (calTerrScaleXValue) calTerrScaleXValue.textContent = selectedTransform.scaleX.toFixed(3);
+    if (calTerrScaleYValue) calTerrScaleYValue.textContent = selectedTransform.scaleY.toFixed(3);
+    if (calTerrOffsetX) {
+      calTerrOffsetX.value = String(Math.round(selectedTransform.offsetX));
+      calTerrOffsetX.disabled = !hasSelection;
+    }
+    if (calTerrOffsetY) {
+      calTerrOffsetY.value = String(Math.round(selectedTransform.offsetY));
+      calTerrOffsetY.disabled = !hasSelection;
+    }
+    if (calTerrScaleX) {
+      calTerrScaleX.value = String(Math.round(selectedTransform.scaleX * 1000));
+      calTerrScaleX.disabled = !hasSelection;
+    }
+    if (calTerrScaleY) {
+      calTerrScaleY.value = String(Math.round(selectedTransform.scaleY * 1000));
+      calTerrScaleY.disabled = !hasSelection;
+    }
+    if (calTerrScaleReset) calTerrScaleReset.disabled = !hasSelection;
+    if (calSelectionClear) calSelectionClear.disabled = !hasSelection;
+    if (calMultiSelect) calMultiSelect.checked = multiSelectEnabled;
+  }
+
+  function applyCalibrationOffset() {
+    if (!geo) return;
+    rebuildTerritoryLayers();
+  }
+
+  function refreshDragToggleUi() {
+    if (!calDragToggle) return;
+    calDragToggle.textContent = dragTerritoriesEnabled
+      ? 'Drag territories: On'
+      : 'Drag territories: Off';
+    calDragToggle.classList.toggle('theme-btn-primary', dragTerritoriesEnabled);
+  }
+
+  /**
+   * @param {number} imgW
+   * @param {number} imgH
+   * @returns {object} Leaflet LatLngBounds
+   */
+  function getImageOverlayBounds(imgW, imgH) {
+    const scaledW = imgW * runtimeBgScaleX;
+    const scaledH = imgH * runtimeBgScaleY;
+    const minLng = (imgW - scaledW) / 2;
+    const maxLng = minLng + scaledW;
+    const minLat = (imgH - scaledH) / 2;
+    const maxLat = minLat + scaledH;
+    return L.latLngBounds([[minLat, minLng], [maxLat, maxLng]]);
+  }
+
+  function applyBackgroundScale() {
+    if (!map || !imageOverlay || !geo) return;
+    imageOverlay.setBounds(getImageOverlayBounds(geo.imgW, geo.imgH));
+  }
+
+  /**
+   * @returns {{ xMin: number, xMax: number, zMin: number, zMax: number }}
+   */
+  function resolveWorldBounds() {
+    const fitted = useAutoFitBounds ? worldBoundsFromTerritories(mergedList) : null;
+    if (fitted) return fitted;
+    return {
+      xMin: MAP_X_MIN,
+      xMax: MAP_X_MAX,
+      zMin: MAP_Z_MIN,
+      zMax: MAP_Z_MAX
+    };
+  }
+
   async function setupMap() {
     const img = new Image();
     img.src = MAP_IMAGE_URL;
@@ -805,19 +1148,22 @@ export async function initTerritoryMap() {
     });
     const imgW = img.naturalWidth;
     const imgH = img.naturalHeight;
-    let xMin = MAP_X_MIN;
-    let xMax = MAP_X_MAX;
-    let zMin = MAP_Z_MIN;
-    let zMax = MAP_Z_MAX;
-    if (xMin == null || xMax == null || zMin == null || zMax == null) {
-      const wb = worldBoundsFromList(mergedList);
-      xMin = xMin != null ? xMin : wb.xMin;
-      xMax = xMax != null ? xMax : wb.xMax;
-      zMin = zMin != null ? zMin : wb.zMin;
-      zMax = zMax != null ? zMax : wb.zMax;
+    const resolved = resolveWorldBounds();
+    const xMin = resolved.xMin;
+    const xMax = resolved.xMax;
+    const zMin = resolved.zMin;
+    const zMax = resolved.zMax;
+    if (
+      !Number.isFinite(xMin) ||
+      !Number.isFinite(xMax) ||
+      !Number.isFinite(zMin) ||
+      !Number.isFinite(zMax)
+    ) {
+      throw new Error('Invalid fixed MAP_* bounds. Set numeric MAP_X_MIN/MAX and MAP_Z_MIN/MAX.');
     }
     geo = { xMin, xMax, zMin, zMax, imgW, imgH };
     const bounds = L.latLngBounds([[0, 0], [imgH, imgW]]);
+    const overlayBounds = getImageOverlayBounds(imgW, imgH);
     map = L.map('map', {
       crs: L.CRS.Simple,
       minZoom: -2,
@@ -825,7 +1171,7 @@ export async function initTerritoryMap() {
       zoomSnap: 0.25,
       attributionControl: false
     });
-    imageOverlay = L.imageOverlay(MAP_IMAGE_URL, bounds).addTo(map);
+    imageOverlay = L.imageOverlay(MAP_IMAGE_URL, overlayBounds).addTo(map);
     map.fitBounds(bounds);
     territoryGroup.addTo(map);
     routeLayer.addTo(map);
@@ -853,6 +1199,8 @@ export async function initTerritoryMap() {
         return m.name === tr.dataset.name;
       });
       if (!t) return;
+      const additive = !!(multiSelectEnabled || ev.shiftKey);
+      updateTerritorySelection(t.name, additive);
       flyToTerritory(t);
       if (toggleSimulate && toggleSimulate.checked) {
         if (simulateSelected.has(t.name)) simulateSelected.delete(t.name);
@@ -936,6 +1284,253 @@ export async function initTerritoryMap() {
     });
   }
 
+  updateCalibrationReadout();
+  if (calAutoFitBounds) calAutoFitBounds.checked = useAutoFitBounds;
+
+  if (calOffsetX) {
+    calOffsetX.addEventListener('input', function () {
+      runtimeOffsetXPx = parseInt(calOffsetX.value, 10) || 0;
+      updateCalibrationReadout();
+      applyCalibrationOffset();
+    });
+  }
+
+  if (calOffsetY) {
+    calOffsetY.addEventListener('input', function () {
+      runtimeOffsetYPx = parseInt(calOffsetY.value, 10) || 0;
+      updateCalibrationReadout();
+      applyCalibrationOffset();
+    });
+  }
+
+  if (calNudgeLeft) {
+    calNudgeLeft.addEventListener('click', function () {
+      runtimeOffsetXPx -= 1;
+      updateCalibrationReadout();
+      applyCalibrationOffset();
+    });
+  }
+
+  if (calNudgeRight) {
+    calNudgeRight.addEventListener('click', function () {
+      runtimeOffsetXPx += 1;
+      updateCalibrationReadout();
+      applyCalibrationOffset();
+    });
+  }
+
+  if (calNudgeUp) {
+    calNudgeUp.addEventListener('click', function () {
+      runtimeOffsetYPx -= 1;
+      updateCalibrationReadout();
+      applyCalibrationOffset();
+    });
+  }
+
+  if (calNudgeDown) {
+    calNudgeDown.addEventListener('click', function () {
+      runtimeOffsetYPx += 1;
+      updateCalibrationReadout();
+      applyCalibrationOffset();
+    });
+  }
+
+  if (calDragToggle) {
+    calDragToggle.addEventListener('click', function () {
+      dragTerritoriesEnabled = !dragTerritoriesEnabled;
+      refreshDragToggleUi();
+      if (!dragTerritoriesEnabled && map) {
+        map.dragging.enable();
+      }
+      setStatus(
+        'info',
+        dragTerritoriesEnabled
+          ? 'Drag mode on: drag on map to move territory overlay.'
+          : 'Drag mode off.'
+      );
+    });
+  }
+
+  if (calReset) {
+    calReset.addEventListener('click', function () {
+      runtimeOffsetXPx = MAP_OFFSET_X_PX;
+      runtimeOffsetYPx = MAP_OFFSET_Y_PX;
+      runtimeScaleX = MAP_SCALE_X;
+      runtimeScaleY = MAP_SCALE_Y;
+      runtimeBgScaleX = MAP_BG_SCALE_X;
+      runtimeBgScaleY = MAP_BG_SCALE_Y;
+      territoryTransformByName.clear();
+      selectedTerritoryNames.clear();
+      updateCalibrationReadout();
+      applyCalibrationOffset();
+      applyBackgroundScale();
+    });
+  }
+
+  if (calCopy) {
+    calCopy.addEventListener('click', async function () {
+      const text =
+        'MAP_OFFSET_X_PX = ' +
+        runtimeOffsetXPx +
+        ';\nMAP_OFFSET_Y_PX = ' +
+        runtimeOffsetYPx +
+        ';\nMAP_SCALE_X = ' +
+        runtimeScaleX.toFixed(3) +
+        ';\nMAP_SCALE_Y = ' +
+        runtimeScaleY.toFixed(3) +
+        ';\nMAP_BG_SCALE_X = ' +
+        runtimeBgScaleX.toFixed(3) +
+        ';\nMAP_BG_SCALE_Y = ' +
+        runtimeBgScaleY.toFixed(3) +
+        ';\nSELECTED_TERRITORIES = ' +
+        (selectedTerritoryNames.size ? Array.from(selectedTerritoryNames).join(', ') : 'None') +
+        ';\nSELECTION_MOVE_X = ' +
+        getSelectionTransformBaseline().offsetX +
+        ';\nSELECTION_MOVE_Y = ' +
+        getSelectionTransformBaseline().offsetY +
+        ';\nSELECTION_SCALE_X = ' +
+        getSelectionTransformBaseline().scaleX.toFixed(3) +
+        ';\nSELECTION_SCALE_Y = ' +
+        getSelectionTransformBaseline().scaleY.toFixed(3) +
+        ';';
+      try {
+        await navigator.clipboard.writeText(text);
+        setStatus('info', 'Calibration offsets copied to clipboard.');
+      } catch (e) {
+        setStatus('warn', 'Copy failed. Use the shown values manually.');
+      }
+    });
+  }
+
+  if (calAutoFitBounds) {
+    calAutoFitBounds.addEventListener('change', function () {
+      useAutoFitBounds = !!calAutoFitBounds.checked;
+      if (!geo) return;
+      const resolved = resolveWorldBounds();
+      geo = {
+        xMin: resolved.xMin,
+        xMax: resolved.xMax,
+        zMin: resolved.zMin,
+        zMax: resolved.zMax,
+        imgW: geo.imgW,
+        imgH: geo.imgH
+      };
+      updateCalibrationReadout();
+      rebuildTerritoryLayers();
+      setStatus('info', useAutoFitBounds ? 'Using auto-fit world bounds.' : 'Using fixed MAP_* bounds.');
+    });
+  }
+
+  if (calScaleX) {
+    calScaleX.addEventListener('input', function () {
+      runtimeScaleX = (parseInt(calScaleX.value, 10) || 1000) / 1000;
+      updateCalibrationReadout();
+      applyCalibrationOffset();
+    });
+  }
+
+  if (calScaleY) {
+    calScaleY.addEventListener('input', function () {
+      runtimeScaleY = (parseInt(calScaleY.value, 10) || 1000) / 1000;
+      updateCalibrationReadout();
+      applyCalibrationOffset();
+    });
+  }
+
+  if (calBgScaleX) {
+    calBgScaleX.addEventListener('input', function () {
+      runtimeBgScaleX = (parseInt(calBgScaleX.value, 10) || 1000) / 1000;
+      updateCalibrationReadout();
+      applyBackgroundScale();
+    });
+  }
+
+  if (calBgScaleY) {
+    calBgScaleY.addEventListener('input', function () {
+      runtimeBgScaleY = (parseInt(calBgScaleY.value, 10) || 1000) / 1000;
+      updateCalibrationReadout();
+      applyBackgroundScale();
+    });
+  }
+
+  if (calMultiSelect) {
+    calMultiSelect.addEventListener('change', function () {
+      multiSelectEnabled = !!calMultiSelect.checked;
+      updateCalibrationReadout();
+    });
+  }
+
+  if (calSelectionClear) {
+    calSelectionClear.addEventListener('click', function () {
+      selectedTerritoryNames.clear();
+      updateCalibrationReadout();
+      applyLayerStyles();
+    });
+  }
+
+  if (calTerrOffsetX) {
+    calTerrOffsetX.addEventListener('input', function () {
+      if (selectedTerritoryNames.size === 0) return;
+      const offsetX = parseInt(calTerrOffsetX.value, 10) || 0;
+      const baseline = getSelectionTransformBaseline().offsetX;
+      const delta = offsetX - baseline;
+      applyTransformToSelection(function (current) {
+        return { ...current, offsetX: current.offsetX + delta };
+      });
+      updateCalibrationReadout();
+      applyCalibrationOffset();
+    });
+  }
+
+  if (calTerrOffsetY) {
+    calTerrOffsetY.addEventListener('input', function () {
+      if (selectedTerritoryNames.size === 0) return;
+      const offsetY = parseInt(calTerrOffsetY.value, 10) || 0;
+      const baseline = getSelectionTransformBaseline().offsetY;
+      const delta = offsetY - baseline;
+      applyTransformToSelection(function (current) {
+        return { ...current, offsetY: current.offsetY + delta };
+      });
+      updateCalibrationReadout();
+      applyCalibrationOffset();
+    });
+  }
+
+  if (calTerrScaleX) {
+    calTerrScaleX.addEventListener('input', function () {
+      if (selectedTerritoryNames.size === 0) return;
+      const scaleX = (parseInt(calTerrScaleX.value, 10) || 1000) / 1000;
+      const baseline = getSelectionTransformBaseline();
+      applyScaleSpacingToSelection(scaleX, baseline.scaleY);
+      updateCalibrationReadout();
+      applyCalibrationOffset();
+    });
+  }
+
+  if (calTerrScaleY) {
+    calTerrScaleY.addEventListener('input', function () {
+      if (selectedTerritoryNames.size === 0) return;
+      const scaleY = (parseInt(calTerrScaleY.value, 10) || 1000) / 1000;
+      const baseline = getSelectionTransformBaseline();
+      applyScaleSpacingToSelection(baseline.scaleX, scaleY);
+      updateCalibrationReadout();
+      applyCalibrationOffset();
+    });
+  }
+
+  if (calTerrScaleReset) {
+    calTerrScaleReset.addEventListener('click', function () {
+      if (selectedTerritoryNames.size === 0) return;
+      selectedTerritoryNames.forEach(function (name) {
+        territoryTransformByName.delete(name);
+      });
+      updateCalibrationReadout();
+      applyCalibrationOffset();
+    });
+  }
+
+  refreshDragToggleUi();
+
   const ok = await loadData(false);
   if (!ok) return;
   rebuildGuildOptions();
@@ -946,6 +1541,52 @@ export async function initTerritoryMap() {
     setStatus('error', msg);
     return;
   }
+
+  map.on('mousedown', function (ev) {
+    if (!dragTerritoriesEnabled) return;
+    isDraggingTerritories = true;
+    dragStartClientX = ev.originalEvent.clientX;
+    dragStartClientY = ev.originalEvent.clientY;
+    dragStartOffsetX = runtimeOffsetXPx;
+    dragStartOffsetY = runtimeOffsetYPx;
+    map.dragging.disable();
+    L.DomEvent.stop(ev.originalEvent);
+  });
+
+  map.on('mousemove', function (ev) {
+    if (!isDraggingTerritories) return;
+    const dx = ev.originalEvent.clientX - dragStartClientX;
+    const dy = ev.originalEvent.clientY - dragStartClientY;
+    runtimeOffsetXPx = dragStartOffsetX + Math.round(dx);
+    runtimeOffsetYPx = dragStartOffsetY + Math.round(dy);
+    updateCalibrationReadout();
+    applyCalibrationOffset();
+  });
+
+  function stopTerritoryDragging() {
+    if (!isDraggingTerritories) return;
+    isDraggingTerritories = false;
+    if (!dragTerritoriesEnabled) {
+      map.dragging.enable();
+    }
+    setStatus(
+      'info',
+      'Drag complete. Current offsets: X ' +
+        runtimeOffsetXPx +
+        ', Y ' +
+        runtimeOffsetYPx +
+        '.'
+    );
+  }
+
+  map.on('mouseup', stopTerritoryDragging);
+  map.on('mouseout', stopTerritoryDragging);
+  map.on('dragstart', function () {
+    if (dragTerritoriesEnabled && isDraggingTerritories) {
+      isDraggingTerritories = false;
+    }
+  });
+
   renderTable();
   updateSimulatePanel();
 }

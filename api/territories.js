@@ -24,7 +24,7 @@ module.exports = async function territoriesApi(req, res) {
 
     if (!upstream.ok) {
       return res.status(upstream.status).json({
-        error: `Wynncraft API error: ${upstream.status}`,
+        error: 'Wynncraft API error: ' + upstream.status,
         detail: data
       });
     }

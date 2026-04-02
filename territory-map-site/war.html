@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="eco-war-socket-url" content="https://wynnitem-territory.vercel.app">
+  <title>1v1 Eco War Lobby</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #121018;
+      color: #efeff8;
+    }
+    .topbar {
+      display: flex;
+      gap: 8px;
+      padding: 10px;
+      border-bottom: 1px solid #2d2640;
+      background: #1a1524;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .btn {
+      border: 1px solid #64518f;
+      background: #2a223d;
+      color: #fff;
+      padding: 8px 10px;
+      cursor: pointer;
+      border-radius: 6px;
+    }
+    .btn:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+    .input {
+      border: 1px solid #64518f;
+      background: #171321;
+      color: #fff;
+      padding: 8px 10px;
+      border-radius: 6px;
+      width: 130px;
+    }
+    .status {
+      margin-left: auto;
+      color: #c9d0ff;
+      font-size: 14px;
+    }
+    #map {
+      width: 100%;
+      height: calc(100vh - 56px);
+      background: #0d0d14;
+    }
+    #lobbyOverlay {
+      position: fixed;
+      right: 14px;
+      top: 70px;
+      width: 320px;
+      max-height: 70vh;
+      overflow: auto;
+      border: 1px solid #64518f;
+      background: rgba(22, 18, 30, 0.95);
+      border-radius: 10px;
+      padding: 10px;
+      display: none;
+      z-index: 999;
+    }
+    #lobbyOverlay h2 {
+      margin: 0 0 8px;
+      font-size: 17px;
+    }
+    .roomRow {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .roomCode {
+      font-size: 22px;
+      letter-spacing: 2px;
+      font-weight: bold;
+      color: #76f7ff;
+    }
+    #territoryList {
+      margin: 8px 0 10px;
+      padding: 0 0 0 18px;
+      font-size: 13px;
+    }
+    .meta {
+      font-size: 13px;
+      color: #d6d7e6;
+      margin-bottom: 6px;
+    }
+    #resourcesPanel {
+      display: none;
+      margin-top: 10px;
+      border-top: 1px solid #3a3150;
+      padding-top: 8px;
+    }
+    .resourceRow {
+      display: flex;
+      justify-content: space-between;
+      font-size: 13px;
+      margin-bottom: 4px;
+    }
+    #tickCountdownText {
+      margin-top: 6px;
+      font-size: 12px;
+      color: #b7ffcf;
+    }
+    #tickMessages {
+      margin-top: 6px;
+      font-size: 12px;
+      color: #f8d9a7;
+      max-height: 90px;
+      overflow: auto;
+      padding-left: 16px;
+    }
+    #upgradeMenuBtn {
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      z-index: 998;
+      display: none;
+    }
+    #upgradeModal {
+      position: fixed;
+      inset: 0;
+      display: none;
+      z-index: 1001;
+      background: rgba(0, 0, 0, 0.45);
+      align-items: center;
+      justify-content: center;
+    }
+    #upgradeModalContent {
+      width: min(720px, calc(100vw - 24px));
+      max-height: calc(100vh - 24px);
+      overflow: auto;
+      border: 2px solid #8f7b51;
+      background: #d4c39a;
+      color: #2e2516;
+      border-radius: 10px;
+      padding: 12px;
+    }
+    .upgradeModalHeader {
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      background: #d4c39a;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #b89f6f;
+      margin-bottom: 8px;
+    }
+    .upgradeTopIcons {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .upgradeIconSlot {
+      border: 1px solid #9a8558;
+      background: #e7d8b5;
+      border-radius: 6px;
+      padding: 6px;
+      text-align: center;
+      font-size: 20px;
+    }
+    .pixelIcon {
+      width: 28px;
+      height: 28px;
+      margin: 0 auto;
+      image-rendering: pixelated;
+      border: 1px solid rgba(0, 0, 0, 0.25);
+      background-color: #6f6654;
+    }
+    .pixelIcon.core {
+      background-image: linear-gradient(135deg, #f0ece3 0 25%, #9a9487 25% 50%, #d4cec2 50% 75%, #6d6659 75% 100%);
+    }
+    .pixelIcon.wand {
+      background-image: linear-gradient(45deg, transparent 40%, #d6a225 40% 60%, transparent 60%), linear-gradient(90deg, #3e3121, #8a6737);
+    }
+    .pixelIcon.orbBlue {
+      border-radius: 50%;
+      background-image: radial-gradient(circle at 30% 30%, #a6dcff, #1f7ac2 70%);
+    }
+    .pixelIcon.orbRed {
+      border-radius: 50%;
+      background-image: radial-gradient(circle at 30% 30%, #ffb0b0, #8a2020 70%);
+    }
+    .pixelIcon.bonus {
+      background-image: linear-gradient(45deg, #a7f0ff, #3dc5df);
+      clip-path: polygon(50% 0%, 90% 30%, 70% 95%, 30% 95%, 10% 30%);
+    }
+    .pixelIcon.sword {
+      background-image: linear-gradient(0deg, transparent 40%, #cfd4dd 40% 70%, transparent 70%), linear-gradient(90deg, transparent 45%, #cfd4dd 45% 55%, transparent 55%), linear-gradient(90deg, transparent 35%, #74552a 35% 65%, transparent 65%);
+    }
+    .pixelIcon.armor {
+      background-image: linear-gradient(180deg, #8a6f3f, #4f3f25);
+    }
+    .pixelIcon.heart {
+      background-image: radial-gradient(circle at 30% 30%, #ff9c9c 0 40%, transparent 42%), radial-gradient(circle at 70% 30%, #ff9c9c 0 40%, transparent 42%), linear-gradient(#d53434, #8d1d1d);
+    }
+    .pixelIcon.book {
+      background-image: linear-gradient(90deg, #7f622c 0 20%, #efe2bf 20% 80%, #7f622c 80% 100%);
+    }
+    .upgradeIconLabel {
+      display: block;
+      font-size: 11px;
+      margin-top: 4px;
+      color: #594222;
+    }
+    .upgradeGrid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .upgradeCard {
+      border: 1px solid #9a8558;
+      background: #f1e4c5;
+      border-radius: 6px;
+      padding: 8px;
+    }
+    .upgradeCard h4 {
+      margin: 0 0 4px;
+      font-size: 14px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .upgradeMeta {
+      font-size: 12px;
+      margin-bottom: 6px;
+      color: #4b3a20;
+    }
+    .levelRow {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 6px;
+      font-size: 11px;
+      color: #4b3a20;
+    }
+    .levelBadge {
+      border: 1px solid #9a8558;
+      background: #f8edcf;
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-weight: 700;
+      min-width: 42px;
+      text-align: center;
+    }
+    .levelBadge.maxed {
+      background: #d2f0b5;
+      border-color: #7ca654;
+      color: #355420;
+    }
+    .segBar {
+      display: grid;
+      grid-template-columns: repeat(11, 1fr);
+      gap: 2px;
+      flex: 1;
+    }
+    .segBar span {
+      height: 7px;
+      border-radius: 2px;
+      background: #c8b891;
+    }
+    .segBar span.on {
+      background: #4ec05a;
+    }
+    .segBar.maxed span.on {
+      background: #2f8fda;
+    }
+    .upgradeCard.state-low {
+      border-color: #b87e55;
+      background: #f4dcc1;
+    }
+    .upgradeCard.state-max {
+      border-color: #75a451;
+      background: #e2f2d5;
+    }
+    #upgradeNoticeList {
+      margin: 8px 0 0;
+      padding-left: 16px;
+      font-size: 12px;
+      color: #5b3e12;
+      max-height: 120px;
+      overflow: auto;
+    }
+    .sfxToggleBtn {
+      margin-left: auto;
+      margin-right: 6px;
+    }
+    @media (max-width: 700px) {
+      #upgradeModalContent {
+        width: calc(100vw - 10px);
+        max-height: calc(100vh - 10px);
+        padding: 8px;
+      }
+      .upgradeGrid {
+        grid-template-columns: 1fr;
+      }
+      .upgradeCard h4 {
+        font-size: 13px;
+      }
+      #upgradeMenuBtn {
+        right: 10px;
+        bottom: 10px;
+      }
+      #lobbyOverlay {
+        right: 8px;
+        left: 8px;
+        width: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <button id="createGameBtn" class="btn">Create 1v1 Eco War Game</button>
+    <input id="joinCodeInput" class="input" maxlength="6" placeholder="6-digit code">
+    <button id="joinGameBtn" class="btn">Join Game</button>
+    <div id="statusText" class="status">Disconnected</div>
+  </div>
+
+  <div id="map"></div>
+
+  <div id="lobbyOverlay">
+    <h2>Room Lobby</h2>
+    <div class="roomRow">
+      <div id="roomCodeText" class="roomCode">------</div>
+      <button id="copyCodeBtn" class="btn">Copy</button>
+    </div>
+    <div id="roleText" class="meta">Role: -</div>
+    <div id="gameStatusText" class="meta">Status: lobby</div>
+    <div id="countdownText" class="meta">Prep countdown: -</div>
+    <div id="readyStateText" class="meta">Defender ready: false | Attacker ready: false</div>
+    <div id="selectionCountText" class="meta">Selected territories: 0</div>
+    <ul id="territoryList"></ul>
+    <button id="readyBtn" class="btn" disabled>Ready</button>
+    <div id="resourcesPanel">
+      <div class="meta">Defender Resources (server authoritative)</div>
+      <div class="resourceRow"><span>Emeralds</span><span id="resEmeralds">0</span></div>
+      <div class="resourceRow"><span>Wood</span><span id="resWood">0</span></div>
+      <div class="resourceRow"><span>Ore</span><span id="resOre">0</span></div>
+      <div class="resourceRow"><span>Crops</span><span id="resCrops">0</span></div>
+      <div class="resourceRow"><span>Fish</span><span id="resFish">0</span></div>
+      <div id="tickCountdownText">Next tick in: -</div>
+      <ul id="tickMessages"></ul>
+    </div>
+    <div id="upgradeReadOnlyPanel" style="display:none; margin-top:8px;">
+      <div class="meta">Territory Upgrades</div>
+      <ul id="upgradeReadOnlyList" style="margin:0; padding-left:16px; font-size:12px; max-height:110px; overflow:auto;"></ul>
+    </div>
+  </div>
+
+  <button id="upgradeMenuBtn" class="btn">Upgrade Menu</button>
+  <div id="upgradeModal">
+    <div id="upgradeModalContent">
+      <div class="roomRow upgradeModalHeader">
+        <h3 style="margin:0;">Territory Defense</h3>
+        <button id="upgradeSfxToggleBtn" class="btn sfxToggleBtn">SFX: ON</button>
+        <button id="upgradeModalCloseBtn" class="btn" style="margin-left:auto;">Close</button>
+      </div>
+      <div class="upgradeTopIcons">
+        <div class="upgradeIconSlot"><div class="pixelIcon core"></div><span class="upgradeIconLabel">Core</span></div>
+        <div class="upgradeIconSlot"><div class="pixelIcon wand"></div><span class="upgradeIconLabel">Wand</span></div>
+        <div class="upgradeIconSlot"><div class="pixelIcon orbBlue"></div><span class="upgradeIconLabel">Orb</span></div>
+        <div class="upgradeIconSlot"><div class="pixelIcon orbRed"></div><span class="upgradeIconLabel">Orb</span></div>
+        <div class="upgradeIconSlot"><div class="pixelIcon bonus"></div><span class="upgradeIconLabel">Bonuses</span></div>
+      </div>
+      <label class="meta" for="upgradeTerritorySelect">Territory</label>
+      <select id="upgradeTerritorySelect" class="input" style="width:100%; margin-bottom:8px;"></select>
+      <div id="upgradeRoleHint" class="meta"></div>
+      <div class="upgradeGrid">
+        <div class="upgradeCard" id="upgradeDamageCard">
+          <h4><span class="pixelIcon sword"></span>Damage (Ore)</h4>
+          <div class="levelRow"><span id="upgradeDamageBadge" class="levelBadge">Lv0</span><div id="upgradeDamageBar" class="segBar"></div></div>
+          <div class="upgradeMeta" id="upgradeDamageMeta">Level 0 · Next cost 0</div>
+          <button id="upgradeDamageBtn" class="btn">Upgrade</button>
+        </div>
+        <div class="upgradeCard" id="upgradeAttackSpeedCard">
+          <h4><span class="pixelIcon armor"></span>Attack Speed (Crops)</h4>
+          <div class="levelRow"><span id="upgradeAttackSpeedBadge" class="levelBadge">Lv0</span><div id="upgradeAttackSpeedBar" class="segBar"></div></div>
+          <div class="upgradeMeta" id="upgradeAttackSpeedMeta">Level 0 · Next cost 0</div>
+          <button id="upgradeAttackSpeedBtn" class="btn">Upgrade</button>
+        </div>
+        <div class="upgradeCard" id="upgradeHealthCard">
+          <h4><span class="pixelIcon heart"></span>Health (Wood)</h4>
+          <div class="levelRow"><span id="upgradeHealthBadge" class="levelBadge">Lv0</span><div id="upgradeHealthBar" class="segBar"></div></div>
+          <div class="upgradeMeta" id="upgradeHealthMeta">Level 0 · Next cost 0</div>
+          <button id="upgradeHealthBtn" class="btn">Upgrade</button>
+        </div>
+        <div class="upgradeCard" id="upgradeDefenseCard">
+          <h4><span class="pixelIcon book"></span>Defense (Fish)</h4>
+          <div class="levelRow"><span id="upgradeDefenseBadge" class="levelBadge">Lv0</span><div id="upgradeDefenseBar" class="segBar"></div></div>
+          <div class="upgradeMeta" id="upgradeDefenseMeta">Level 0 · Next cost 0</div>
+          <button id="upgradeDefenseBtn" class="btn">Upgrade</button>
+        </div>
+      </div>
+      <ul id="upgradeNoticeList"></ul>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="https://cdn.socket.io/4.8.3/socket.io.min.js"></script>
+  <script src="./script.js"></script>
+</body>
+</html>
