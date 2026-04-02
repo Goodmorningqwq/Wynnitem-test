@@ -1,6 +1,10 @@
 /** @typedef {Record<string, string>} ResourceSet */
 /** @typedef {{ name: string, resources: ResourceSet, tradeRoutes: string[], guild: { uuid: string, name: string, prefix: string }, acquired: string, minX: number, maxX: number, minZ: number, maxZ: number, emeralds: number, wood: number, ore: number, crops: number, fish: number, dominant: string, productionScore: number, ownerLabel: string }} MergedTerritory */
 
+const STATIC_TERRITORIES_URL =
+  'https://raw.githubusercontent.com/jakematt123/Wynncraft-Territory-Info/main/territories.json';
+/** Same-origin proxy (api/territories.js) — avoids browser CORS on wynncraft.com */
+const LIVE_TERRITORIES_URL = '/api/territories';
 const MAP_IMAGE_URL = '/main-map.webp';
 
 /**
@@ -34,6 +38,7 @@ let runtimeBgScaleY = MAP_BG_SCALE_Y;
 /** Set true if the map appears vertically mirrored vs territories */
 const FLIP_Z = true;
 
+const RESOURCE_KEYS = ['emeralds', 'wood', 'ore', 'crops', 'fish'];
 const HIGHLIGHT_COLORS = {
   emeralds: '#58ff66',
   wood: '#22c55e',
@@ -41,6 +46,9 @@ const HIGHLIGHT_COLORS = {
   crops: '#eab308',
   fish: '#38bdf8'
 };
+
+/** @type {{ static: object | null, live: object | null, mergedAt: number }} */
+let cache = { static: null, live: null, mergedAt: 0 };
 
 /**
  * Escape text for safe HTML insertion.
@@ -58,6 +66,98 @@ export function escapeHtml(value) {
 }
 
 /**
+ * @param {string} name
+ * @returns {string}
+ */
+function normalizeKey(name) {
+  return String(name)
+    .trim()
+    .replace(/\u2019/g, "'")
+    .replace(/\u2018/g, "'")
+    .toLowerCase();
+}
+
+/**
+ * @param {object} live
+ * @returns {Map<string, string>}
+ */
+function buildLiveKeyMap(live) {
+  /** @type {Map<string, string>} */
+  const map = new Map();
+  Object.keys(live).forEach(function (k) {
+    map.set(normalizeKey(k), k);
+  });
+  return map;
+}
+
+/**
+ * @param {object} row
+ * @returns {{ start: number[], end: number[] } | null}
+ */
+function readLocation(row) {
+  const loc = row.Location || row.location;
+  if (!loc || !loc.start || !loc.end) return null;
+  return { start: loc.start, end: loc.end };
+}
+
+/**
+ * @param {object} row
+ * @returns {string[]}
+ */
+function readTradeRoutes(row) {
+  const tr = row['Trading Routes'] || row.tradingRoutes || row.trade_routes;
+  return Array.isArray(tr) ? tr.map(String) : [];
+}
+
+/**
+ * @param {object} row
+ * @returns {ResourceSet}
+ */
+function readResources(row) {
+  const res = row.resources || {};
+  /** @type {ResourceSet} */
+  const out = {};
+  RESOURCE_KEYS.forEach(function (k) {
+    const v = res[k];
+    out[k] = v != null ? String(v) : '0';
+  });
+  return out;
+}
+
+/**
+ * @param {ResourceSet} res
+ * @returns {{ emeralds: number, wood: number, ore: number, crops: number, fish: number, dominant: string, productionScore: number }}
+ */
+function parseResourceNumbers(res) {
+  const nums = {
+    emeralds: parseInt(res.emeralds || '0', 10) || 0,
+    wood: parseInt(res.wood || '0', 10) || 0,
+    ore: parseInt(res.ore || '0', 10) || 0,
+    crops: parseInt(res.crops || '0', 10) || 0,
+    fish: parseInt(res.fish || '0', 10) || 0
+  };
+  let dominant = 'emeralds';
+  let max = nums.emeralds;
+  ['wood', 'ore', 'crops', 'fish'].forEach(function (k) {
+    if (nums[k] > max) {
+      max = nums[k];
+      dominant = k;
+    }
+  });
+  if (
+    nums.wood === nums.ore &&
+    nums.ore === nums.crops &&
+    nums.crops === nums.fish &&
+    nums.fish === 0
+  ) {
+    dominant = 'emeralds';
+  }
+  const productionScore =
+    nums.emeralds + nums.wood + nums.ore + nums.crops + nums.fish;
+  return { ...nums, dominant, productionScore };
+}
+
+/**
  * @param {string} guildName
  * @returns {string}
  */
@@ -69,6 +169,92 @@ export function guildColor(guildName) {
   }
   const hue = h % 360;
   return 'hsl(' + hue + ', 62%, 52%)';
+}
+
+/**
+ * @param {object} staticData
+ * @param {object} liveData
+ * @returns {MergedTerritory[]}
+ */
+export function mergeTerritories(staticData, liveData) {
+  const liveMap = buildLiveKeyMap(liveData);
+  const names = new Set([
+    ...Object.keys(staticData),
+    ...Object.keys(liveData)
+  ]);
+  /** @type {MergedTerritory[]} */
+  const list = [];
+  names.forEach(function (name) {
+    const sRow = staticData[name] || {};
+    const liveKey = liveData[name] ? name : liveMap.get(normalizeKey(name));
+    const lRow = liveKey ? liveData[liveKey] : null;
+    const resources = readResources(Object.keys(sRow).length ? sRow : {});
+    const tradeRoutes = readTradeRoutes(sRow);
+    let guild = { uuid: '', name: '', prefix: '' };
+    let acquired = '';
+    let loc = readLocation(sRow);
+    if (lRow) {
+      if (lRow.guild) guild = { ...guild, ...lRow.guild };
+      if (lRow.acquired) acquired = String(lRow.acquired);
+      const liveLoc = readLocation(lRow);
+      if (liveLoc) loc = liveLoc;
+    }
+    if (!loc) return;
+    const x1 = loc.start[0];
+    const z1 = loc.start[1];
+    const x2 = loc.end[0];
+    const z2 = loc.end[1];
+    const minX = Math.min(x1, x2);
+    const maxX = Math.max(x1, x2);
+    const minZ = Math.min(z1, z2);
+    const maxZ = Math.max(z1, z2);
+    const parsed = parseResourceNumbers(resources);
+    const ownerLabel =
+      guild.name && guild.name.trim()
+        ? guild.name + (guild.prefix ? ' [' + guild.prefix + ']' : '')
+        : 'Unclaimed';
+    list.push({
+      name,
+      resources,
+      tradeRoutes,
+      guild,
+      acquired,
+      minX,
+      maxX,
+      minZ,
+      maxZ,
+      emeralds: parsed.emeralds,
+      wood: parsed.wood,
+      ore: parsed.ore,
+      crops: parsed.crops,
+      fish: parsed.fish,
+      dominant: parsed.dominant,
+      productionScore: parsed.productionScore,
+      ownerLabel
+    });
+  });
+  list.sort(function (a, b) {
+    return a.name.localeCompare(b.name);
+  });
+  return list;
+}
+
+/**
+ * @returns {Promise<object>}
+ */
+async function fetchStaticTerritories() {
+  const res = await fetch(STATIC_TERRITORIES_URL);
+  if (!res.ok) throw new Error('Static territory data failed (' + res.status + ')');
+  return res.json();
+}
+
+/**
+ * @returns {Promise<object>}
+ */
+async function fetchLiveTerritories() {
+  const res = await fetch(LIVE_TERRITORIES_URL);
+  if (!res.ok) throw new Error('Wynncraft territory API failed (' + res.status + ')');
+  return res.json();
 }
 
 function clamp01(value) {
@@ -456,13 +642,34 @@ export async function initTerritoryMap() {
     }
   }
 
-  async function loadData() {
-    mergedList = [];
-    if (mergedMeta) {
-      mergedMeta.textContent = 'Map only · no territory overlays';
+  async function loadData(force) {
+    setStatus('info', 'Loading territory data…');
+    try {
+      let staticData = cache.static;
+      let liveData = cache.live;
+      if (force || !staticData || !liveData) {
+        const [s, l] = await Promise.all([
+          fetchStaticTerritories(),
+          fetchLiveTerritories()
+        ]);
+        staticData = s;
+        liveData = l;
+        cache = { static: s, live: l, mergedAt: Date.now() };
+      }
+      mergedList = mergeTerritories(staticData, liveData);
+      if (mergedMeta) {
+        mergedMeta.textContent =
+          mergedList.length +
+          ' territories · updated ' +
+          new Date(cache.mergedAt).toLocaleTimeString();
+      }
+      setStatus('', '');
+      return true;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Failed to load data';
+      setStatus('error', msg + ' — Retry or check network / API limits.');
+      return false;
     }
-    setStatus('', '');
-    return true;
   }
 
   function rebuildGuildOptions() {
@@ -1008,7 +1215,7 @@ export async function initTerritoryMap() {
 
   if (refreshBtn) {
     refreshBtn.addEventListener('click', async function () {
-      const ok = await loadData();
+      const ok = await loadData(true);
       if (!ok || !map) return;
       rebuildGuildOptions();
       rebuildTerritoryLayers();
@@ -1324,7 +1531,7 @@ export async function initTerritoryMap() {
 
   refreshDragToggleUi();
 
-  const ok = await loadData();
+  const ok = await loadData(false);
   if (!ok) return;
   rebuildGuildOptions();
   try {
