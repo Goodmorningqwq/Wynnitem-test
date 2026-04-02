@@ -12,7 +12,6 @@
   const MAP_SCALE_Y = 1;
   const MAP_BG_SCALE_X = 0.803;
   const MAP_BG_SCALE_Y = 0.966;
-  const LIVE_TERRITORIES_URL = '/api/territories';
   const SOCKET_DEV_PORT = 3001;
   const FLIP_Z = true;
   const UPGRADE_COSTS = {
@@ -233,26 +232,6 @@
     return L.latLngBounds([[minLat, minLng], [maxLat, maxLng]]);
   }
 
-  function normalizeKey(name) {
-    return String(name)
-      .trim()
-      .replace(/\u2019/g, "'")
-      .replace(/\u2018/g, "'")
-      .toLowerCase();
-  }
-
-  /**
-   * @param {object} liveData
-   * @returns {Map<string, string>}
-   */
-  function buildLiveKeyMap(liveData) {
-    const map = new Map();
-    Object.keys(liveData).forEach(function (k) {
-      map.set(normalizeKey(k), k);
-    });
-    return map;
-  }
-
   /**
    * @param {string} guildName
    * @returns {string}
@@ -267,43 +246,10 @@
     return 'hsl(' + hue + ', 62%, 52%)';
   }
 
-  /**
-   * @param {object | null} row
-   * @returns {string}
-   */
-  function guildNameFromLiveRow(row) {
-    if (!row || !row.guild || !row.guild.name) return '';
-    const n = String(row.guild.name).trim();
-    return n;
-  }
-
-  /**
-   * @param {string} name
-   * @param {object} liveData
-   * @param {Map<string, string>} liveKeyMap
-   * @returns {object | null}
-   */
-  function resolveLiveRow(name, liveData, liveKeyMap) {
-    if (liveData[name]) return liveData[name];
-    const canon = liveKeyMap.get(normalizeKey(name));
-    return canon ? liveData[canon] : null;
-  }
-
-  async function applyLiveOwnership() {
-    try {
-      const res = await fetch(LIVE_TERRITORIES_URL);
-      if (!res.ok) throw new Error('Live territory API ' + res.status);
-      const live = await res.json();
-      const liveKeyMap = buildLiveKeyMap(live);
-      state.territoryByName.forEach(function (t) {
-        const row = resolveLiveRow(t.name, live, liveKeyMap);
-        t.guildName = guildNameFromLiveRow(row);
-      });
-    } catch (_e) {
-      state.territoryByName.forEach(function (t) {
-        t.guildName = '';
-      });
-    }
+  function applyLiveOwnership() {
+    state.territoryByName.forEach(function (t) {
+      t.guildName = '';
+    });
     renderSelectionLocally();
   }
 
@@ -781,7 +727,7 @@
     const staticData = await territoryDataAdapter.loadStatic();
     const territories = territoryDataAdapter.parseTerritories(staticData);
     selectionController.initMapLayers(territories);
-    await applyLiveOwnership();
+    applyLiveOwnership();
   }
 
   function bindUi() {
