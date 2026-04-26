@@ -12,7 +12,8 @@ const FULL_DB_KEY = 'wynn_full_db';
 const PAGES_COUNT = 276;
 
 module.exports = async function handler(req, res) {
-  res.setHeader('Cache-Control', 'public, max-age=43200');
+  // Let Vercel Edge cache for 12 hours (s-maxage), but force browsers to revalidate.
+  res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=43200, stale-while-revalidate=86400');
   res.setHeader('Access-Control-Allow-Origin', '*');
   
   const startTime = Date.now();

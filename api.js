@@ -3,9 +3,12 @@
 // The frontend calls a local proxy to avoid CORS.
 const API_BASE = '/api/item';
 
-const DATABASE_ENDPOINT = `${API_BASE}/database`;
-const METADATA_ENDPOINT = `${API_BASE}/metadata`;
-const SEARCH_ENDPOINT = `${API_BASE}/database`;
+// App Version for Cache Busting Server Endpoints
+const APP_VERSION = '1.1.0';
+
+const DATABASE_ENDPOINT = `${API_BASE}/database?v=${APP_VERSION}`;
+const METADATA_ENDPOINT = `${API_BASE}/metadata?v=${APP_VERSION}`;
+const SEARCH_ENDPOINT = `${API_BASE}/database?v=${APP_VERSION}`;
 
 // Wynncraft Search API endpoints (for reference)
 // GET https://api.wynncraft.com/v3/item/search/<str:query>
