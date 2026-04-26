@@ -63,13 +63,14 @@ module.exports = async function handler(req, res) {
   // Build full database
   const fullDb = {
     controller: { total: 0, count: PAGES_COUNT },
-    results: {}
+    results: []
   };
   
   // Add all cached pages to full DB
   for (const [key, pageData] of Object.entries(cachedPages)) {
-    Object.assign(fullDb.results, pageData.results);
-    fullDb.controller.total += Object.keys(pageData.results).length;
+    const items = Array.isArray(pageData.results) ? pageData.results : Object.values(pageData.results || {});
+    fullDb.results.push(...items);
+    fullDb.controller.total += items.length;
   }
   
   // Fetch missing pages
@@ -96,8 +97,9 @@ module.exports = async function handler(req, res) {
         await redis.setex(`wynn_page_${page}`, TTL, pageData);
         stats.commands++; // 1 SETEX per page
         stats.misses++;
-        Object.assign(fullDb.results, pageData.results);
-        fullDb.controller.total += Object.keys(pageData.results).length;
+        const newItems = Array.isArray(pageData.results) ? pageData.results : Object.values(pageData.results || {});
+        fullDb.results.push(...newItems);
+        fullDb.controller.total += newItems.length;
         
         if (stats.misses % 20 === 0) {
           console.log(`[Vercel/database] Fetched ${stats.misses}/${missingPages.length} missing pages`);
