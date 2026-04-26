@@ -77,13 +77,14 @@ async function buildFullDatabase() {
   
   const fullDb = {
     controller: { total: 0, count: PAGES_COUNT },
-    results: {}
+    results: []
   };
   
   for (const [key, pageData] of Object.entries(allCachedPages)) {
     if (pageData.results) {
-      Object.assign(fullDb.results, pageData.results);
-      fullDb.controller.total += Object.keys(pageData.results).length;
+      const items = Array.isArray(pageData.results) ? pageData.results : Object.values(pageData.results || {});
+      fullDb.results.push(...items);
+      fullDb.controller.total += items.length;
     }
   }
   
