@@ -121,9 +121,9 @@ function getItemStats(item) {
     attackSpeed: item.attackSpeed?.replace(/_/g, ' ') || null,
     damage: base.baseDamage ? { min: base.baseDamage.min, max: base.baseDamage.max } : null,
     elementalDamages,
-    averageDPS: item.averageDPS || null,
+    averageDPS: item.averageDps || item.averageDPS || null,
     baseHealth: base.baseHealth || null,
-    armorType: item.armourType?.replace(/_/g, ' ') || null,
+    armorType: (item.armourType || item.subType)?.replace(/_/g, ' ') || null,
     classReq: item.requirements?.classRequirement?.toLowerCase() || 'Universal',
     level: item.requirements?.level || '?',
     powderSlots: item.powderSlots || 0,
@@ -194,8 +194,8 @@ function formatStatReqLabel(key) {
 
 function getItemCategory(item) {
   const classReq = item.classRequirement?.toLowerCase();
-  const weaponType = item.weaponType?.toLowerCase();
-  const armorType = item.armourType?.toLowerCase();
+  const weaponType = (item.weaponType || item.subType)?.toLowerCase();
+  const armorType = (item.armourType || item.subType)?.toLowerCase();
   
   if (classReq === 'warrior') return '⚔️';
   if (classReq === 'archer') return '🏹';
@@ -229,8 +229,8 @@ function getItemCategory(item) {
 
 function getCategoryLabel(item) {
   const classReq = item.classRequirement;
-  const weaponType = item.weaponType;
-  const armorType = item.armourType;
+  const weaponType = item.weaponType || item.subType;
+  const armorType = item.armourType || item.subType;
   
   if (classReq === 'warrior') return 'Warrior';
   if (classReq === 'archer') return 'Archer';
@@ -316,7 +316,7 @@ function getSignedIdClass(value) {
 }
 
 function createItemCard(item) {
-  const tierStyle = getTierStyle(item.rarity);
+  const tierStyle = getTierStyle(item.tier || item.rarity);
   const type = item.type || 'Unknown';
   const stats = getItemStats(item);
   const reqs = getRequirements(item);
@@ -328,8 +328,10 @@ function createItemCard(item) {
   const majorIds = item.majorIds ? Object.entries(item.majorIds) : [];
   const sortedOtherIds = Object.entries(otherIds).sort((a, b) => formatIdName(a[0]).localeCompare(formatIdName(b[0])));
 
-  const weaponTypeLabel = item.weaponType ? item.weaponType.charAt(0).toUpperCase() + item.weaponType.slice(1) : null;
-  const armorTypeLabel = item.armourType ? item.armourType.charAt(0).toUpperCase() + item.armourType.slice(1) : null;
+  const wpType = item.weaponType || item.subType;
+  const amType = item.armourType || item.subType;
+  const weaponTypeLabel = wpType ? wpType.charAt(0).toUpperCase() + wpType.slice(1) : null;
+  const armorTypeLabel = amType ? amType.charAt(0).toUpperCase() + amType.slice(1) : null;
   const typeLabel = weaponTypeLabel || armorTypeLabel || type;
 
   let detailsHtml = '<div class="card-details text-xs mt-3 pt-3 space-y-0.5" style="border-top: 1px solid rgba(80,80,80,0.3);">';
@@ -379,9 +381,9 @@ function createItemCard(item) {
     >
       <div class="flex items-start justify-between mb-2">
         <div class="flex-1 min-w-0">
-          <div class="font-bold text-base leading-tight text-white truncate pr-2" style="color: ${tierStyle.textColor};">${escapeHtml(item.name)}</div>
+          <div class="font-bold text-base leading-tight text-white truncate pr-2" style="color: ${tierStyle.textColor};">${escapeHtml(item.displayName || item.name)}</div>
           <div class="flex items-center gap-2 mt-1.5">
-            <span class="tag-pill ${tierStyle.tierClass}">${escapeHtml(item.rarity || 'Unknown')}</span>
+            <span class="tag-pill ${tierStyle.tierClass}">${escapeHtml(item.tier || item.rarity || 'Unknown')}</span>
             <span class="tag-pill">Lv ${escapeHtml(stats.level)}</span>
           </div>
         </div>
@@ -548,7 +550,7 @@ function applyFiltersToItems(items) {
   let filtered = items;
   
   if (tier) {
-    filtered = filtered.filter(item => item.rarity?.toLowerCase() === tier.toLowerCase());
+    filtered = filtered.filter(item => (item.tier || item.rarity)?.toLowerCase() === tier.toLowerCase());
   }
   
   if (levelMin != null) {
@@ -632,11 +634,11 @@ async function loadItemsForCategory(category) {
       return;
     }
     
-    allLoadedItems = Object.entries(result.items).map(([name, item]) => ({ name, ...item }));
+    allLoadedItems = Object.entries(result.items).map(([name, item]) => ({ name: item.displayName || item.internalName || item.name || name, ...item }));
     allLoadedItems.sort((a, b) => {
       const tierOrder = ['mythic', 'fabled', 'legendary', 'epic', 'rare', 'uncommon', 'common'];
-      const aIdx = tierOrder.indexOf(a.rarity?.toLowerCase() || '');
-      const bIdx = tierOrder.indexOf(b.rarity?.toLowerCase() || '');
+      const aIdx = tierOrder.indexOf((a.tier || a.rarity)?.toLowerCase() || '');
+      const bIdx = tierOrder.indexOf((b.tier || b.rarity)?.toLowerCase() || '');
       return (aIdx === -1 ? tierOrder.length : aIdx) - (bIdx === -1 ? tierOrder.length : bIdx);
     });
     
@@ -802,7 +804,7 @@ async function showItemModal(name, item) {
     }
   }
   
-  const rarity = itemData?.rarity || 'common';
+  const rarity = itemData?.tier || itemData?.rarity || 'common';
   const tierStyle = getTierStyle(rarity);
   const categoryIcon = getItemCategory(itemData);
   const stats = getItemStats(itemData);
@@ -817,8 +819,10 @@ async function showItemModal(name, item) {
   modalTitle.textContent = itemName;
   modalTitle.style.color = tierStyle.textColor;
 
-  const weaponTypeLabel = itemData?.weaponType ? itemData.weaponType.charAt(0).toUpperCase() + itemData.weaponType.slice(1) : null;
-  const armorTypeLabel = itemData?.armourType ? itemData.armourType.charAt(0).toUpperCase() + itemData.armourType.slice(1) : null;
+  const wpType = itemData?.weaponType || itemData?.subType;
+  const amType = itemData?.armourType || itemData?.subType;
+  const weaponTypeLabel = wpType ? wpType.charAt(0).toUpperCase() + wpType.slice(1) : null;
+  const armorTypeLabel = amType ? amType.charAt(0).toUpperCase() + amType.slice(1) : null;
   const typeLabel = weaponTypeLabel || armorTypeLabel || itemData?.type || 'Unknown';
 
   let html = `<div class="space-y-4 max-h-[80vh] overflow-y-auto pr-2 text-sm">`;
@@ -829,7 +833,7 @@ async function showItemModal(name, item) {
         ${categoryIcon || '🎒'}
       </div>
       <div class="flex-1 min-w-0">
-        <div class="text-2xl font-bold leading-tight truncate mb-2" style="color:${tierStyle.textColor};">${escapeHtml(itemName)}</div>
+        <div class="text-2xl font-bold leading-tight truncate mb-2" style="color:${tierStyle.textColor};">${escapeHtml(itemData?.displayName || itemData?.name || itemName)}</div>
         <div class="flex flex-wrap items-center gap-2">
           <span class="modal-tier-badge" style="background: rgba(${tierStyle.glowRgb}, 0.15); border: 1px solid rgba(${tierStyle.glowRgb}, 0.4); color: ${tierStyle.textColor};">${escapeHtml(rarity.toUpperCase())}</span>
           <span class="text-gray-400 text-sm capitalize">${escapeHtml(typeLabel)}</span>

@@ -147,11 +147,12 @@ export function filterAndSortItems(items, types = ITEM_TYPES) {
   
   for (const [name, item] of Object.entries(items)) {
     if (types.includes(item.type?.toLowerCase())) {
-      filtered.push({ name, ...item });
+      const realName = item.displayName || item.name || name;
+      filtered.push({ name: realName, ...item });
     }
   }
   
-  filtered.sort((a, b) => getTierIndex(a.rarity) - getTierIndex(b.rarity));
+  filtered.sort((a, b) => getTierIndex(a.tier || a.rarity) - getTierIndex(b.tier || b.rarity));
   
   return filtered;
 }
@@ -161,13 +162,14 @@ export function filterByArmourType(items, armourTypes) {
   const typesLower = armourTypes.map(t => t.toLowerCase());
   
   for (const [name, item] of Object.entries(items)) {
-    const itemArmourType = item.armourType?.toLowerCase();
+    const itemArmourType = (item.armourType || item.subType)?.toLowerCase();
     if (itemArmourType && typesLower.includes(itemArmourType)) {
-      filtered.push({ name, ...item });
+      const realName = item.displayName || item.name || name;
+      filtered.push({ name: realName, ...item });
     }
   }
   
-  filtered.sort((a, b) => getTierIndex(a.rarity) - getTierIndex(b.rarity));
+  filtered.sort((a, b) => getTierIndex(a.tier || a.rarity) - getTierIndex(b.tier || b.rarity));
   
   return filtered;
 }
@@ -234,8 +236,8 @@ export async function fetchFilteredItems(options = {}, onProgress) {
   
   for (const [name, item] of Object.entries(results)) {
     const itemType = item.type?.toLowerCase();
-    const itemArmorType = item.armourType?.toLowerCase();
-    const itemWeaponType = item.weaponType?.toLowerCase();
+    const itemArmorType = (item.armourType || item.subType)?.toLowerCase();
+    const itemWeaponType = (item.weaponType || item.subType)?.toLowerCase();
     
     if (category === 'weapon') {
       if (itemType !== 'weapon') continue;
@@ -247,17 +249,19 @@ export async function fetchFilteredItems(options = {}, onProgress) {
       if (itemType !== 'accessory') continue;
       if (accessoryType && itemArmorType !== accessoryType) continue;
     } else if (category === 'misc') {
-      if (itemType !== 'tome' && itemType !== 'charm') continue;
+      if (itemType !== 'tome' && itemType !== 'charm' && itemType !== 'misc') continue;
       if (miscType && itemType !== miscType) continue;
     }
     
-    if (tier && item.rarity?.toLowerCase() !== tier.toLowerCase()) continue;
+    const objTier = item.tier || item.rarity;
+    if (tier && objTier?.toLowerCase() !== tier.toLowerCase()) continue;
     
     const itemLevel = item.requirements?.level;
     if (levelMin != null && (itemLevel == null || itemLevel < levelMin)) continue;
     if (levelMax != null && (itemLevel == null || itemLevel > levelMax)) continue;
     
-    filteredItems[name] = item;
+    const realName = item.displayName || item.internalName || item.name || name;
+    filteredItems[realName] = item;
   }
   
   const filterTime = Date.now() - totalStartTime;
