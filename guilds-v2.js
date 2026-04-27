@@ -457,22 +457,22 @@ function renderMembersList(players) {
     const onlineIndicator = player.online ? '<span class="w-1.5 h-1.5 rounded-full bg-green-500 inline-block ml-1"></span>' : '';
     
     return `
-      <div class="grid grid-cols-[80px_1fr_70px_40px_40px] gap-2 px-3 py-1.5 hover:bg-gray-800/30 rounded transition-colors text-[11px] items-center">
+      <div onclick="window.viewPlayerProfile('${escapeHtml(player.username)}')" class="grid grid-cols-[80px_1fr_70px_40px_40px] gap-2 px-3 py-1.5 hover:bg-white/5 cursor-pointer rounded transition-all text-[11px] items-center group active:scale-[0.98]">
         <div class="flex flex-col">
-          <span style="color: ${rc.color}" class="font-bold">${rc.label}</span>
-          <span class="text-[8px] mt-[-2px]" style="color: ${rc.color}; opacity: 0.8">${stars}</span>
+          <span style="color: ${rc.color}" class="font-bold uppercase text-[9px] leading-tight">${rc.label}</span>
+          <span class="text-[8px] mt-[-2px] opacity-60" style="color: ${rc.color}">${stars}</span>
         </div>
         <div class="flex items-center">
-          <span class="text-white truncate font-medium">${escapeHtml(player.username)}</span>
+          <span class="text-white truncate font-medium group-hover:text-purple-300 transition-colors">${escapeHtml(player.username)}</span>
           ${onlineIndicator}
         </div>
-        <div class="text-right font-mono text-violet-300">
+        <div class="text-right font-mono text-violet-300/80 group-hover:text-violet-100 italic">
           ${formatCompactNumber(player.contributed)}
         </div>
-        <div class="text-right font-mono text-orange-300">
+        <div class="text-right font-mono text-orange-300/80 group-hover:text-orange-100">
           ${player.wars ?? 0}
         </div>
-        <div class="text-right font-mono text-cyan-300">
+        <div class="text-right font-mono text-cyan-300/80 group-hover:text-cyan-100">
           ${player.guildRaids ?? 0}
         </div>
       </div>
@@ -499,14 +499,14 @@ function renderPlayerSelection(players) {
            <span style="color: ${rc.color}" class="text-[9px] font-bold leading-none uppercase">${rc.label}</span>
            <span class="text-[8px] opacity-40" style="color: ${rc.color}">${stars}</span>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex items-center gap-2 flex-1" onclick="window.viewPlayerProfile('${escapeHtml(player.username)}')">
            <span class="text-white text-sm font-medium group-hover:text-purple-300 transition-colors">${escapeHtml(player.username)}</span>
            <svg class="w-3.5 h-3.5 text-green-400 opacity-0 peer-checked:opacity-100 transition-opacity shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
         </div>
-        <div class="ml-auto text-right flex items-center gap-3">
-          <span class="text-[10px] font-mono text-violet-400/40 group-has-[:checked]:text-violet-400/70">${formatCompactNumber(player.contributed)} XP</span>
-          <span class="text-[10px] font-mono text-orange-400/40 group-has-[:checked]:text-orange-400/70">${player.wars ?? 0}W</span>
-          <span class="text-[10px] font-mono text-cyan-400/40 group-has-[:checked]:text-cyan-400/70">${player.guildRaids ?? 0}R</span>
+        <div class="ml-auto text-right flex items-center gap-3 opacity-60 group-hover:opacity-100 transition-opacity">
+          <span class="text-[10px] font-mono text-violet-400/80">${formatCompactNumber(player.contributed)} XP</span>
+          <span class="text-[10px] font-mono text-orange-400/80">${player.wars ?? 0}W</span>
+          <span class="text-[10px] font-mono text-cyan-400/80">${player.guildRaids ?? 0}R</span>
         </div>
       </label>
     `;
@@ -2162,4 +2162,170 @@ document.addEventListener('DOMContentLoaded', async () => {
     await loadUserDashboard(userData);
     updateTrackedGuildsList(userData?.guildName || null);
   }
+
+  // Handle modal closing
+  document.getElementById('playerProfileModal').addEventListener('click', (e) => {
+    if (e.target.id === 'playerProfileModal') window.closePlayerProfile();
+  });
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') window.closePlayerProfile();
+  });
 });
+
+/**
+ * View Player Profile Logic
+ */
+window.viewPlayerProfile = async function(username) {
+  const modal = document.getElementById('playerProfileModal');
+  const card = document.getElementById('profileCard');
+  const content = document.getElementById('profileContent');
+
+  // Show modal + loading
+  modal.classList.remove('hidden', 'pointer-events-none');
+  modal.classList.add('flex', 'opacity-100');
+  card.classList.add('scale-100', 'opacity-100');
+  
+  content.innerHTML = `
+    <div class="flex flex-col items-center justify-center py-20 space-y-6">
+      <div class="relative">
+        <div class="w-16 h-16 border-4 border-pink-500/20 border-t-pink-500 rounded-full animate-spin"></div>
+        <div class="absolute inset-0 flex items-center justify-center">
+          <div class="w-8 h-8 bg-pink-500/10 rounded-full animate-pulse"></div>
+        </div>
+      </div>
+      <div class="text-center">
+        <p class="text-pink-400 font-mono text-xs uppercase tracking-[0.2em] animate-pulse">Accessing Member Profile</p>
+        <p class="text-gray-500 text-[10px] mt-2 font-mono">${escapeHtml(username)}</p>
+      </div>
+    </div>
+  `;
+
+  try {
+    const res = await fetch(`/api/player/${encodeURIComponent(username)}`);
+    if (!res.ok) throw new Error(`API Error: ${res.status}`);
+    const data = await res.json();
+    renderFullPlayerProfile(data);
+  } catch (err) {
+    content.innerHTML = `
+      <div class="text-center py-12 px-6">
+        <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-red-950/30 border border-red-500/50 text-red-500 mb-4 animate-bounce">!</div>
+        <p class="text-red-400 font-bold mb-2">Sync Interrupted</p>
+        <p class="text-gray-500 text-xs mb-6 max-w-xs mx-auto">Could not retrieve stats for ${escapeHtml(username)}. The Wynncraft API might be under heavy load.</p>
+        <button onclick="window.closePlayerProfile()" class="theme-btn px-6 py-2 rounded-lg text-xs font-bold uppercase tracking-wider">Return to Dashboard</button>
+      </div>
+    `;
+  }
+};
+
+window.closePlayerProfile = function() {
+  const modal = document.getElementById('playerProfileModal');
+  const card = document.getElementById('profileCard');
+  card.classList.remove('scale-100', 'opacity-100');
+  modal.classList.remove('opacity-100');
+  modal.classList.add('pointer-events-none');
+  setTimeout(() => {
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+  }, 300);
+};
+
+function renderFullPlayerProfile(data) {
+  const content = document.getElementById('profileContent');
+  const g = data.globalData || {};
+  const rankings = data.rankings || {};
+  
+  // Format dates/strings
+  const joinedDate = data.joined ? new Date(data.joined).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Unknown';
+  const playtime = Math.round(data.playtime || 0);
+  const guildName = data.guild?.name || 'No Guild';
+  const guildRank = data.guild?.rank || '';
+  const grc = getRankConfig(guildRank);
+
+  // Stats Grid
+  const stats = [
+    { label: 'Rank', value: data.supportRank || 'Player', color: 'neon-pink' },
+    { label: 'Playtime', value: `${playtime.toLocaleString()}h`, color: 'neon-cyan' },
+    { label: 'Mobs Killed', value: formatCompactNumber(g.mobsKilled || 0), color: 'text-gray-200' },
+    { label: 'Total Level', value: (g.totalLevel || 0).toLocaleString(), color: 'neon-gold' },
+    { label: 'Chests Found', value: formatCompactNumber(g.chestsFound || 0), color: 'text-gray-200' },
+    { label: 'Wars', value: (g.wars || 0).toLocaleString(), color: 'text-orange-400' }
+  ];
+
+  const rankingCards = [
+    { label: 'Combat Solo Level', value: rankings.combatSoloLevel },
+    { label: 'Combat Global Level', value: rankings.combatOverallLevel },
+    { label: 'Total Solo Level', value: rankings.totalSoloLevel },
+    { label: 'Total Global Level', value: rankings.totalOverallLevel },
+    { label: 'Professions Solo Level', value: rankings.professionsSoloLevel },
+    { label: 'Professions Global Level', value: rankings.professionsOverallLevel }
+  ];
+
+  // Raid icons/completions from data
+  // v3 API character summaries usually have dungeons/raids
+  // For simplicity since it's v3 Player, we aggregate across characters or use the global field if available
+  // Actually v3 Player response root has dungeons and raids
+  const raidList = data.raids || {};
+  const raidDisplay = Object.entries(raidList).map(([name, count]) => {
+     const cleanName = name.replace(/([A-Z])/g, ' $1').trim();
+     return `
+       <div class="flex flex-col items-center justify-center p-3 profile-stat-card rounded-xl">
+         <span class="text-white font-bold text-lg leading-none">${count}</span>
+         <span class="text-[9px] text-gray-500 uppercase font-bold mt-1 text-center whitespace-nowrap">${cleanName}</span>
+       </div>
+     `;
+  }).join('');
+
+  content.innerHTML = `
+    <div class="relative">
+      <button onclick="window.closePlayerProfile()" class="absolute -top-1 -right-1 p-2 text-gray-500 hover:text-white transition-colors">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+
+      <div class="mb-8 pr-10">
+        <h2 class="text-3xl font-black text-white italic tracking-tighter uppercase mb-1">Guild Information</h2>
+        <p class="text-red-500 font-bold text-xs uppercase tracking-widest mb-3">${escapeHtml(data.username)}</p>
+        <div class="flex items-center gap-2">
+           <span style="color: ${grc.color}" class="font-bold text-sm uppercase">${grc.label}</span>
+           <span class="text-gray-500 text-sm">of</span>
+           <span class="text-white font-bold text-sm">${escapeHtml(guildName)}</span>
+        </div>
+      </div>
+
+      <div class="mb-8 pt-6 border-t border-gray-800/50">
+        <h3 class="text-gray-400 uppercase text-[10px] tracking-widest font-black mb-4">Global Stats</h3>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+          ${stats.map(s => `
+            <div class="profile-stat-card p-3 rounded-xl">
+              <span class="text-gray-500 text-[9px] uppercase font-bold block mb-1">${s.label}</span>
+              <span class="text-sm font-black ${s.color}">${s.value}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <div class="mb-8">
+        <h3 class="text-gray-400 uppercase text-[10px] tracking-widest font-black mb-4">Rankings</h3>
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+          ${rankingCards.filter(c => c.value).map(c => `
+            <div class="profile-rank-card p-4 rounded-xl text-center">
+              <span class="text-gray-500 text-[8px] uppercase font-bold block mb-1">${c.label}</span>
+              <span class="text-xl font-black text-white tracking-tighter">#${c.value.toLocaleString()}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <div>
+        <h3 class="text-gray-400 uppercase text-[10px] tracking-widest font-black mb-4">Raid Completions</h3>
+        <div class="grid grid-cols-3 md:grid-cols-4 gap-3">
+          ${raidDisplay || '<p class="text-gray-600 text-[10px] italic">No recorded raid completions</p>'}
+        </div>
+      </div>
+      
+      <div class="mt-8 pt-4 border-t border-gray-800/30 flex justify-between items-center text-[9px] text-gray-600 font-medium">
+         <span>Account Created: ${joinedDate}</span>
+         <span class="uppercase tracking-widest">Wynncraft Archive v3</span>
+      </div>
+    </div>
+  `;
+}

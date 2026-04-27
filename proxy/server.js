@@ -279,6 +279,13 @@ app.get('/api/item/search/:query', async (req, res) => {
   }
 });
 
+app.get('/api/player/:player', async (req, res) => {
+  const player = req.params.player;
+  const url = `https://api.wynncraft.com/v3/player/${encodeURIComponent(player)}?fullResult=true`;
+  const cacheKey = `player_v3_${player.toLowerCase()}`;
+  return forwardJson({ targetUrl: url, cacheKey, ttlMs: 10 * 60 * 1000 }, res);
+});
+
 app.get('/api/item/clear-cache', (req, res) => {
   pageCache.clear();
   
