@@ -455,10 +455,13 @@ function renderMembersList(players) {
     const rc = getRankConfig(player.rank);
     const stars = '★'.repeat(rc.stars).padEnd(5, ' ');
     const onlineIndicator = player.online ? '<span class="w-1.5 h-1.5 rounded-full bg-green-500 inline-block ml-1"></span>' : '';
-    const profileArgs = `${JSON.stringify(player.username || '')}, ${JSON.stringify(player.uuid || '')}`;
     
     return `
-      <div onclick="window.viewPlayerProfile(${profileArgs})" class="grid grid-cols-[80px_1fr_70px_40px_40px] gap-2 px-3 py-1.5 hover:bg-white/5 cursor-pointer rounded transition-all text-[11px] items-center group active:scale-[0.98]">
+      <div
+        onclick="window.viewPlayerProfileFromElement(this)"
+        data-profile-username="${escapeHtml(player.username || '')}"
+        data-profile-uuid="${escapeHtml(player.uuid || '')}"
+        class="grid grid-cols-[80px_1fr_70px_40px_40px] gap-2 px-3 py-1.5 hover:bg-white/5 cursor-pointer rounded transition-all text-[11px] items-center group active:scale-[0.98]">
         <div class="flex flex-col">
           <span style="color: ${rc.color}" class="font-bold uppercase text-[9px] leading-tight">${rc.label}</span>
           <span class="text-[8px] mt-[-2px] opacity-60" style="color: ${rc.color}">${stars}</span>
@@ -493,7 +496,6 @@ function renderPlayerSelection(players) {
   container.innerHTML = players.map((player) => {
     const rc = getRankConfig(player.rank);
     const stars = '★'.repeat(rc.stars).padEnd(5, ' ');
-    const profileArgs = `${JSON.stringify(player.username || '')}, ${JSON.stringify(player.uuid || '')}`;
     return `
       <label class="flex items-center gap-3 px-3 py-2 hover:bg-gray-800/40 rounded cursor-pointer transition-all border border-transparent has-[:checked]:bg-green-500/10 has-[:checked]:border-green-500/30 group select-none">
         <input type="checkbox" value="${escapeHtml(player.username)}" class="hidden peer">
@@ -501,7 +503,11 @@ function renderPlayerSelection(players) {
            <span style="color: ${rc.color}" class="text-[9px] font-bold leading-none uppercase">${rc.label}</span>
            <span class="text-[8px] opacity-40" style="color: ${rc.color}">${stars}</span>
         </div>
-        <div class="flex items-center gap-2 flex-1" onclick="window.viewPlayerProfile(${profileArgs})">
+        <div
+          class="flex items-center gap-2 flex-1"
+          onclick="window.viewPlayerProfileFromElement(this)"
+          data-profile-username="${escapeHtml(player.username || '')}"
+          data-profile-uuid="${escapeHtml(player.uuid || '')}">
            <span class="text-white text-sm font-medium group-hover:text-purple-300 transition-colors">${escapeHtml(player.username)}</span>
            <svg class="w-3.5 h-3.5 text-green-400 opacity-0 peer-checked:opacity-100 transition-opacity shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
         </div>
@@ -2225,6 +2231,12 @@ window.viewPlayerProfile = async function(username, uuid = '') {
       </div>
     `;
   }
+};
+
+window.viewPlayerProfileFromElement = function(element) {
+  const username = String(element?.getAttribute('data-profile-username') || '');
+  const uuid = String(element?.getAttribute('data-profile-uuid') || '');
+  window.viewPlayerProfile(username, uuid);
 };
 
 window.closePlayerProfile = function() {
