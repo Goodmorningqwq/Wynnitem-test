@@ -172,13 +172,13 @@ function collectGuildMembers(guild) {
   const players = [];
   for (const rank of ranks) {
     if (!guild.members[rank]) continue;
-    for (const [memberUuid, member] of Object.entries(guild.members[rank])) {
+    for (const [memberKey, member] of Object.entries(guild.members[rank])) {
       players.push({
-        uuid: member.uuid || memberUuid || null,
-        username: member.username,
+        uuid: member.uuid || memberKey || null,
+        username: member.username || member.legacyName || memberKey,
         contributed: Number(member.contributed || 0),
-        guildRaids: Number(member.guildRaids?.total ?? 0),
-        wars: memberWarsCache.get(member.uuid || memberUuid || '') ?? null
+        guildRaids: Number(member.globalData?.guildRaids?.total ?? member.guildRaids?.total ?? 0),
+        wars: memberWarsCache.get(member.uuid || memberKey || '') ?? null
       });
     }
   }
