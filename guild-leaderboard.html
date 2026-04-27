@@ -37,7 +37,11 @@
 <body class="min-h-screen flex flex-col text-gray-100">
   <header class="bg-[rgba(22,22,22,0.98)] border-b border-[rgba(50,50,50,0.5)]">
     <div class="container mx-auto px-4 py-3 flex items-center justify-between">
-      <a href="/guild" class="text-white font-semibold">Guild Leaderboard</a>
+      <div class="flex items-center gap-4">
+        <a href="/" class="text-gray-300 hover:text-white text-sm">Home</a>
+        <a href="/guild" class="text-white font-semibold">Guild Leaderboard</a>
+        <a href="/guild/event_history" class="text-gray-300 hover:text-white text-sm">Event History</a>
+      </div>
       <button id="backToGuildBtn" class="theme-btn px-4 py-2 rounded-lg text-sm">Back to Guild</button>
     </div>
   </header>
@@ -45,12 +49,38 @@
   <main class="flex-1 container mx-auto px-4 py-8">
     <div class="max-w-4xl mx-auto space-y-4">
       <div class="theme-panel p-6 rounded-xl">
-        <h2 class="text-xl font-bold text-white mb-2">Active Event Summary</h2>
-        <div class="flex gap-2 mb-3">
+        <h2 class="text-xl font-bold text-white mb-2">Open Event Leaderboard</h2>
+        <p class="text-xs text-gray-400 mb-3">Paste an event code to view a shared leaderboard, or open your current active event when logged in.</p>
+        <label for="eventCodeInput" class="text-gray-400 text-xs uppercase tracking-widest font-semibold mb-1 block">Event Code</label>
+        <div class="flex gap-2 mb-2">
           <input id="eventCodeInput" type="text" placeholder="Enter event code (e.g. A7K9Q2)" class="flex-1 bg-[rgba(26,12,40,0.95)] border border-[rgba(143,95,216,0.45)] rounded-lg px-3 py-2 text-white placeholder-gray-500 focus:border-violet-500 focus:outline-none">
           <button id="viewEventCodeBtn" class="theme-btn px-4 py-2 rounded-lg text-sm">View Event</button>
+          <button id="copyEventLinkBtn" class="theme-btn px-4 py-2 rounded-lg text-sm">Copy Link</button>
         </div>
-        <p id="leaderboardMeta" class="text-sm text-gray-300">Loading...</p>
+        <p id="eventCodeValidation" class="text-xs text-gray-500 mb-3">Tip: event codes are 6 uppercase characters.</p>
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
+          <div class="bg-gray-800/40 rounded p-2">
+            <p class="text-[10px] text-gray-500 uppercase">Guild</p>
+            <p id="summaryGuild" class="text-white font-medium">-</p>
+          </div>
+          <div class="bg-gray-800/40 rounded p-2">
+            <p class="text-[10px] text-gray-500 uppercase">Metric</p>
+            <p id="summaryMetric" class="text-white font-medium">-</p>
+          </div>
+          <div class="bg-gray-800/40 rounded p-2">
+            <p class="text-[10px] text-gray-500 uppercase">Scope</p>
+            <p id="summaryScope" class="text-white font-medium">-</p>
+          </div>
+          <div class="bg-gray-800/40 rounded p-2">
+            <p class="text-[10px] text-gray-500 uppercase">Delta</p>
+            <p id="summaryDelta" class="text-green-300 font-semibold">-</p>
+          </div>
+          <div class="bg-gray-800/40 rounded p-2">
+            <p class="text-[10px] text-gray-500 uppercase">Started</p>
+            <p id="summaryStarted" class="text-white font-medium">-</p>
+          </div>
+        </div>
+        <p id="leaderboardMeta" class="text-xs text-gray-400 mt-3">Loading...</p>
       </div>
 
       <div class="theme-panel p-6 rounded-xl">
@@ -65,6 +95,6 @@
     </div>
   </main>
 
-  <script type="module" src="/guild-leaderboard.js?v=20260329a"></script>
+  <script type="module" src="/guild-leaderboard.js?v=20260427b"></script>
 </body>
 </html>

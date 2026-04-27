@@ -35,20 +35,34 @@
   </style>
 </head>
 <body class="min-h-screen text-gray-100">
+  <header class="bg-[rgba(22,22,22,0.98)] border-b border-[rgba(50,50,50,0.5)]">
+    <div class="container mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <a href="/" class="text-gray-300 hover:text-white text-sm">Home</a>
+        <a href="/guild" class="text-white font-semibold">Guild Event History</a>
+        <a href="/guild/leaderboard" class="text-gray-300 hover:text-white text-sm">Leaderboard</a>
+      </div>
+      <button id="backToGuildBtn" class="theme-btn px-4 py-2 rounded-lg text-sm">Back to Guild</button>
+    </div>
+  </header>
   <main class="container mx-auto px-4 py-8">
     <div class="max-w-4xl mx-auto">
       <div class="flex items-center justify-between mb-4">
         <h1 class="text-2xl font-bold text-white">Guild Event History</h1>
-        <button id="backToGuildBtn" class="theme-btn px-4 py-2 rounded-lg text-sm">Back to Dashboard</button>
       </div>
       <div class="theme-panel p-6 rounded-xl">
-        <p class="text-gray-400 text-sm mb-4">Recent tracked events for your account.</p>
+        <p class="text-gray-400 text-sm mb-2">Recent completed events from your Guild Tracker account.</p>
+        <p class="text-gray-500 text-xs mb-4">Use this page to compare recent runs, then open guild search to start a new tracked event.</p>
+        <div id="historyActions" class="hidden mb-4 flex gap-2">
+          <a id="historyLoginCta" href="/login" class="theme-btn px-4 py-2 rounded-lg text-xs">Login</a>
+          <a id="historyTrackerCta" href="/guild" class="theme-btn px-4 py-2 rounded-lg text-xs">Open Guild Tracker</a>
+        </div>
         <div id="eventHistoryList" class="space-y-2">
           <p class="text-gray-500 text-sm text-center py-4">Loading event history...</p>
         </div>
       </div>
     </div>
   </main>
-  <script type="module" src="/guild-event-history.js"></script>
+  <script type="module" src="/guild-event-history.js?v=20260427b"></script>
 </body>
 </html>
