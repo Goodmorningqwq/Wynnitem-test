@@ -1,33 +1,11 @@
 module.exports = async (req, res) => {
-  // 1. Try to get player from all possible sources
-  const urlObj = new URL(req.url, 'http://localhost');
-  
-  // Try req.query (Vercel standard)
-  let player = req.query?.player || req.query?.uuid;
-  
-  // Try search params from URL string
-  if (!player) player = urlObj.searchParams.get('player') || urlObj.searchParams.get('uuid');
-  
-  // Try path parts as a last resort
-  if (!player) {
-    const parts = urlObj.pathname.split('/').filter(Boolean);
-    // URL: /api/player/Aerrihn -> parts: ['api', 'player', 'Aerrihn']
-    const last = parts.pop();
-    if (last && last !== 'player' && last !== 'index.js') {
-      player = last;
-    }
-  }
+  const player = req.query.player || req.query.uuid;
+  const action = req.query.action;
 
   if (!player) {
     return res.status(400).json({ 
       error: 'Player name or UUID required', 
-      debug: { 
-        url: req.url, 
-        query: req.query || {},
-        originalUrl: req.originalUrl || '',
-        params: req.params || {},
-        method: req.method
-      } 
+      debug: { url: req.url, query: req.query || {} } 
     });
   }
 
