@@ -443,6 +443,121 @@
       backdrop-filter: blur(3px);
     }
 
+    .hero-stage {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+      align-items: center;
+    }
+
+    .hero-copy {
+      text-align: center;
+    }
+
+    .hero-visual-wrap {
+      display: flex;
+      justify-content: center;
+    }
+
+    .hero-visual {
+      width: min(320px, 84vw);
+      border-radius: 1.15rem;
+      border: 1px solid rgba(124, 89, 194, 0.42);
+      background: linear-gradient(170deg, rgba(21, 13, 36, 0.96), rgba(16, 9, 28, 0.96));
+      box-shadow: inset 0 0 0 1px rgba(67, 36, 101, 0.44), 0 10px 30px rgba(0, 0, 0, 0.36);
+      padding: 0.95rem;
+    }
+
+    .hero-avatar-shell {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      border-radius: 0.95rem;
+      border: 1px solid rgba(121, 87, 196, 0.45);
+      background: radial-gradient(circle at 30% 25%, rgba(167, 139, 250, 0.26), transparent 48%),
+                  radial-gradient(circle at 68% 65%, rgba(44, 232, 255, 0.2), transparent 50%),
+                  rgba(18, 9, 30, 0.92);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    .hero-avatar {
+      width: 58%;
+      aspect-ratio: 1 / 1;
+      border-radius: 9999px;
+      border: 1px solid rgba(181, 144, 255, 0.5);
+      background: linear-gradient(145deg, rgba(215, 189, 255, 0.92), rgba(110, 157, 255, 0.9));
+      box-shadow: 0 0 24px rgba(167, 139, 250, 0.28);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: rgba(26, 15, 43, 0.95);
+      font-size: clamp(2.3rem, 5vw, 3.2rem);
+      font-weight: 900;
+      letter-spacing: -0.04em;
+    }
+
+    .hero-avatar-ring {
+      position: absolute;
+      inset: 12%;
+      border-radius: 9999px;
+      border: 1px dashed rgba(167, 139, 250, 0.34);
+      animation: slowSpin 16s linear infinite;
+    }
+
+    .hero-micro-grid {
+      margin-top: 0.8rem;
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 0.45rem;
+    }
+
+    .hero-micro-card {
+      border-radius: 0.7rem;
+      border: 1px solid rgba(108, 74, 178, 0.4);
+      background: rgba(28, 16, 45, 0.92);
+      padding: 0.45rem 0.6rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 0.73rem;
+      color: #d7ddf2;
+    }
+
+    .hero-micro-label {
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #94a3b8;
+      font-size: 0.6rem;
+    }
+
+    .hero-micro-value {
+      font-weight: 700;
+      color: #f4f1ff;
+    }
+
+    .hero-proof-row {
+      margin-top: 0.9rem;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.4rem;
+    }
+
+    .hero-proof-pill {
+      font-size: 0.64rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      border-radius: 9999px;
+      padding: 0.2rem 0.55rem;
+      border: 1px solid rgba(130, 92, 203, 0.42);
+      background: rgba(32, 20, 50, 0.82);
+      color: #d7def8;
+    }
+
     .hero-kicker {
       letter-spacing: 0.28em;
       text-transform: uppercase;
@@ -513,8 +628,42 @@
       50% { opacity: 1; transform: scale(1.2); }
     }
 
+    @keyframes slowSpin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    @media (min-width: 960px) {
+      .hero-stage {
+        grid-template-columns: minmax(0, 1.45fr) minmax(260px, 0.95fr);
+        gap: 2rem;
+      }
+      .hero-copy {
+        text-align: left;
+      }
+      .hero-copy .hero-title-shell,
+      .hero-copy .hero-subtitle {
+        margin-left: 0;
+        margin-right: 0;
+      }
+      .hero-copy .hero-title-shell {
+        text-align: left;
+      }
+      .hero-copy .hero-subtitle {
+        max-width: 39rem;
+      }
+      .hero-copy .hero-cta-row,
+      .hero-copy .hero-chip-row,
+      .hero-copy .hero-proof-row {
+        justify-content: flex-start;
+      }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       .hero-sparkle {
+        animation: none !important;
+      }
+      .hero-avatar-ring {
         animation: none !important;
       }
       .menu-card,
@@ -590,23 +739,54 @@
       </div>
 
       <div class="container mx-auto px-4 relative z-10 py-10 md:py-12">
-        <div class="max-w-4xl mx-auto cinematic-panel rounded-2xl px-6 py-8 md:px-10 md:py-10 text-center">
-          <p class="hero-kicker mb-4">Wynncraft Intelligence Hub</p>
-          <h2 class="hero-title-shell mb-5">
-            <span class="hero-title hero-title--anim">Wynncraft data, reimagined.</span>
-          </h2>
-          <p class="hero-subtitle text-base md:text-xl max-w-3xl mx-auto leading-relaxed mb-6">
-            Explore elite item builds, run cinematic guild events, and track leaderboard momentum with a command-center experience built for competitive play.
-          </p>
-          <div class="flex flex-wrap justify-center gap-2.5 mb-5">
-            <a href="/item" class="theme-btn-primary px-6 py-3 rounded-lg text-sm font-semibold">Enter Item Database</a>
-            <a href="/guild" class="theme-btn px-6 py-3 rounded-lg text-sm font-semibold">Open Guild Tracker</a>
-            <a href="https://wynnitem-territory.vercel.app/" target="_blank" rel="noopener noreferrer" class="theme-btn px-6 py-3 rounded-lg text-sm font-semibold">Launch Territory Map</a>
-          </div>
-          <div class="flex flex-wrap justify-center gap-2">
-            <span class="feature-chip">Live event codes</span>
-            <span class="feature-chip">Guild wars + raids</span>
-            <span class="feature-chip">Shareable leaderboards</span>
+        <div class="max-w-6xl mx-auto cinematic-panel rounded-2xl px-6 py-8 md:px-10 md:py-10">
+          <div class="hero-stage">
+            <div class="hero-copy">
+              <p class="hero-kicker mb-4">Wynncraft Intelligence Hub</p>
+              <h2 class="hero-title-shell mb-5">
+                <span class="hero-title hero-title--anim">Wynncraft data, reimagined.</span>
+              </h2>
+              <p class="hero-subtitle text-base md:text-xl max-w-3xl mx-auto leading-relaxed mb-6">
+                Explore elite item builds, run cinematic guild events, and track leaderboard momentum with a command-center experience built for competitive play.
+              </p>
+              <div class="hero-cta-row flex flex-wrap justify-center gap-2.5 mb-4">
+                <a href="/item" class="theme-btn-primary px-6 py-3 rounded-lg text-sm font-semibold">Enter Item Database</a>
+                <a href="/guild" class="theme-btn px-6 py-3 rounded-lg text-sm font-semibold">Open Guild Tracker</a>
+                <a href="https://wynnitem-territory.vercel.app/" target="_blank" rel="noopener noreferrer" class="theme-btn px-6 py-3 rounded-lg text-sm font-semibold">Launch Territory Map</a>
+              </div>
+              <div class="hero-chip-row flex flex-wrap justify-center gap-2">
+                <span class="feature-chip">Live event codes</span>
+                <span class="feature-chip">Guild wars + raids</span>
+                <span class="feature-chip">Shareable leaderboards</span>
+              </div>
+              <div class="hero-proof-row">
+                <span class="hero-proof-pill">Fast route-first UI</span>
+                <span class="hero-proof-pill">Built for guild ops</span>
+                <span class="hero-proof-pill">Realtime data workflows</span>
+              </div>
+            </div>
+            <div class="hero-visual-wrap" aria-hidden="true">
+              <div class="hero-visual">
+                <div class="hero-avatar-shell">
+                  <div class="hero-avatar-ring"></div>
+                  <div class="hero-avatar">W</div>
+                </div>
+                <div class="hero-micro-grid">
+                  <div class="hero-micro-card">
+                    <span class="hero-micro-label">Signal</span>
+                    <span class="hero-micro-value">Operational</span>
+                  </div>
+                  <div class="hero-micro-card">
+                    <span class="hero-micro-label">Core Mode</span>
+                    <span class="hero-micro-value">Search -> Track -> Share</span>
+                  </div>
+                  <div class="hero-micro-card">
+                    <span class="hero-micro-label">Feed</span>
+                    <span class="hero-micro-value">Wynncraft API v3</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
