@@ -1,16 +1,32 @@
 module.exports = async (req, res) => {
-  // Robust parameter extraction using standard URL API
+  // 1. Try to get player from all possible sources
   const urlObj = new URL(req.url, 'http://localhost');
-  const player = req.query?.player || req.query?.uuid || urlObj.searchParams.get('player') || urlObj.searchParams.get('uuid');
-
+  
+  // Try req.query (Vercel standard)
+  let player = req.query?.player || req.query?.uuid;
+  
+  // Try search params from URL string
+  if (!player) player = urlObj.searchParams.get('player') || urlObj.searchParams.get('uuid');
+  
+  // Try path parts as a last resort
   if (!player) {
     const parts = urlObj.pathname.split('/').filter(Boolean);
+    // URL: /api/player/Aerrihn -> parts: ['api', 'player', 'Aerrihn']
     const last = parts.pop();
-    // If URL was /api/player/Aerrihn, last is Aerrihn
-    if (last && last !== 'player') {
-      return res.status(400).json({ error: 'Player name required', debugPath: last });
+    if (last && last !== 'player' && last !== 'index.js') {
+      player = last;
     }
-    return res.status(400).json({ error: 'Player name or UUID required', debugUrl: req.url });
+  }
+
+  if (!player) {
+    return res.status(400).json({ 
+      error: 'Player name or UUID required', 
+      debug: { 
+        url: req.url, 
+        query: req.query || {},
+        pathname: urlObj.pathname
+      } 
+    });
   }
 
   const action = req.query?.action || urlObj.searchParams.get('action') || (urlObj.pathname.includes('/wars') ? 'wars' : null);
