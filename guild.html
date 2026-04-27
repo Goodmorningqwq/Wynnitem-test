@@ -75,6 +75,14 @@
       border-color: rgba(167, 116, 255, 0.8);
       color: #fff;
     }
+
+    .hide-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .hide-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
   </style>
 </head>
 <body class="text-gray-100 min-h-screen flex flex-col">
@@ -347,7 +355,7 @@
           <div class="flex items-center justify-between mb-3">
             <h4 id="membersTitle" class="text-gray-400 uppercase text-xs tracking-widest font-semibold">Members</h4>
           </div>
-          <div id="guildMembersList" class="max-h-96 overflow-y-auto space-y-px">
+          <div id="guildMembersList" class="max-h-96 overflow-y-auto space-y-px hide-scrollbar">
             <!-- Members will be listed here -->
           </div>
           <p class="text-[10px] text-gray-600 mt-3 italic">Raid and war totals come from the Wynncraft guild API response.</p>
