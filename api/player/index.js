@@ -24,7 +24,9 @@ module.exports = async (req, res) => {
       debug: { 
         url: req.url, 
         query: req.query || {},
-        pathname: urlObj.pathname
+        originalUrl: req.originalUrl || '',
+        params: req.params || {},
+        method: req.method
       } 
     });
   }
