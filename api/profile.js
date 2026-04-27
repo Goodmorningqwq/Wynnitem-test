@@ -9,8 +9,6 @@ module.exports = async (req, res) => {
     });
   }
 
-  const action = req.query?.action || urlObj.searchParams.get('action') || (urlObj.pathname.includes('/wars') ? 'wars' : null);
-
   // 1. Handle "wars" specialized endpoint
   if (action === 'wars') {
     const uuid = typeof player === 'string' ? player.trim() : '';
@@ -39,13 +37,6 @@ module.exports = async (req, res) => {
   }
 
   // 2. Handle Profile Lookup (default)
-  if (!player) {
-    return res.status(400).json({ 
-      error: 'Player name or UUID required',
-      debug: { query: req.query, url: req.url }
-    });
-  }
-
   const url = `https://api.wynncraft.com/v3/player/${encodeURIComponent(player)}?fullResult=true`;
   
   try {
@@ -62,6 +53,7 @@ module.exports = async (req, res) => {
     res.setHeader('Cache-Control', 's-maxage=600, stale-while-revalidate=600');
     return res.json(data);
   } catch (err) {
-    return res.status(500).json({ error: 'Internal server error' });
+    console.error('Player profile error:', err.message);
+    return res.status(500).json({ error: 'Internal server error while fetching player profile' });
   }
 };
