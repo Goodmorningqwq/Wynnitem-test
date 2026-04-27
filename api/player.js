@@ -1,16 +1,19 @@
 module.exports = async (req, res) => {
-  // Support both /api/player?player=Name and /api/player/Name
-  let player = req.query.player || req.query.uuid;
-  
+  // Robust parameter extraction using standard URL API
+  const urlObj = new URL(req.url, 'http://localhost');
+  const player = req.query?.player || req.query?.uuid || urlObj.searchParams.get('player') || urlObj.searchParams.get('uuid');
+
   if (!player) {
-    const urlParts = req.url.split('?')[0].split('/').filter(Boolean);
-    const last = urlParts.pop();
-    if (last && last !== 'player' && last !== 'api') {
-      player = last;
+    const parts = urlObj.pathname.split('/').filter(Boolean);
+    const last = parts.pop();
+    // If URL was /api/player/Aerrihn, last is Aerrihn
+    if (last && last !== 'player') {
+      return res.status(400).json({ error: 'Player name required', debugPath: last });
     }
+    return res.status(400).json({ error: 'Player name or UUID required', debugUrl: req.url });
   }
 
-  const action = req.query.action || (req.url.includes('/wars') ? 'wars' : null);
+  const action = req.query?.action || urlObj.searchParams.get('action') || (urlObj.pathname.includes('/wars') ? 'wars' : null);
 
   // 1. Handle "wars" specialized endpoint
   if (action === 'wars') {
