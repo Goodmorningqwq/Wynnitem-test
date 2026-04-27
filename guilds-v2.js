@@ -455,9 +455,10 @@ function renderMembersList(players) {
     const rc = getRankConfig(player.rank);
     const stars = '★'.repeat(rc.stars).padEnd(5, ' ');
     const onlineIndicator = player.online ? '<span class="w-1.5 h-1.5 rounded-full bg-green-500 inline-block ml-1"></span>' : '';
+    const profileArgs = `${JSON.stringify(player.username || '')}, ${JSON.stringify(player.uuid || '')}`;
     
     return `
-      <div onclick="window.viewPlayerProfile('${escapeHtml(player.username)}')" class="grid grid-cols-[80px_1fr_70px_40px_40px] gap-2 px-3 py-1.5 hover:bg-white/5 cursor-pointer rounded transition-all text-[11px] items-center group active:scale-[0.98]">
+      <div onclick="window.viewPlayerProfile(${profileArgs})" class="grid grid-cols-[80px_1fr_70px_40px_40px] gap-2 px-3 py-1.5 hover:bg-white/5 cursor-pointer rounded transition-all text-[11px] items-center group active:scale-[0.98]">
         <div class="flex flex-col">
           <span style="color: ${rc.color}" class="font-bold uppercase text-[9px] leading-tight">${rc.label}</span>
           <span class="text-[8px] mt-[-2px] opacity-60" style="color: ${rc.color}">${stars}</span>
@@ -492,6 +493,7 @@ function renderPlayerSelection(players) {
   container.innerHTML = players.map((player) => {
     const rc = getRankConfig(player.rank);
     const stars = '★'.repeat(rc.stars).padEnd(5, ' ');
+    const profileArgs = `${JSON.stringify(player.username || '')}, ${JSON.stringify(player.uuid || '')}`;
     return `
       <label class="flex items-center gap-3 px-3 py-2 hover:bg-gray-800/40 rounded cursor-pointer transition-all border border-transparent has-[:checked]:bg-green-500/10 has-[:checked]:border-green-500/30 group select-none">
         <input type="checkbox" value="${escapeHtml(player.username)}" class="hidden peer">
@@ -499,7 +501,7 @@ function renderPlayerSelection(players) {
            <span style="color: ${rc.color}" class="text-[9px] font-bold leading-none uppercase">${rc.label}</span>
            <span class="text-[8px] opacity-40" style="color: ${rc.color}">${stars}</span>
         </div>
-        <div class="flex items-center gap-2 flex-1" onclick="window.viewPlayerProfile('${escapeHtml(player.username)}')">
+        <div class="flex items-center gap-2 flex-1" onclick="window.viewPlayerProfile(${profileArgs})">
            <span class="text-white text-sm font-medium group-hover:text-purple-300 transition-colors">${escapeHtml(player.username)}</span>
            <svg class="w-3.5 h-3.5 text-green-400 opacity-0 peer-checked:opacity-100 transition-opacity shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
         </div>
@@ -2175,7 +2177,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 /**
  * View Player Profile Logic
  */
-window.viewPlayerProfile = async function(username) {
+window.viewPlayerProfile = async function(username, uuid = '') {
   const modal = document.getElementById('playerProfileModal');
   const card = document.getElementById('profileCard');
   const content = document.getElementById('profileContent');
@@ -2201,7 +2203,11 @@ window.viewPlayerProfile = async function(username) {
   `;
 
   try {
-    const res = await fetch(`/api/profile?player=${encodeURIComponent(username)}`);
+    const hasUuid = typeof uuid === 'string' && uuid.trim().length > 0;
+    const query = hasUuid
+      ? `uuid=${encodeURIComponent(uuid.trim())}`
+      : `player=${encodeURIComponent(username)}`;
+    const res = await fetch(`/api/profile?${query}`);
     if (!res.ok) {
       const respText = await res.text();
       console.error('[wynn-profile] error response:', respText);
