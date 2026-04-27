@@ -166,6 +166,21 @@ async function wipeUserData() {
   }
 }
 
+function preSeedMemberWars(guild) {
+  if (!guild?.members) return;
+  const ranks = ['owner', 'chief', 'strategist', 'captain', 'recruiter', 'recruit'];
+  for (const rank of ranks) {
+    if (!guild.members[rank]) continue;
+    for (const [memberKey, member] of Object.entries(guild.members[rank])) {
+      const wars = member.globalData?.wars;
+      if (typeof wars === 'number') {
+        const id = member.uuid || memberKey || '';
+        if (id) memberWarsCache.set(id, wars);
+      }
+    }
+  }
+}
+
 function collectGuildMembers(guild) {
   if (!guild?.members) return [];
   const ranks = ['owner', 'chief', 'strategist', 'captain', 'recruiter', 'recruit'];
@@ -178,7 +193,7 @@ function collectGuildMembers(guild) {
         username: member.username || member.legacyName || memberKey,
         contributed: Number(member.contributed || 0),
         guildRaids: Number(member.globalData?.guildRaids?.total ?? member.guildRaids?.total ?? 0),
-        wars: memberWarsCache.get(member.uuid || memberKey || '') ?? null
+        wars: member.globalData?.wars ?? (memberWarsCache.get(member.uuid || memberKey || '') ?? null)
       });
     }
   }
@@ -1512,6 +1527,7 @@ async function searchGuild(name, mode = 'auto', options = {}) {
       throw new Error(`API Error: ${response.status}`);
     }
     currentGuild = data;
+    preSeedMemberWars(data);
     if (hydrateWars) {
       guildWarsHydrating = shouldRender;
       if (shouldRender) {
