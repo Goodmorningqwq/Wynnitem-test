@@ -15,7 +15,7 @@
     { "source": "/api/user/register", "destination": "/api/user/auth?action=register" },
     { "source": "/api/user(.*)", "destination": "/api/user$1" },
     { "source": "/api/player/wars", "destination": "/api/player?action=wars" },
-    { "source": "/api/player/(.*)", "destination": "/api/player?player=$1" },
+    { "source": "/api/player/:player", "destination": "/api/player?player=:player" },
     { "source": "/api/discord/webhook-link", "destination": "/api/guild/events?discordAction=webhook-link" },
     { "source": "/api/discord/notify", "destination": "/api/guild/events?discordAction=notify" }
   ],

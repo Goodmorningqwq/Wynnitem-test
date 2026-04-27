@@ -1,14 +1,10 @@
 module.exports = async (req, res) => {
-  // Robust parameter extraction for Vercel
-  const urlParts = req.url.split('?')[0].split('/').filter(Boolean);
-  const lastPathPart = urlParts.pop();
-  
-  const action = req.query.action || (lastPathPart === 'wars' ? 'wars' : null);
-  const player = req.query.player || (lastPathPart !== 'index.js' && lastPathPart !== 'player' ? lastPathPart : null);
+  const player = req.query.player || req.query.uuid;
+  const action = req.query.action || (req.url.includes('/wars') ? 'wars' : null);
 
   // 1. Handle "wars" specialized endpoint
   if (action === 'wars') {
-    const uuid = typeof req.query.uuid === 'string' ? req.query.uuid.trim() : '';
+    const uuid = typeof player === 'string' ? player.trim() : '';
     if (!uuid) return res.status(400).json({ error: 'uuid required' });
     
     try {
