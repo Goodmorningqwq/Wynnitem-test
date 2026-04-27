@@ -199,11 +199,51 @@ function collectGuildMembers(guild) {
         username: member.username || member.legacyName || memberKey,
         contributed: Number(member.contributed || 0),
         guildRaids: Number(member.globalData?.guildRaids?.total ?? member.guildRaids?.total ?? 0),
-        wars: member.globalData?.wars ?? memberWarsCache.get(member.uuid || memberKey || '') ?? null
+        wars: member.globalData?.wars ?? memberWarsCache.get(member.uuid || memberKey || '') ?? null,
+        rank: rank,
+        joined: member.joined || '',
+        online: member.online || false
       });
     }
   }
   return players;
+}
+
+function formatCompactNumber(num) {
+  if (num >= 1_000_000_000) return (num / 1_000_000_000).toFixed(1) + 'B';
+  if (num >= 1_000_000) return (num / 1_000_000).toFixed(1) + 'M';
+  if (num >= 1_000) return (num / 1_000).toFixed(1) + 'k';
+  return num.toString();
+}
+
+function formatRelativeTime(dateStr) {
+  if (!dateStr) return 'unknown';
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffMs = now - date;
+  
+  const years = Math.floor(diffMs / (1000 * 60 * 60 * 24 * 365));
+  const months = Math.floor((diffMs % (1000 * 60 * 60 * 24 * 365)) / (1000 * 60 * 60 * 24 * 30));
+  const days = Math.floor((diffMs % (1000 * 60 * 60 * 24 * 30)) / (1000 * 60 * 60 * 24));
+  
+  const parts = [];
+  if (years > 0) parts.push(`${years}y`);
+  if (months > 0) parts.push(`${months}mo`);
+  if (parts.length < 2 && days > 0) parts.push(`${days}d`);
+  
+  return parts.length > 0 ? parts.join(' ') + ' ago' : 'Today';
+}
+
+function getRankConfig(rank) {
+  const configs = {
+    owner: { color: '#ff5a68', stars: 5, label: 'Owner' },
+    chief: { color: '#ff5a68', stars: 4, label: 'Chief' },
+    strategist: { color: '#a855f7', stars: 3, label: 'Strategist' },
+    captain: { color: '#3b82f6', stars: 2, label: 'Captain' },
+    recruiter: { color: '#22c55e', stars: 1, label: 'Recruiter' },
+    recruit: { color: '#9ca3af', stars: 0, label: 'Recruit' }
+  };
+  return configs[rank.toLowerCase()] || configs.recruit;
 }
 
 function buildPlayerMap(players) {
@@ -394,12 +434,46 @@ function renderMembersList(players) {
     listEl.innerHTML = '<p class="text-gray-500 text-sm">No members</p>';
     return;
   }
-  listEl.innerHTML = players.map((player) => `
-    <div class="flex justify-between items-center bg-gray-800/30 px-3 py-2 rounded text-sm">
-      <span class="text-white font-medium">${escapeHtml(player.username)}</span>
-      <span class="text-gray-400">${Number(player.contributed).toLocaleString()} XP${formatRaidsSuffix(player.guildRaids)}${formatWarsSuffix(player.wars)}</span>
+
+  // Update title with count
+  const titleEl = document.getElementById('membersTitle');
+  if (titleEl) {
+    titleEl.textContent = `Guild Members (${players.length})`;
+  }
+
+  const tableHeader = `
+    <div class="grid grid-cols-[80px_1fr_80px_80px] gap-2 px-3 py-2 border-b border-gray-700/50 text-[10px] uppercase tracking-wider font-bold text-gray-500 mb-1">
+      <span>Rank</span>
+      <span>Member</span>
+      <span class="text-right">XP Contributed</span>
+      <span class="text-right">Joined</span>
     </div>
-  `).join('');
+  `;
+
+  listEl.innerHTML = tableHeader + players.map((player) => {
+    const rc = getRankConfig(player.rank);
+    const stars = '★'.repeat(rc.stars).padEnd(5, ' ');
+    const onlineIndicator = player.online ? '<span class="w-1.5 h-1.5 rounded-full bg-green-500 inline-block ml-1"></span>' : '';
+    
+    return `
+      <div class="grid grid-cols-[80px_1fr_80px_80px] gap-2 px-3 py-1.5 hover:bg-gray-800/30 rounded transition-colors text-[11px] items-center">
+        <div class="flex flex-col">
+          <span style="color: ${rc.color}" class="font-bold">${rc.label}</span>
+          <span class="text-[8px] mt-[-2px]" style="color: ${rc.color}; opacity: 0.8">${stars}</span>
+        </div>
+        <div class="flex items-center">
+          <span class="text-white truncate font-medium">${escapeHtml(player.username)}</span>
+          ${onlineIndicator}
+        </div>
+        <div class="text-right font-mono text-violet-300">
+          ${formatCompactNumber(player.contributed)}
+        </div>
+        <div class="text-right text-gray-500 text-[10px]">
+          ${formatRelativeTime(player.joined)}
+        </div>
+      </div>
+    `;
+  }).join('');
 }
 
 function renderPlayerSelection(players) {
