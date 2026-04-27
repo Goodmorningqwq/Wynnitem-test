@@ -1,16 +1,22 @@
 module.exports = async (req, res) => {
-  // Extract path or query
-  const parts = req.url.split('?')[0].split('/').filter(Boolean);
-  const lastPart = parts.pop();
+  // Robust parameter extraction for Vercel
+  const urlParts = req.url.split('?')[0].split('/').filter(Boolean);
+  const lastPathPart = urlParts.pop();
   
+  const action = req.query.action || (lastPathPart === 'wars' ? 'wars' : null);
+  const player = req.query.player || (lastPathPart !== 'index.js' && lastPathPart !== 'player' ? lastPathPart : null);
+
   // 1. Handle "wars" specialized endpoint
-  if (lastPart === 'wars' || req.query.action === 'wars') {
+  if (action === 'wars') {
     const uuid = typeof req.query.uuid === 'string' ? req.query.uuid.trim() : '';
     if (!uuid) return res.status(400).json({ error: 'uuid required' });
     
     try {
       const response = await fetch(`https://api.wynncraft.com/v3/player/${encodeURIComponent(uuid)}`, {
-        headers: { Accept: 'application/json' }
+        headers: { 
+          'Accept': 'application/json',
+          'User-Agent': 'Wynnitem-Tracker/1.0'
+        }
       }).catch(() => null);
 
       if (!response) return res.status(503).json({ error: 'Upstream unavailable' });
@@ -28,8 +34,7 @@ module.exports = async (req, res) => {
   }
 
   // 2. Handle Profile Lookup (default)
-  const player = req.query.player || lastPart;
-  if (!player || player === 'index.js') {
+  if (!player) {
     return res.status(400).json({ error: 'Player name or UUID required' });
   }
 
