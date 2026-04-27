@@ -69,6 +69,12 @@
       border-color: rgba(200, 160, 255, 0.8);
       transform: translateY(-2px);
     }
+
+    .guild-mode-btn--active {
+      background: linear-gradient(180deg, rgba(100, 55, 175, 0.6), rgba(70, 38, 130, 0.6));
+      border-color: rgba(167, 116, 255, 0.8);
+      color: #fff;
+    }
   </style>
 </head>
 <body class="text-gray-100 min-h-screen flex flex-col">
@@ -263,11 +269,20 @@
         </div>
         <p class="text-gray-400 text-center mb-6">Search by guild name or prefix and track XP or war progress</p>
         
+        <div class="mb-3">
+          <label class="text-gray-400 text-xs uppercase tracking-widest font-semibold mb-1 block">Search Mode</label>
+          <div class="flex gap-2">
+            <button type="button" data-mode="auto" class="guild-mode-btn flex-1 px-3 py-2 rounded-lg text-sm border border-[rgba(143,95,216,0.45)] text-gray-300 hover:border-violet-400 hover:text-white transition-colors bg-[rgba(26,12,40,0.95)] guild-mode-btn--active">Auto-detect</button>
+            <button type="button" data-mode="name" class="guild-mode-btn flex-1 px-3 py-2 rounded-lg text-sm border border-[rgba(143,95,216,0.45)] text-gray-400 hover:border-violet-400 hover:text-white transition-colors bg-[rgba(26,12,40,0.95)]">By Name</button>
+            <button type="button" data-mode="prefix" class="guild-mode-btn flex-1 px-3 py-2 rounded-lg text-sm border border-[rgba(143,95,216,0.45)] text-gray-400 hover:border-violet-400 hover:text-white transition-colors bg-[rgba(26,12,40,0.95)]">By Prefix</button>
+            <button type="button" data-mode="uuid" class="guild-mode-btn flex-1 px-3 py-2 rounded-lg text-sm border border-[rgba(143,95,216,0.45)] text-gray-400 hover:border-violet-400 hover:text-white transition-colors bg-[rgba(26,12,40,0.95)]">By UUID</button>
+          </div>
+        </div>
         <div class="flex gap-4">
           <input 
             type="text" 
             id="guildSearchInput" 
-            placeholder="Enter guild name or prefix..."
+            placeholder="Enter guild name, prefix, or UUID..."
             class="flex-1 bg-[rgba(26,12,40,0.95)] border border-[rgba(143,95,216,0.45)] rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-violet-500 focus:outline-none"
           >
           <button type="button" id="guildSearchBtn" class="theme-btn-primary px-6 py-3 rounded-lg font-medium">

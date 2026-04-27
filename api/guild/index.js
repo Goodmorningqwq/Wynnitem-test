@@ -1,7 +1,24 @@
-async function fetchGuild(target, mode) {
-  const isPrefix = mode === 'prefix';
-  const path = isPrefix ? `prefix/${encodeURIComponent(target)}` : encodeURIComponent(target);
-  const url = `https://api.wynncraft.com/v3/guild/${path}?identifier=uuid`;
+let cachedGuildList = null;
+let cachedGuildListTime = 0;
+
+async function getGuildList() {
+  if (cachedGuildList && Date.now() - cachedGuildListTime < 5 * 60 * 1000) {
+    return cachedGuildList;
+  }
+  const listRes = await fetch('https://api.wynncraft.com/v3/guild/list/guild');
+  if (listRes.ok) {
+    try {
+      cachedGuildList = await listRes.json();
+      cachedGuildListTime = Date.now();
+    } catch {
+      // Ignored
+    }
+  }
+  return cachedGuildList;
+}
+
+async function fetchGuildName(name) {
+  const url = `https://api.wynncraft.com/v3/guild/${encodeURIComponent(name)}?identifier=uuid`;
   const response = await fetch(url, {
     headers: {
       Accept: 'application/json'
@@ -16,10 +33,72 @@ async function fetchGuild(target, mode) {
   return { response, data, url };
 }
 
+async function fetchGuildUuid(uuid) {
+  const url = `https://api.wynncraft.com/v3/guild/uuid/${encodeURIComponent(uuid)}?identifier=uuid`;
+  const response = await fetch(url, {
+    headers: {
+      Accept: 'application/json'
+    }
+  });
+  let data = null;
+  try {
+    data = await response.json();
+  } catch {
+    data = null;
+  }
+  return { response, data, url };
+}
+
+async function fetchGuildPrefix(prefix) {
+  const listData = await getGuildList();
+  if (!listData) {
+    // Fallback to legacy prefix endpoint if list fails entirely
+    const url = `https://api.wynncraft.com/v3/guild/prefix/${encodeURIComponent(prefix)}?identifier=uuid`;
+    const response = await fetch(url, { headers: { Accept: 'application/json' } });
+    let data;
+    try { data = await response.json(); } catch { data = null; }
+    return { response, data, url };
+  }
+
+  const targetLower = String(prefix).trim().toLowerCase();
+  const matches = [];
+  for (const [name, info] of Object.entries(listData)) {
+    if (info.prefix && String(info.prefix).toLowerCase() === targetLower) {
+      matches.push({ name, prefix: info.prefix });
+    }
+  }
+
+  if (matches.length === 0) {
+    return { response: { ok: false, status: 404 }, data: null };
+  }
+
+  if (matches.length === 1) {
+    return await fetchGuildName(matches[0].name);
+  }
+
+  // Disambiguate multiple matches
+  const options = {};
+  for (const match of matches) {
+    options[match.name] = { name: match.name, prefix: match.prefix };
+  }
+  return { response: { ok: false, status: 300 }, data: options };
+}
+
+function looksLikeUuid(str) {
+  // Standard UUID: 8-4-4-4-12 hex digits, optionally without dashes (32 chars)
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str.trim())
+    || /^[0-9a-f]{32}$/i.test(str.trim());
+}
+
 function isNotFoundLike(response, data) {
   if (response.status === 404) return true;
   const detail = typeof data?.detail === 'string' ? data.detail.toLowerCase() : '';
   return response.status === 500 && detail.includes('unable to render this guild');
+}
+
+function applyCacheHeaders(res) {
+  // Edge caching: 60s max age
+  res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate');
 }
 
 module.exports = async (req, res) => {
@@ -31,48 +110,97 @@ module.exports = async (req, res) => {
     return res.status(400).json({ error: 'Guild query required' });
   }
 
-  if (!['auto', 'name', 'prefix'].includes(mode)) {
+  if (!['auto', 'name', 'prefix', 'uuid'].includes(mode)) {
     return res.status(400).json({ error: 'Invalid search mode' });
   }
 
   try {
-    if (mode === 'name' || mode === 'prefix') {
-      const { response, data } = await fetchGuild(query, mode);
+    if (mode === 'uuid') {
+      const { response, data } = await fetchGuildUuid(query);
       if (!response.ok) {
+        if (response.status === 429) {
+          return res.status(429).json({ error: 'Rate limit exceeded' });
+        }
+        if (isNotFoundLike(response, data)) {
+          return res.status(404).json({ error: 'Guild not found' });
+        }
+        return res.status(response.status).json({ error: `API Error: ${response.status}` });
+      }
+      applyCacheHeaders(res);
+      return res.json({ ...data, searchType: 'uuid' });
+    }
+
+    if (mode === 'name') {
+      const { response, data } = await fetchGuildName(query);
+      if (!response.ok) {
+        if (response.status === 429) {
+          return res.status(429).json({ error: 'Rate limit exceeded' });
+        }
+        if (isNotFoundLike(response, data)) {
+          return res.status(404).json({ error: 'Guild not found' });
+        }
+        return res.status(response.status).json({ error: `API Error: ${response.status}` });
+      }
+      applyCacheHeaders(res);
+      return res.json({ ...data, searchType: 'name' });
+    }
+
+    if (mode === 'prefix') {
+      const { response, data } = await fetchGuildPrefix(query);
+      if (!response.ok) {
+        if (response.status === 429) {
+          return res.status(429).json({ error: 'Rate limit exceeded' });
+        }
         if (isNotFoundLike(response, data)) {
           return res.status(404).json({ error: 'Guild not found' });
         }
         if (response.status === 300) {
+          applyCacheHeaders(res);
           return res.status(300).json({
             error: 'Ambiguous guild query',
             ambiguous: true,
-            searchType: mode,
+            searchType: 'prefix',
             options: data || {}
           });
         }
         return res.status(response.status).json({ error: `API Error: ${response.status}` });
       }
-      return res.json({ ...data, searchType: mode });
+      applyCacheHeaders(res);
+      return res.json({ ...data, searchType: 'prefix' });
     }
 
-    const nameResult = await fetchGuild(query, 'name');
+    // Auto mode: detect UUID format first
+    if (looksLikeUuid(query)) {
+      const { response, data } = await fetchGuildUuid(query);
+      if (response.ok) {
+        applyCacheHeaders(res);
+        return res.json({ ...(data || {}), searchType: 'uuid' });
+      }
+      if (response.status === 429) {
+        return res.status(429).json({ error: 'Rate limit exceeded' });
+      }
+      // Fall through to name lookup if UUID attempt fails
+    }
+
+    const nameResult = await fetchGuildName(query);
     if (nameResult.response.ok) {
+      applyCacheHeaders(res);
       return res.json({ ...(nameResult.data || {}), searchType: 'name' });
     }
-    if (nameResult.response.status === 300) {
-      return res.status(300).json({
-        error: 'Ambiguous guild query',
-        ambiguous: true,
-        searchType: 'name',
-        options: nameResult.data || {}
-      });
+
+    // Short circuit if we hit a rate limit on the first try
+    if (nameResult.response.status === 429) {
+      return res.status(429).json({ error: 'Rate limit exceeded' });
     }
 
-    const prefixResult = await fetchGuild(query, 'prefix');
+    const prefixResult = await fetchGuildPrefix(query);
     if (prefixResult.response.ok) {
+      applyCacheHeaders(res);
       return res.json({ ...(prefixResult.data || {}), searchType: 'prefix' });
     }
+
     if (prefixResult.response.status === 300) {
+      applyCacheHeaders(res);
       return res.status(300).json({
         error: 'Ambiguous guild query',
         ambiguous: true,
@@ -85,7 +213,8 @@ module.exports = async (req, res) => {
       return res.status(404).json({ error: 'Guild not found' });
     }
 
-    const upstreamStatus = prefixResult.response.status || nameResult.response.status || 500;
+    // Return the highest priority status (like 429 over 404)
+    const upstreamStatus = prefixResult.response.status === 429 ? 429 : (prefixResult.response.status || nameResult.response.status || 500);
     return res.status(upstreamStatus).json({ error: `API Error: ${upstreamStatus}` });
   } catch (e) {
     console.error('Guild API error:', e.message);

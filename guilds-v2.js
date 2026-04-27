@@ -46,6 +46,7 @@ let guildWarsHydrating = false;
 let webhookStatusLastEventCode = '';
 let webhookStatusRequestInFlight = false;
 const isSearchPage = window.location.pathname.startsWith('/guild/search');
+let guildSearchMode = 'auto';
 
 function getCurrentUser() {
   try {
@@ -1996,12 +1997,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.location.href = '/login';
   });
 
+  // Mode button toggle
+  document.querySelectorAll('.guild-mode-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.guild-mode-btn').forEach((b) => b.classList.remove('guild-mode-btn--active'));
+      btn.classList.add('guild-mode-btn--active');
+      guildSearchMode = btn.getAttribute('data-mode') || 'auto';
+      const placeholders = {
+        auto: 'Enter guild name, prefix, or UUID...',
+        name: 'Enter guild name...',
+        prefix: 'Enter guild prefix (e.g. ANO)...',
+        uuid: 'Enter guild UUID...'
+      };
+      const input = document.getElementById('guildSearchInput');
+      if (input) input.placeholder = placeholders[guildSearchMode] || 'Enter guild name, prefix, or UUID...';
+    });
+  });
+
   document.getElementById('guildSearchBtn').addEventListener('click', () => {
-    searchGuild(document.getElementById('guildSearchInput').value);
+    searchGuild(document.getElementById('guildSearchInput').value, guildSearchMode);
   });
   document.getElementById('guildSearchInput').addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
-      searchGuild(document.getElementById('guildSearchInput').value);
+      searchGuild(document.getElementById('guildSearchInput').value, guildSearchMode);
     }
   });
   document.getElementById('dashboardOpenSearchBtn')?.addEventListener('click', () => {

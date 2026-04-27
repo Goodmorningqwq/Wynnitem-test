@@ -390,6 +390,9 @@ app.get('/api/discord/webhook-link', async (req, res) => {
   }
 });
 
+// Mock Vercel serverless functions locally
+app.get('/api/guild', require('../api/guild/index.js'));
+
 const repoRoot = path.join(__dirname, '..');
 
 app.use((req, res, next) => {
