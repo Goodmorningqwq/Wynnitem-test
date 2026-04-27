@@ -503,11 +503,7 @@ function renderPlayerSelection(players) {
            <span style="color: ${rc.color}" class="text-[9px] font-bold leading-none uppercase">${rc.label}</span>
            <span class="text-[8px] opacity-40" style="color: ${rc.color}">${stars}</span>
         </div>
-        <div
-          class="flex items-center gap-2 flex-1"
-          onclick="window.viewPlayerProfileFromElement(this)"
-          data-profile-username="${escapeHtml(player.username || '')}"
-          data-profile-uuid="${escapeHtml(player.uuid || '')}">
+        <div class="flex items-center gap-2 flex-1">
            <span class="text-white text-sm font-medium group-hover:text-purple-300 transition-colors">${escapeHtml(player.username)}</span>
            <svg class="w-3.5 h-3.5 text-green-400 opacity-0 peer-checked:opacity-100 transition-opacity shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
         </div>
