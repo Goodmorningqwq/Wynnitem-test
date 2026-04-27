@@ -24,53 +24,6 @@ function formatDelta(value) {
   return `${prefix}${Number(value || 0).toLocaleString()}`;
 }
 
-function setCodeValidation(message, tone = 'neutral') {
-  const el = document.getElementById('eventCodeValidation');
-  if (!el) return;
-  el.textContent = message;
-  el.classList.remove('text-gray-500', 'text-red-300', 'text-green-300', 'text-violet-300');
-  if (tone === 'error') {
-    el.classList.add('text-red-300');
-    return;
-  }
-  if (tone === 'success') {
-    el.classList.add('text-green-300');
-    return;
-  }
-  if (tone === 'guide') {
-    el.classList.add('text-violet-300');
-    return;
-  }
-  el.classList.add('text-gray-500');
-}
-
-function updateSummary(event = null) {
-  const guildEl = document.getElementById('summaryGuild');
-  const metricEl = document.getElementById('summaryMetric');
-  const scopeEl = document.getElementById('summaryScope');
-  const deltaEl = document.getElementById('summaryDelta');
-  const startedEl = document.getElementById('summaryStarted');
-  if (!guildEl || !metricEl || !scopeEl || !deltaEl || !startedEl) return;
-
-  if (!event) {
-    guildEl.textContent = '-';
-    metricEl.textContent = '-';
-    scopeEl.textContent = '-';
-    deltaEl.textContent = '-';
-    deltaEl.className = 'text-white font-semibold';
-    startedEl.textContent = '-';
-    return;
-  }
-
-  const metricDelta = Number(event.current?.metricValue || 0) - Number(event.baseline?.metricValue || 0);
-  guildEl.textContent = event.guildName || 'Unknown Guild';
-  metricEl.textContent = formatMetric(event.metric);
-  scopeEl.textContent = formatScope(event.scope);
-  deltaEl.textContent = formatDelta(metricDelta);
-  deltaEl.className = `${metricDelta >= 0 ? 'text-green-300' : 'text-red-300'} font-semibold`;
-  startedEl.textContent = new Date(Number(event.startedAt || Date.now())).toLocaleString();
-}
-
 function normalizeActiveEvent(rawEvent, fallbackTrackedPlayers = []) {
   if (!rawEvent || typeof rawEvent !== 'object') return null;
   if (rawEvent.metric && rawEvent.startedAt && rawEvent.baseline) return rawEvent;
@@ -133,16 +86,14 @@ async function loadEventByCode(code, username) {
 function renderEmpty(message) {
   document.getElementById('leaderboardMeta').textContent = message;
   document.getElementById('leaderboardList').innerHTML = '<p class="text-sm text-gray-500">No active event leaderboard to display.</p>';
-  updateSummary(null);
 }
 
 function renderLeaderboard(event) {
   const metricDelta = Number(event.current?.metricValue || 0) - Number(event.baseline?.metricValue || 0);
   const startedAt = new Date(Number(event.startedAt || Date.now())).toLocaleString();
   document.getElementById('leaderboardMeta').textContent =
-    `Showing ${event.guildName || 'Unknown Guild'} · ${formatMetric(event.metric)} · ${formatScope(event.scope)} · Started ${startedAt}`;
+    `${event.guildName || 'Unknown Guild'} · ${formatMetric(event.metric)} · ${formatScope(event.scope)} · Delta ${formatDelta(metricDelta)} · Started ${startedAt}`;
   document.getElementById('leaderboardUpdatedAt').textContent = `Updated ${new Date().toLocaleTimeString()}`;
-  updateSummary(event);
 
   const entries = computeLeaderboard(event);
   if (!entries.length) {
@@ -172,42 +123,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   const codeFromUrl = (params.get('code') || '').trim().toUpperCase();
   if (codeFromUrl) {
     codeInput.value = codeFromUrl;
-    setCodeValidation('Loaded event code from URL.', 'guide');
   }
-  const submitCode = () => {
+  viewCodeBtn.addEventListener('click', () => {
     const enteredCode = (codeInput.value || '').trim().toUpperCase();
-    if (!enteredCode) {
-      setCodeValidation('Enter an event code before viewing leaderboard.', 'error');
-      return;
-    }
-    setCodeValidation('Opening leaderboard by code...', 'guide');
+    if (!enteredCode) return;
     window.location.href = `/guild/leaderboard?code=${encodeURIComponent(enteredCode)}`;
-  };
-  viewCodeBtn.addEventListener('click', submitCode);
-  codeInput.addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-      submitCode();
-    }
-  });
-  document.getElementById('copyEventLinkBtn')?.addEventListener('click', async () => {
-    const enteredCode = ((codeInput.value || '').trim() || codeFromUrl || '').toUpperCase();
-    if (!enteredCode) {
-      setCodeValidation('Enter a code first, then copy the share link.', 'error');
-      return;
-    }
-    const url = `${window.location.origin}/guild/leaderboard?code=${encodeURIComponent(enteredCode)}`;
-    try {
-      await navigator.clipboard.writeText(url);
-      setCodeValidation('Leaderboard link copied to clipboard.', 'success');
-    } catch {
-      setCodeValidation('Unable to copy link in this browser.', 'error');
-    }
   });
 
   const currentUser = getCurrentUser();
   if (!currentUser && !codeFromUrl) {
     renderEmpty('Please log in to view leaderboard.');
-    setCodeValidation('Log in or paste an event code to continue.', 'guide');
     return;
   }
 
@@ -222,13 +147,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     if (!event) {
       renderEmpty('No active event found for this user.');
-      setCodeValidation('No active event found. Paste an event code to view shared data.', 'guide');
       return;
     }
-    setCodeValidation('Leaderboard loaded.', 'success');
     renderLeaderboard(event);
   } catch (e) {
     renderEmpty(e.message);
-    setCodeValidation(e.message, 'error');
   }
 });

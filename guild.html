@@ -158,45 +158,38 @@
 
       <!-- How to use (dashboard route only; toggled in guilds-v2.js) -->
       <div id="guildHowToSection" class="hidden theme-panel p-6 rounded-xl mb-6">
-        <h3 class="text-gray-400 uppercase text-xs tracking-widest font-semibold mb-4">Quick Start Guide</h3>
+        <h3 class="text-gray-400 uppercase text-xs tracking-widest font-semibold mb-4">How to use Guild Tracker</h3>
         <ol class="list-decimal list-inside space-y-3 text-sm text-gray-300">
           <li id="guildHowToLoginStep">
-            <span class="text-gray-200 font-medium">Sign in before starting events</span>
-            <span class="block pl-6 mt-1 text-gray-400">Use <strong class="text-gray-300">Login</strong> in the header, or open <a href="/login" class="text-violet-400 hover:text-violet-300 hover:underline">/login</a> to create an account.</span>
+            <span class="text-gray-200 font-medium">Log in or register</span>
+            <span class="block pl-6 mt-1 text-gray-400">Use <strong class="text-gray-300">Login</strong> in the header, or go to </span>
+            <span class="block pl-6 mt-1"><a href="/login" class="text-violet-400 hover:text-violet-300 hover:underline">/login</a>. On that page, use <strong class="text-gray-300">Register</strong> if you need an account.</span>
           </li>
           <li>
-            <span class="text-gray-200 font-medium">Search and open a guild</span>
-            <span class="block pl-6 mt-1 text-gray-400">Go to <a href="/guild/search" class="text-violet-400 hover:text-violet-300 hover:underline">/guild/search</a>, choose a search mode, then load a guild card.</span>
+            <span class="text-gray-200 font-medium">Find a guild</span>
+            <span class="block pl-6 mt-1 text-gray-400">Click <strong class="text-gray-300">Search Guild</strong> below, or open </span>
+            <span class="block pl-6 mt-1"><a href="/guild/search" class="text-violet-400 hover:text-violet-300 hover:underline">/guild/search</a>. Search by guild name or prefix.</span>
           </li>
           <li>
-            <span class="text-gray-200 font-medium">Configure event scope and metric</span>
-            <span class="block pl-6 mt-1 text-gray-400">Pick <strong class="text-gray-300">Selected Players</strong> or <strong class="text-gray-300">Entire Guild</strong>, choose a metric, then click <strong class="text-gray-300">Start Event</strong>.</span>
+            <span class="text-gray-200 font-medium">Track and start an event</span>
+            <span class="block pl-6 mt-1 text-gray-400">From the guild card, click <strong class="text-gray-300">Select Players</strong>, choose members, set metric and scope, then <strong class="text-gray-300">Start Event</strong>.</span>
           </li>
           <li>
-            <span class="text-gray-200 font-medium">Refresh, share, and review</span>
-            <span class="block pl-6 mt-1 text-gray-400">Use refresh cooldown status, share event code, open leaderboard during active runs, and review old runs in <strong class="text-gray-300">Event History</strong>.</span>
+            <span class="text-gray-200 font-medium">Join or review events</span>
+            <span class="block pl-6 mt-1 text-gray-400">Use <strong class="text-gray-300">Enter Event Code</strong> to join by code, <strong class="text-gray-300">Event History</strong> for past runs, and <strong class="text-gray-300">Open Leaderboard</strong> while an event is active.</span>
           </li>
         </ol>
-        <div id="guildHowToTips" class="mt-4 rounded-lg border border-violet-500/30 bg-violet-900/20 p-3 text-xs text-violet-100">
-          <p class="font-semibold mb-1">First-time tips</p>
-          <p>Wars events may briefly block start while war counts hydrate. Wait for loading to finish, then start.</p>
-        </div>
       </div>
       
       <!-- User Dashboard (when logged in) -->
       <div id="userDashboard" class="hidden theme-panel p-6 rounded-xl mb-6">
         <div class="flex items-start justify-between mb-4">
-          <h3 id="dashboardTitle" class="text-gray-400 uppercase text-xs tracking-widest font-semibold mt-1">Your Guild</h3>
+          <h3 class="text-gray-400 uppercase text-xs tracking-widest font-semibold mt-1">Your Guild</h3>
           <button type="button" id="dashboardOpenHistoryBtn" class="theme-btn px-3 py-1 rounded text-xs" title="Open Event History">Event History</button>
-        </div>
-        <div id="dashboardGuestNotice" class="hidden rounded-lg border border-violet-500/30 bg-violet-900/20 p-4 mb-4">
-          <p class="text-violet-100 text-sm font-medium mb-1">Log in to save guild tracking progress.</p>
-          <p class="text-violet-200/80 text-xs mb-3">You can explore guilds without logging in, but starting and saving events requires an account.</p>
-          <a href="/login" class="theme-btn-primary inline-block px-4 py-2 rounded-lg text-xs">Go to Login</a>
         </div>
         <div id="noGuildTracked" class="hidden text-center py-4">
           <p class="text-gray-500 mb-4">You haven't tracked any guild yet.</p>
-          <p class="text-gray-400 text-sm">Open Search Guild to load a guild and begin event setup.</p>
+          <p class="text-gray-400 text-sm">Go to search menu to start tracking.</p>
         </div>
         <div id="guildTracked" class="hidden">
           <div class="flex justify-between items-center mb-4">
@@ -312,15 +305,6 @@
           <button type="button" id="backToDashboardBtn" class="theme-btn px-4 py-2 rounded-lg text-sm ml-4">Back to Dashboard</button>
         </div>
         <p class="text-gray-400 text-center mb-6">Search by guild name or prefix and track XP or war progress</p>
-        <div id="searchQuickGuide" class="hidden mb-5 rounded-lg border border-violet-500/30 bg-violet-900/20 p-4">
-          <p class="text-violet-100 text-sm font-medium mb-1">Quick setup on this page</p>
-          <ul class="list-disc list-inside text-xs text-violet-100/90 space-y-1">
-            <li>Search a guild, then open the event setup block in the result card.</li>
-            <li id="searchQuickGuideLoginLine">Log in first if you want to start and save events.</li>
-            <li>Choose metric + scope, then start event and use leaderboard/history to review.</li>
-            <li id="searchQuickGuideStartLine">For wars tracking, wait until war counts finish loading before starting.</li>
-          </ul>
-        </div>
         
         <div class="mb-3">
           <label class="text-gray-400 text-xs uppercase tracking-widest font-semibold mb-1 block">Search Mode</label>
@@ -428,7 +412,6 @@
                 </select>
               </div>
             </div>
-            <p id="eventScopeHint" class="text-xs text-violet-200/80 -mt-2">Selected Players scope uses only checked members in the list below.</p>
             <div>
               <label class="text-gray-400 text-xs mb-1 block">Manual Refresh Cooldown</label>
               <p class="text-sm text-gray-400">15 minutes between refreshes to reduce Redis usage.</p>
@@ -458,7 +441,6 @@
           </div>
 
           <button type="button" id="startEventBtn" class="theme-btn-primary w-full px-4 py-2 rounded-lg text-sm font-medium mb-4">Start Event</button>
-          <p id="eventPreconditionHint" class="text-xs text-gray-400 text-center mb-4">Ready: load a guild, choose scope/metric, and start event.</p>
           
           <!-- Active Event -->
           <div id="activeEventSection" class="hidden mb-4">
@@ -554,6 +536,22 @@
         <p class="text-gray-400">No guild with that name was found. Please check the spelling.</p>
       </div>
 
+      <!-- Tracked Guilds -->
+      <div id="trackedGuildsSection" class="theme-panel p-6 rounded-xl mb-6">
+        <h3 class="text-gray-400 uppercase text-xs tracking-widest font-semibold mb-4">Tracked Guilds</h3>
+        <div id="trackedGuildsList" class="space-y-2">
+          <p class="text-gray-500 text-sm text-center py-4" id="noTrackedGuilds">No guilds tracked yet. Search for a guild and click "Track Guild".</p>
+        </div>
+      </div>
+
+      <!-- Event History -->
+      <div id="eventHistorySection" class="theme-panel p-6 rounded-xl">
+        <h3 class="text-gray-400 uppercase text-xs tracking-widest font-semibold mb-4">Event History</h3>
+        <div id="eventHistoryList" class="space-y-2">
+          <p class="text-gray-500 text-sm text-center py-4" id="noEventHistory">No events recorded yet.</p>
+        </div>
+      </div>
+
     </div>
   </main>
 
@@ -582,6 +580,6 @@
     </div>
   </div>
 
-  <script type="module" src="/guilds-v2.js?v=20260427j"></script>
+  <script type="module" src="/guilds-v2.js?v=20260427h"></script>
 </body>
 </html>

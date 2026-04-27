@@ -29,16 +29,6 @@ function formatDelta(value) {
   return `${num >= 0 ? '+' : ''}${num.toLocaleString()}`;
 }
 
-function showHistoryActions(showLogin = false) {
-  const actions = document.getElementById('historyActions');
-  const loginCta = document.getElementById('historyLoginCta');
-  const trackerCta = document.getElementById('historyTrackerCta');
-  if (!actions || !loginCta || !trackerCta) return;
-  actions.classList.remove('hidden');
-  loginCta.classList.toggle('hidden', !showLogin);
-  trackerCta.classList.toggle('hidden', false);
-}
-
 async function loadUserData(username) {
   const response = await fetch(`${USER_API}/data?username=${encodeURIComponent(username)}&includeEvents=true`);
   if (!response.ok) {
@@ -55,25 +45,15 @@ function renderHistory(events) {
   const list = document.getElementById('eventHistoryList');
   if (!Array.isArray(events) || !events.length) {
     renderEmpty('No events recorded yet.');
-    showHistoryActions(false);
     return;
   }
-  showHistoryActions(false);
   list.innerHTML = events.map((evt) => `
     <div class="bg-gray-800/50 p-4 rounded-lg">
-      <div class="flex justify-between items-start mb-2">
-        <div>
-          <span class="text-white font-medium block">${escapeHtml(evt.guildName || 'Unknown Guild')}</span>
-          <span class="text-xs text-gray-400">${formatMetric(evt.type || evt.metric)} · ${formatScope(evt.scope || 'selected')}</span>
-        </div>
+      <div class="flex justify-between items-center mb-1">
+        <span class="text-white font-medium">${escapeHtml(evt.guildName || 'Unknown Guild')} (${formatMetric(evt.type || evt.metric)})</span>
         <span class="${Number(evt.totalDelta || 0) >= 0 ? 'text-green-400' : 'text-red-400'} font-bold">${formatDelta(evt.totalDelta || 0)}</span>
       </div>
-      <div class="text-xs text-gray-300 mb-1">Ended: ${new Date(evt.endedAt || evt.endTime || Date.now()).toLocaleString()}</div>
-      <div class="text-[11px] text-gray-500">Started: ${new Date(evt.startedAt || evt.startTime || Date.now()).toLocaleString()}</div>
-      <div class="text-[11px] text-gray-500 mt-1">Tracked players: ${Array.isArray(evt.trackedPlayers) ? evt.trackedPlayers.length : 0}</div>
-      <div class="mt-2">
-        <a href="/guild/search" class="text-xs text-violet-300 hover:text-violet-200 hover:underline">Open guild search</a>
-      </div>
+      <div class="text-xs text-gray-500">${formatScope(evt.scope || 'selected')} · ${new Date(evt.endedAt || evt.endTime || Date.now()).toLocaleString()}</div>
     </div>
   `).join('');
 }
@@ -86,7 +66,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   const currentUser = getCurrentUser();
   if (!currentUser) {
     renderEmpty('Please log in to view event history.');
-    showHistoryActions(true);
     return;
   }
 
@@ -95,6 +74,5 @@ document.addEventListener('DOMContentLoaded', async () => {
     renderHistory(data?.events || []);
   } catch (e) {
     renderEmpty(`Unable to load event history: ${e.message}`);
-    showHistoryActions(false);
   }
 });

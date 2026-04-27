@@ -503,7 +503,11 @@ function renderPlayerSelection(players) {
            <span style="color: ${rc.color}" class="text-[9px] font-bold leading-none uppercase">${rc.label}</span>
            <span class="text-[8px] opacity-40" style="color: ${rc.color}">${stars}</span>
         </div>
-        <div class="flex items-center gap-2 flex-1">
+        <div
+          class="flex items-center gap-2 flex-1"
+          onclick="window.viewPlayerProfileFromElement(this)"
+          data-profile-username="${escapeHtml(player.username || '')}"
+          data-profile-uuid="${escapeHtml(player.uuid || '')}">
            <span class="text-white text-sm font-medium group-hover:text-purple-300 transition-colors">${escapeHtml(player.username)}</span>
            <svg class="w-3.5 h-3.5 text-green-400 opacity-0 peer-checked:opacity-100 transition-opacity shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
         </div>
@@ -1350,49 +1354,6 @@ function updateStopTrackingState() {
   stopBtn.title = hasActiveEvent ? 'End the active event first' : 'Stop tracking this guild';
 }
 
-function setEventPreconditionHint(message, tone = 'neutral') {
-  const hintEl = document.getElementById('eventPreconditionHint');
-  if (!hintEl) return;
-  hintEl.textContent = message;
-  hintEl.classList.remove('text-gray-400', 'text-red-300', 'text-yellow-200', 'text-green-300', 'text-violet-200');
-  if (tone === 'error') {
-    hintEl.classList.add('text-red-300');
-    return;
-  }
-  if (tone === 'warn') {
-    hintEl.classList.add('text-yellow-200');
-    return;
-  }
-  if (tone === 'success') {
-    hintEl.classList.add('text-green-300');
-    return;
-  }
-  if (tone === 'guide') {
-    hintEl.classList.add('text-violet-200');
-    return;
-  }
-  hintEl.classList.add('text-gray-400');
-}
-
-function updateOnboardingPanels() {
-  const loggedIn = Boolean(currentUser);
-  const dashboardGuestNotice = document.getElementById('dashboardGuestNotice');
-  const dashboardTitle = document.getElementById('dashboardTitle');
-  const loginStep = document.getElementById('guildHowToLoginStep');
-  const searchQuickGuide = document.getElementById('searchQuickGuide');
-  const searchQuickGuideLoginLine = document.getElementById('searchQuickGuideLoginLine');
-  const searchQuickGuideStartLine = document.getElementById('searchQuickGuideStartLine');
-
-  loginStep?.classList.toggle('hidden', loggedIn);
-  dashboardGuestNotice?.classList.toggle('hidden', loggedIn || isSearchPage);
-  if (dashboardTitle) {
-    dashboardTitle.textContent = loggedIn ? 'Your Guild' : 'Guild Tracker';
-  }
-  searchQuickGuide?.classList.toggle('hidden', !isSearchPage);
-  searchQuickGuideLoginLine?.classList.toggle('hidden', loggedIn);
-  searchQuickGuideStartLine?.classList.toggle('hidden', Boolean(activeEvent));
-}
-
 function getGuildDelta(event) {
   const start = Number(event.baseline?.metricValue || 0);
   const current = Number(event.current?.metricValue || start);
@@ -1518,12 +1479,6 @@ function renderActiveEvent() {
     if (quickCodeValue) {
       quickCodeValue.textContent = '-';
     }
-    if (currentUser) {
-      setEventPreconditionHint('Ready: choose scope and metric, then start event.', 'guide');
-    } else {
-      setEventPreconditionHint('Login required to start and save events.', 'warn');
-    }
-    updateOnboardingPanels();
     updateStopTrackingState();
     return;
   }
@@ -1623,8 +1578,6 @@ function renderActiveEvent() {
   loadEventWebhookLinkStatus({ force: false }).catch(() => {});
 
   updateCooldownText();
-  setEventPreconditionHint('Event is active. Use refresh and leaderboard to monitor progress.', 'success');
-  updateOnboardingPanels();
   updateStopTrackingState();
 }
 
@@ -1700,23 +1653,19 @@ async function searchGuild(name, mode = 'auto', options = {}) {
 
 async function startEvent() {
   if (!currentUser) {
-    setEventPreconditionHint('Please log in first to start an event.', 'error');
     alert('Please log in first.');
     return;
   }
   const metric = document.getElementById('trackMetricSelect').value;
   if (!currentGuild?.name) {
-    setEventPreconditionHint('Search and load a guild before starting an event.', 'error');
     alert('Search and load a guild first.');
     return;
   }
   if (metric === 'wars' && guildWarsHydrating) {
-    setEventPreconditionHint('Wait for wars loading to complete before starting a Wars event.', 'warn');
     alert('Please wait until wars loading is complete before starting a Wars event.');
     return;
   }
   if (activeEvent) {
-    setEventPreconditionHint('Only one active event can run at a time.', 'warn');
     alert('Only one active event is allowed.');
     return;
   }
@@ -1728,7 +1677,6 @@ async function startEvent() {
   if (scope === 'selected') {
     trackedPlayers = getSelectedPlayers();
     if (!trackedPlayers.length) {
-      setEventPreconditionHint('Select at least one player or switch scope to Entire Guild.', 'error');
       alert('Select at least one player or choose Entire Guild.');
       return;
     }
@@ -1759,13 +1707,11 @@ async function startEvent() {
       break;
     }
     if (reserveResult.status !== 409) {
-      setEventPreconditionHint(`Unable to reserve event code: ${reserveResult.error}`, 'error');
       alert(`Failed to reserve event code: ${reserveResult.error}`);
       return;
     }
   }
   if (!eventCode) {
-    setEventPreconditionHint('Could not generate an event code. Try again.', 'error');
     alert('Unable to generate unique event code. Please try again.');
     return;
   }
@@ -1791,7 +1737,6 @@ async function startEvent() {
   });
   if (!saveResult.ok) {
     await removeEventCodeIndex(eventCode);
-    setEventPreconditionHint(`Failed to save event: ${saveResult.error}`, 'error');
     alert(`Failed to save event: ${saveResult.error}`);
     return;
   }
@@ -1801,7 +1746,6 @@ async function startEvent() {
   }
   activeEvent = event;
   renderTrackedPlayersInfo(trackedPlayers);
-  setEventPreconditionHint('Event started successfully. Share the code to invite viewers.', 'success');
   renderActiveEvent();
   startCooldownTicker();
 }
@@ -1930,30 +1874,31 @@ async function toggleActiveEventVisibility(isPublic) {
 
 function updateScopeUI() {
   const scope = document.getElementById('trackScopeSelect').value;
-  const playerSelectSection = document.getElementById('playerSelectSection');
-  const trackGuildBtn = document.getElementById('trackGuildBtn');
-  const scopeHint = document.getElementById('eventScopeHint');
-  playerSelectSection?.classList.toggle('hidden', scope !== 'selected');
-  if (scopeHint) {
-    scopeHint.textContent = scope === 'selected'
-      ? 'Selected Players scope uses only checked members in the list below.'
-      : 'Entire Guild scope uses guild totals and auto-includes the full roster.';
+  document.getElementById('playerSelectSection').classList.toggle('hidden', scope !== 'selected');
+}
+
+async function loadEventHistory(prefetchedUserData = null) {
+  const list = document.getElementById('eventHistoryList');
+  const noEl = document.getElementById('noEventHistory');
+  if (!list) return;
+  const userData = prefetchedUserData || await loadUserData({ includeEvents: true });
+  const events = userData?.events || [];
+  if (!events.length) {
+    list.innerHTML = '<p class="text-gray-500 text-sm text-center py-4" id="noEventHistory">No events recorded yet.</p>';
+    return;
   }
-  if (trackGuildBtn) {
-    trackGuildBtn.textContent = scope === 'selected' ? 'Select Players' : 'Review Setup';
+  if (noEl) {
+    noEl.classList.add('hidden');
   }
-  if (!activeEvent) {
-    if (!currentUser) {
-      setEventPreconditionHint('Login required to start and save events.', 'warn');
-    } else if (!currentGuild?.name) {
-      setEventPreconditionHint('Search and load a guild before starting an event.', 'guide');
-    } else if (scope === 'selected') {
-      setEventPreconditionHint('Pick one or more players, then click Start Event.', 'guide');
-    } else {
-      setEventPreconditionHint('Entire Guild selected. Review metric and click Start Event.', 'guide');
-    }
-  }
-  updateOnboardingPanels();
+  list.innerHTML = events.map((evt) => `
+    <div class="bg-gray-800/50 p-4 rounded-lg">
+      <div class="flex justify-between items-center mb-1">
+        <span class="text-white font-medium">${escapeHtml(evt.guildName)} (${formatMetric(evt.type || evt.metric)})</span>
+        <span class="${Number(evt.totalDelta || 0) >= 0 ? 'text-green-400' : 'text-red-400'} font-bold">${formatDelta(evt.totalDelta || 0)}</span>
+      </div>
+      <div class="text-xs text-gray-500">${formatScope(evt.scope || 'selected')} · ${new Date(evt.endedAt || evt.endTime || Date.now()).toLocaleString()}</div>
+    </div>
+  `).join('');
 }
 
 async function loadUserDashboard(prefetchedUserData = null) {
@@ -1976,7 +1921,6 @@ async function loadUserDashboard(prefetchedUserData = null) {
     document.getElementById('guildTracked').classList.add('hidden');
     renderActiveEvent();
     if (activeEvent) startCooldownTicker();
-    updateOnboardingPanels();
     updateStopTrackingState();
     return;
   }
@@ -1995,7 +1939,6 @@ async function loadUserDashboard(prefetchedUserData = null) {
   setDashboardEventLoading(false);
   renderActiveEvent();
   if (activeEvent) startCooldownTicker();
-  updateOnboardingPanels();
   updateStopTrackingState();
 }
 
@@ -2024,11 +1967,33 @@ async function stopTrackingGuild() {
   currentGuild = null;
   activeEvent = null;
   renderActiveEvent();
+  updateTrackedGuildsList(null);
   await loadUserDashboard({
     guildName: null,
     trackedPlayers: [],
     activeEvent: null,
     events: []
+  });
+}
+
+function updateTrackedGuildsList(name) {
+  const list = document.getElementById('trackedGuildsList');
+  const noEl = document.getElementById('noTrackedGuilds');
+  if (!list || !noEl) return;
+  if (!name) {
+    noEl.classList.remove('hidden');
+    list.innerHTML = '';
+    return;
+  }
+  noEl.classList.add('hidden');
+  list.innerHTML = `
+    <button type="button" class="w-full text-left bg-gray-800/50 hover:bg-gray-700/50 p-3 rounded-lg transition-colors" data-guild-name="${escapeHtml(name)}">
+      <span class="text-white font-medium">${escapeHtml(name)}</span>
+    </button>
+  `;
+  list.querySelector('button')?.addEventListener('click', () => {
+    document.getElementById('guildSearchInput').value = name;
+    searchGuild(name, 'name');
   });
 }
 
@@ -2038,6 +2003,9 @@ function configurePageMode() {
   const noResult = document.getElementById('noResult');
   const userDashboard = document.getElementById('userDashboard');
   const guildHowToSection = document.getElementById('guildHowToSection');
+  const trackedGuildsSection = document.getElementById('trackedGuildsSection');
+  const eventHistorySection = document.getElementById('eventHistorySection');
+  const dashboardOpenSearchBtn = document.getElementById('dashboardOpenSearchBtn');
   const backToDashboardBtn = document.getElementById('backToDashboardBtn');
 
   guildHowToSection?.classList.toggle('hidden', isSearchPage);
@@ -2045,8 +2013,9 @@ function configurePageMode() {
   if (isSearchPage) {
     searchSection?.classList.remove('hidden');
     userDashboard?.classList.add('hidden');
+    trackedGuildsSection?.classList.add('hidden');
+    eventHistorySection?.classList.add('hidden');
     backToDashboardBtn?.classList.remove('hidden');
-    updateOnboardingPanels();
     return;
   }
 
@@ -2054,8 +2023,9 @@ function configurePageMode() {
   guildResult?.classList.add('hidden');
   noResult?.classList.add('hidden');
   userDashboard?.classList.remove('hidden');
+  trackedGuildsSection?.classList.add('hidden');
+  eventHistorySection?.classList.add('hidden');
   backToDashboardBtn?.classList.add('hidden');
-  updateOnboardingPanels();
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -2066,7 +2036,7 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   configurePageMode();
   currentUser = getCurrentUser();
-  updateOnboardingPanels();
+  document.getElementById('guildHowToLoginStep')?.classList.toggle('hidden', Boolean(currentUser));
   if (currentUser) {
     headerLoginBtn.classList.add('hidden');
     headerUserBtn.classList.remove('hidden');
@@ -2161,13 +2131,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('startEventBtn').addEventListener('click', startEvent);
   document.getElementById('saveEventWebhookBtn')?.addEventListener('click', saveEventWebhookLink);
   document.getElementById('trackGuildBtn').addEventListener('click', () => {
-    const scope = document.getElementById('trackScopeSelect')?.value || 'selected';
-    if (scope === 'guild') {
-      const eventSetup = document.getElementById('eventSetupSection');
-      setEventPreconditionHint('Entire Guild scope is active. Review metric and click Start Event.', 'guide');
-      eventSetup?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      return;
-    }
     const section = document.getElementById('playerSelectSection');
     section.classList.remove('hidden');
     section.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -2205,6 +2168,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (currentUser) {
     const userData = await loadUserData({ includeEvents: false });
     await loadUserDashboard(userData);
+    updateTrackedGuildsList(userData?.guildName || null);
   }
 
   // Handle modal closing
