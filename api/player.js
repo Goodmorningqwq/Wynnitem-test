@@ -31,7 +31,10 @@ module.exports = async (req, res) => {
 
   // 2. Handle Profile Lookup (default)
   if (!player) {
-    return res.status(400).json({ error: 'Player name or UUID required' });
+    return res.status(400).json({ 
+      error: 'Player name or UUID required',
+      debug: { query: req.query, url: req.url }
+    });
   }
 
   const url = `https://api.wynncraft.com/v3/player/${encodeURIComponent(player)}?fullResult=true`;
