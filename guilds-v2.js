@@ -1754,7 +1754,6 @@ async function refreshEvent() {
         renderMembersList(refreshedMembers);
         renderPlayerSelection(refreshedMembers);
       }
-    }
 
     liveRoster = getLiveRosterUsernames(activeEvent, currentGuild);
     const snapshot = getSnapshot(activeEvent.metric, currentGuild, liveRoster, eventScope);
