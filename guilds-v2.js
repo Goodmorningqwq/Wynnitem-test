@@ -628,9 +628,7 @@ function getSnapshot(metric, guild, trackedPlayers, scope = 'selected') {
   } else if (metric === 'wars') {
     metricValue = Number(guild.wars || 0);
   } else if (metric === 'guildRaids') {
-    metricValue = scope === 'guild'
-      ? selectedTotal
-      : sumGuildRaidsAcrossMembers(guild);
+    metricValue = Number(guild.raids || 0);
   } else {
     metricValue = Number(guild.xpPercent || 0);
   }
@@ -1747,69 +1745,9 @@ async function refreshEvent() {
     let liveRoster = getLiveRosterUsernames(activeEvent, currentGuild);
 
     if (activeEvent.metric === 'wars') {
-      setRefreshWarsHydrationProgress(0, 1, 'Loading war counts...');
-      await hydrateVisibleMemberWarsWaves(
-        currentGuild,
-        true,
-        liveRoster,
-        null,
-        WYNN_PLAYER_WARS_429_WAVE_BATCH_SIZE,
-        WYNN_PLAYER_WARS_429_WAVE_WAIT_MS,
-        ({ done, total }) => setRefreshWarsHydrationProgress(done, total, 'Loading war counts...'),
-        3
-      );
-      const members = collectGuildMembers(currentGuild).filter((m) => liveRoster.includes(m.username));
-      const missingWarMembers = members.filter((m) => m.wars == null);
-      const fetchableMissing = missingWarMembers.filter((m) => m.uuid);
-      const stuckNoUuid = missingWarMembers.filter((m) => !m.uuid);
-
-      if (fetchableMissing.length > 0) {
-        const remainingIdList = missingWarMembers
-          .slice(0, 8)
-          .map((m) => (m.uuid ? `${m.uuid.slice(0, 8)}…` : m.username))
-          .join(', ');
-        const remainingSuffix = missingWarMembers.length > 8 ? '...' : '';
-        const label = `Checking missed players (${remainingIdList}${remainingSuffix})`;
-
-        setRefreshWarsHydrationProgress(0, fetchableMissing.length, label);
-        await hydrateVisibleMemberWarsWaves(
-          currentGuild,
-          true,
-          fetchableMissing.map((m) => m.username),
-          null,
-          WYNN_PLAYER_WARS_429_WAVE_BATCH_SIZE,
-          WYNN_PLAYER_WARS_429_WAVE_WAIT_MS,
-          ({ done, total }) => setRefreshWarsHydrationProgress(done, total, label),
-          6
-        );
-      } else if (missingWarMembers.length > 0) {
-        const remainingIdList = missingWarMembers
-          .slice(0, 8)
-          .map((m) => (m.uuid ? `${m.uuid.slice(0, 8)}…` : m.username))
-          .join(', ');
-        const remainingSuffix = missingWarMembers.length > 8 ? '...' : '';
-        const label = `Remaining without UUID (${remainingIdList}${remainingSuffix})`;
-        setRefreshWarsHydrationProgress(missingWarMembers.length, missingWarMembers.length, label);
-        await delay(2500);
-      }
-
-      const finalMissing = collectGuildMembers(currentGuild)
-        .filter((m) => liveRoster.includes(m.username))
-        .filter((m) => m.uuid && !memberWarsCache.has(m.uuid)).length;
-      if (finalMissing > 0) {
-        await hydrateVisibleMemberWarsWaves(
-          currentGuild,
-          false,
-          liveRoster,
-          null,
-          10,
-          0,
-          null,
-          8
-        );
-      }
-
-      hideRefreshWarsHydrationProgress();
+      // Wars data is now instantly available in currentGuild from searchGuild above
+      updateRefreshProgress();
+    }
 
       if (isGuildResultCardVisible() && currentGuild) {
         const refreshedMembers = collectGuildMembers(currentGuild);
