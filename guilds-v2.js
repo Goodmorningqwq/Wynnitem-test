@@ -233,9 +233,8 @@ function formatRaidsSuffix(guildRaids) {
   return ` · ${n.toLocaleString()} ${label}`;
 }
 
-function formatWarsSuffix(showWars, wars) {
-  if (!showWars) return ' · ... Wars';
-  if (wars == null) return ' · ⏳ Loading wars';
+function formatWarsSuffix(wars) {
+  if (wars == null) return ' · ... Wars';
   return ` · ${Number(wars).toLocaleString()} Wars`;
 }
 
@@ -385,7 +384,6 @@ function updateGuildResultCollapseUI() {
 
 function renderMembersList(players) {
   const listEl = document.getElementById('guildMembersList');
-  const showWars = showMemberWarsEnabled() && !guildWarsHydrating;
   if (!players.length) {
     listEl.innerHTML = '<p class="text-gray-500 text-sm">No members</p>';
     return;
@@ -393,14 +391,13 @@ function renderMembersList(players) {
   listEl.innerHTML = players.map((player) => `
     <div class="flex justify-between items-center bg-gray-800/30 px-3 py-2 rounded text-sm">
       <span class="text-white font-medium">${escapeHtml(player.username)}</span>
-      <span class="text-gray-400">${Number(player.contributed).toLocaleString()} XP${formatRaidsSuffix(player.guildRaids)}${formatWarsSuffix(showWars, player.wars)}</span>
+      <span class="text-gray-400">${Number(player.contributed).toLocaleString()} XP${formatRaidsSuffix(player.guildRaids)}${formatWarsSuffix(player.wars)}</span>
     </div>
   `).join('');
 }
 
 function renderPlayerSelection(players) {
   const container = document.getElementById('playerCheckboxes');
-  const showWars = showMemberWarsEnabled() && !guildWarsHydrating;
   // #region agent log
   debugLog('pre-fix', 'H5', 'guilds-v2.js:renderPlayerSelection', 'rendering player selection wars state', { players: players.length, showWars, resolvedWars: players.filter((p) => p.wars != null).length, placeholderWars: players.filter((p) => p.wars == null).length });
   // #endregion
@@ -412,7 +409,7 @@ function renderPlayerSelection(players) {
     <label class="flex items-center gap-2 p-2 hover:bg-gray-800/50 rounded cursor-pointer">
       <input type="checkbox" value="${escapeHtml(player.username)}" class="accent-purple-500">
       <span class="text-white text-sm">${escapeHtml(player.username)}</span>
-      <span class="text-gray-500 text-xs ml-auto">${Number(player.contributed).toLocaleString()} XP${formatRaidsSuffix(player.guildRaids)}${formatWarsSuffix(showWars, player.wars)}</span>
+      <span class="text-gray-500 text-xs ml-auto">${Number(player.contributed).toLocaleString()} XP${formatRaidsSuffix(player.guildRaids)}${formatWarsSuffix(player.wars)}</span>
     </label>
   `).join('');
 }
@@ -1481,7 +1478,7 @@ function renderActiveEvent() {
 
 async function searchGuild(name, mode = 'auto', options = {}) {
   const shouldRender = options.render !== false;
-  const hydrateWars = options.hydrateWars !== undefined ? options.hydrateWars : isSearchPage;
+  const hydrateWars = options.hydrateWars !== undefined ? options.hydrateWars : false;
   warLog('searchGuild', {
     query: (name || '').slice(0, 40),
     mode,
