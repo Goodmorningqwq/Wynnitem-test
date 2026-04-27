@@ -405,7 +405,7 @@ function renderMembersList(players) {
 function renderPlayerSelection(players) {
   const container = document.getElementById('playerCheckboxes');
   // #region agent log
-  debugLog('pre-fix', 'H5', 'guilds-v2.js:renderPlayerSelection', 'rendering player selection wars state', { players: players.length, showWars, resolvedWars: players.filter((p) => p.wars != null).length, placeholderWars: players.filter((p) => p.wars == null).length });
+  debugLog('pre-fix', 'H5', 'guilds-v2.js:renderPlayerSelection', 'rendering player selection wars state', { players: players.length, resolvedWars: players.filter((p) => p.wars != null).length, placeholderWars: players.filter((p) => p.wars == null).length });
   // #endregion
   if (!players.length) {
     container.innerHTML = '<p class="text-gray-500 text-sm">No members available</p>';
