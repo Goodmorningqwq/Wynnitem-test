@@ -1,5 +1,15 @@
 module.exports = async (req, res) => {
-  const player = req.query.player || req.query.uuid;
+  // Support both /api/player?player=Name and /api/player/Name
+  let player = req.query.player || req.query.uuid;
+  
+  if (!player) {
+    const urlParts = req.url.split('?')[0].split('/').filter(Boolean);
+    const last = urlParts.pop();
+    if (last && last !== 'player' && last !== 'api') {
+      player = last;
+    }
+  }
+
   const action = req.query.action || (req.url.includes('/wars') ? 'wars' : null);
 
   // 1. Handle "wars" specialized endpoint
