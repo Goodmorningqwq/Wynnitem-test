@@ -168,17 +168,23 @@ async function wipeUserData() {
 
 function preSeedMemberWars(guild) {
   if (!guild?.members) return;
+  warLog('pre-seeding member wars from guild data');
   const ranks = ['owner', 'chief', 'strategist', 'captain', 'recruiter', 'recruit'];
+  let count = 0;
   for (const rank of ranks) {
     if (!guild.members[rank]) continue;
     for (const [memberKey, member] of Object.entries(guild.members[rank])) {
       const wars = member.globalData?.wars;
       if (typeof wars === 'number') {
         const id = member.uuid || memberKey || '';
-        if (id) memberWarsCache.set(id, wars);
+        if (id) {
+          memberWarsCache.set(id, wars);
+          count++;
+        }
       }
     }
   }
+  warLog(`pre-seeded ${count} members`);
 }
 
 function collectGuildMembers(guild) {
@@ -193,7 +199,7 @@ function collectGuildMembers(guild) {
         username: member.username || member.legacyName || memberKey,
         contributed: Number(member.contributed || 0),
         guildRaids: Number(member.globalData?.guildRaids?.total ?? member.guildRaids?.total ?? 0),
-        wars: member.globalData?.wars ?? (memberWarsCache.get(member.uuid || memberKey || '') ?? null)
+        wars: member.globalData?.wars ?? memberWarsCache.get(member.uuid || memberKey || '') ?? null
       });
     }
   }
