@@ -2202,8 +2202,12 @@ window.viewPlayerProfile = async function(username) {
 
   try {
     const res = await fetch(`/api/player?player=${encodeURIComponent(username)}`);
-    if (!res.ok) throw new Error(`API Error: ${res.status}`);
-    const data = await res.json();
+    if (!res.ok) {
+      const respText = await res.text();
+      console.error('[wynn-profile] error response:', respText);
+      throw new Error(`API Error: ${res.status}`);
+    }
+    const data = JSON.parse(respText);
     renderFullPlayerProfile(data);
   } catch (err) {
     content.innerHTML = `
