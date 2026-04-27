@@ -493,17 +493,20 @@ function renderPlayerSelection(players) {
     const rc = getRankConfig(player.rank);
     const stars = '★'.repeat(rc.stars).padEnd(5, ' ');
     return `
-      <label class="flex items-center gap-3 px-3 py-2 hover:bg-gray-800/50 rounded cursor-pointer transition-all border-b border-gray-700/20 last:border-0 group">
-        <input type="checkbox" value="${escapeHtml(player.username)}" class="w-4 h-4 accent-purple-500">
-        <div class="flex flex-col min-w-[70px]">
+      <label class="flex items-center gap-3 px-3 py-2 hover:bg-gray-800/40 rounded cursor-pointer transition-all border border-transparent has-[:checked]:bg-green-500/10 has-[:checked]:border-green-500/30 group select-none">
+        <input type="checkbox" value="${escapeHtml(player.username)}" class="hidden peer">
+        <div class="flex flex-col min-w-[70px] opacity-80 group-has-[:checked]:opacity-100">
            <span style="color: ${rc.color}" class="text-[9px] font-bold leading-none uppercase">${rc.label}</span>
-           <span class="text-[8px] opacity-60" style="color: ${rc.color}">${stars}</span>
+           <span class="text-[8px] opacity-40" style="color: ${rc.color}">${stars}</span>
         </div>
-        <span class="text-white text-sm font-medium group-hover:text-purple-300 transition-colors">${escapeHtml(player.username)}</span>
+        <div class="flex items-center gap-2">
+           <span class="text-white text-sm font-medium group-hover:text-purple-300 transition-colors">${escapeHtml(player.username)}</span>
+           <svg class="w-3.5 h-3.5 text-green-400 opacity-0 peer-checked:opacity-100 transition-opacity shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
+        </div>
         <div class="ml-auto text-right flex items-center gap-3">
-          <span class="text-[10px] font-mono text-violet-400/70">${formatCompactNumber(player.contributed)} XP</span>
-          <span class="text-[10px] font-mono text-orange-400/70">${player.wars ?? 0}W</span>
-          <span class="text-[10px] font-mono text-cyan-400/70">${player.guildRaids ?? 0}R</span>
+          <span class="text-[10px] font-mono text-violet-400/40 group-has-[:checked]:text-violet-400/70">${formatCompactNumber(player.contributed)} XP</span>
+          <span class="text-[10px] font-mono text-orange-400/40 group-has-[:checked]:text-orange-400/70">${player.wars ?? 0}W</span>
+          <span class="text-[10px] font-mono text-cyan-400/40 group-has-[:checked]:text-cyan-400/70">${player.guildRaids ?? 0}R</span>
         </div>
       </label>
     `;
