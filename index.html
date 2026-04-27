@@ -365,6 +365,154 @@
       box-shadow: 0 0 24px rgba(52, 211, 153, 0.15);
     }
 
+    .cinematic-hero {
+      position: relative;
+      min-height: 84vh;
+      display: flex;
+      align-items: center;
+      overflow: hidden;
+    }
+
+    .hero-atmosphere {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .hero-grid {
+      position: absolute;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(167, 139, 250, 0.08) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(44, 232, 255, 0.08) 1px, transparent 1px);
+      background-size: 72px 72px;
+      mask-image: radial-gradient(circle at center, black 38%, transparent 92%);
+      opacity: 0.35;
+    }
+
+    .hero-orb {
+      position: absolute;
+      border-radius: 9999px;
+      filter: blur(90px);
+      opacity: 0.38;
+      animation: floatOrb 16s ease-in-out infinite alternate;
+    }
+
+    .hero-orb--a {
+      width: min(560px, 62vw);
+      height: min(560px, 62vw);
+      background: rgba(139, 92, 246, 0.52);
+      top: -20%;
+      left: -14%;
+    }
+
+    .hero-orb--b {
+      width: min(500px, 55vw);
+      height: min(500px, 55vw);
+      background: rgba(44, 232, 255, 0.34);
+      right: -14%;
+      top: -8%;
+      animation-delay: 1.3s;
+    }
+
+    .hero-orb--c {
+      width: min(420px, 48vw);
+      height: min(420px, 48vw);
+      background: rgba(236, 72, 153, 0.25);
+      left: 42%;
+      bottom: -28%;
+      animation-delay: 2.1s;
+    }
+
+    .hero-beam {
+      position: absolute;
+      width: 140%;
+      height: 220px;
+      left: -20%;
+      top: 46%;
+      background: linear-gradient(90deg, transparent 0%, rgba(103, 232, 249, 0.08) 40%, rgba(167, 139, 250, 0.12) 52%, transparent 100%);
+      filter: blur(20px);
+      transform: rotate(-8deg);
+      animation: beamSweep 13s ease-in-out infinite;
+    }
+
+    .cinematic-panel {
+      background: linear-gradient(160deg, rgba(22, 14, 40, 0.86), rgba(14, 9, 29, 0.9));
+      border: 1px solid rgba(149, 116, 224, 0.42);
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.52), inset 0 0 0 1px rgba(73, 38, 102, 0.6);
+      backdrop-filter: blur(3px);
+    }
+
+    .hero-kicker {
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      font-size: 0.7rem;
+      color: rgba(192, 220, 255, 0.9);
+    }
+
+    .signal-strip-card {
+      background: linear-gradient(180deg, rgba(26, 14, 43, 0.92), rgba(19, 10, 34, 0.92));
+      border: 1px solid rgba(120, 68, 190, 0.35);
+      box-shadow: inset 0 0 0 1px rgba(73, 38, 102, 0.4);
+    }
+
+    .signal-dot {
+      width: 0.45rem;
+      height: 0.45rem;
+      border-radius: 9999px;
+      background: #34d399;
+      box-shadow: 0 0 10px rgba(52, 211, 153, 0.75);
+      display: inline-block;
+      margin-right: 0.45rem;
+      animation: dotPulse 1.9s ease-in-out infinite;
+    }
+
+    .feature-spotlight {
+      position: relative;
+      border-radius: 1rem;
+      overflow: hidden;
+      border: 1px solid rgba(128, 84, 205, 0.45);
+      background: linear-gradient(170deg, rgba(31, 16, 49, 0.96), rgba(18, 9, 31, 0.98));
+      box-shadow: inset 0 0 0 1px rgba(75, 43, 108, 0.58);
+      transition: transform 220ms ease, border-color 220ms ease, box-shadow 220ms ease;
+    }
+
+    .feature-spotlight:hover {
+      transform: translateY(-8px);
+      border-color: rgba(167, 116, 255, 0.7);
+      box-shadow: 0 20px 44px rgba(0, 0, 0, 0.5), 0 0 30px rgba(143, 95, 216, 0.22);
+    }
+
+    .feature-glow {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.85;
+      background: radial-gradient(circle at 80% 0%, rgba(103, 232, 249, 0.18), transparent 42%),
+                  radial-gradient(circle at 10% 100%, rgba(167, 139, 250, 0.18), transparent 45%);
+    }
+
+    .story-panel {
+      background: linear-gradient(170deg, rgba(26, 15, 44, 0.95), rgba(16, 9, 28, 0.96));
+      border: 1px solid rgba(126, 81, 204, 0.45);
+      box-shadow: inset 0 0 0 1px rgba(67, 36, 101, 0.56);
+    }
+
+    @keyframes floatOrb {
+      0% { transform: translateY(0) translateX(0) scale(1); }
+      100% { transform: translateY(-20px) translateX(16px) scale(1.06); }
+    }
+
+    @keyframes beamSweep {
+      0%, 100% { opacity: 0.34; transform: rotate(-8deg) translateY(0); }
+      50% { opacity: 0.62; transform: rotate(-6deg) translateY(-16px); }
+    }
+
+    @keyframes dotPulse {
+      0%, 100% { opacity: 0.55; transform: scale(0.95); }
+      50% { opacity: 1; transform: scale(1.2); }
+    }
+
     @media (prefers-reduced-motion: reduce) {
       .hero-sparkle {
         animation: none !important;
@@ -432,84 +580,114 @@
   </div>
 
   <main class="flex-1 relative">
-    <div class="home-hero-wrap">
-      <div class="home-mesh" aria-hidden="true">
-        <div class="home-blob home-blob--1"></div>
-        <div class="home-blob home-blob--2"></div>
-        <div class="home-blob home-blob--3"></div>
+    <section class="cinematic-hero">
+      <div class="hero-atmosphere" aria-hidden="true">
+        <div class="hero-grid"></div>
+        <div class="hero-orb hero-orb--a"></div>
+        <div class="hero-orb hero-orb--b"></div>
+        <div class="hero-orb hero-orb--c"></div>
+        <div class="hero-beam"></div>
       </div>
 
-      <div class="container mx-auto px-4 py-12 relative z-10">
-        <div class="max-w-4xl mx-auto text-center mb-14 md:mb-16 hero-intro">
-          <div class="hero-sparkles" aria-hidden="true">
-            <span class="hero-sparkle hero-sparkle--1"></span>
-            <span class="hero-sparkle hero-sparkle--2"></span>
-            <span class="hero-sparkle hero-sparkle--3"></span>
-            <span class="hero-sparkle hero-sparkle--4"></span>
-            <span class="hero-sparkle hero-sparkle--5"></span>
-            <span class="hero-sparkle hero-sparkle--6"></span>
-          </div>
-          <div class="tier-dots">
-            <span class="tier-dot text-gray-300"></span>
-            <span class="tier-dot text-green-400"></span>
-            <span class="tier-dot text-blue-400"></span>
-            <span class="tier-dot text-violet-400"></span>
-            <span class="tier-dot text-orange-400"></span>
-            <span class="tier-dot text-pink-400"></span>
-          </div>
-          <h2 class="hero-title-shell mb-6">
-            <span class="hero-title hero-title--anim">Browse smarter. Track deeper.</span>
+      <div class="container mx-auto px-4 relative z-10 py-16">
+        <div class="max-w-5xl mx-auto cinematic-panel rounded-2xl px-6 py-10 md:px-12 md:py-14 text-center">
+          <p class="hero-kicker mb-4">Wynncraft Intelligence Hub</p>
+          <h2 class="hero-title-shell mb-5">
+            <span class="hero-title hero-title--anim">Wynncraft data, reimagined.</span>
           </h2>
-          <p class="hero-subtitle text-lg md:text-xl max-w-2xl mx-auto leading-relaxed mb-8">
-            One place for the item database and guild tracking—wars, XP, raids, and event leaderboards built for active guilds.
+          <p class="hero-subtitle text-lg md:text-2xl max-w-3xl mx-auto leading-relaxed mb-8">
+            Explore elite item builds, run cinematic guild events, and track leaderboard momentum with a command-center experience built for competitive play.
           </p>
+          <div class="flex flex-wrap justify-center gap-3 mb-7">
+            <a href="/item" class="theme-btn-primary px-6 py-3 rounded-lg text-sm font-semibold">Enter Item Database</a>
+            <a href="/guild" class="theme-btn px-6 py-3 rounded-lg text-sm font-semibold">Open Guild Tracker</a>
+            <a href="https://wynnitem-territory.vercel.app/" target="_blank" rel="noopener noreferrer" class="theme-btn px-6 py-3 rounded-lg text-sm font-semibold">Launch Territory Map</a>
+          </div>
           <div class="flex flex-wrap justify-center gap-2 md:gap-3">
-            <span class="feature-chip">Item database</span>
-            <span class="feature-chip">Guild tracker</span>
-            <span class="feature-chip">Territory map</span>
-            <span class="feature-chip">Event leaderboards</span>
+            <span class="feature-chip">Live event codes</span>
+            <span class="feature-chip">Guild wars + raids</span>
+            <span class="feature-chip">Fast item lookup</span>
+            <span class="feature-chip">Shareable leaderboards</span>
           </div>
         </div>
+      </div>
+    </section>
 
-        <div class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
-          <a href="/item" class="menu-card menu-card--items group rounded-xl flex flex-col md:flex-row md:items-center gap-6 p-8 md:p-10 overflow-hidden">
-            <div class="menu-card-icon mx-auto md:mx-0 group-hover:scale-105 transition-transform duration-200">⚔️</div>
-            <div class="flex-1 text-center md:text-left">
-              <div class="text-2xl font-bold text-white mb-2 home-card-title--flash">Items</div>
-              <div class="text-gray-400 text-sm md:text-base leading-relaxed">Weapons, armor, accessories, and more from the Wynncraft item API.</div>
-            </div>
-            <span class="flex items-center justify-center md:justify-start gap-1 text-violet-300 text-sm font-semibold opacity-90 group-hover:opacity-100 whitespace-nowrap">
-              Open
-              <svg class="w-4 h-4 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
-            </span>
-          </a>
-
-          <a href="/guild" class="menu-card menu-card--guild group rounded-xl flex flex-col md:flex-row md:items-center gap-6 p-8 md:p-10 overflow-hidden">
-            <div class="menu-card-icon mx-auto md:mx-0 group-hover:scale-105 transition-transform duration-200">🏰</div>
-            <div class="flex-1 text-center md:text-left">
-              <div class="text-2xl font-bold text-white mb-2 home-card-title--flash">Guilds</div>
-              <div class="text-gray-400 text-sm md:text-base leading-relaxed">Search guilds, track members, wars, Graids, and run timed events.</div>
-            </div>
-            <span class="flex items-center justify-center md:justify-start gap-1 text-cyan-300 text-sm font-semibold opacity-90 group-hover:opacity-100 whitespace-nowrap">
-              Open
-              <svg class="w-4 h-4 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
-            </span>
-          </a>
-
-          <a href="https://wynnitem-territory.vercel.app/" target="_blank" rel="noopener noreferrer" class="menu-card menu-card--territory group rounded-xl flex flex-col xl:flex-row xl:items-center gap-6 p-8 md:p-10 overflow-hidden">
-            <div class="menu-card-icon mx-auto xl:mx-0 group-hover:scale-105 transition-transform duration-200">🗺️</div>
-            <div class="flex-1 text-center xl:text-left">
-              <div class="text-2xl font-bold text-white mb-2 home-card-title--flash">Territories</div>
-              <div class="text-gray-400 text-sm md:text-base leading-relaxed">Live Interactive Territory War Map & Economy Simulator</div>
-            </div>
-            <span class="flex items-center justify-center xl:justify-start gap-1 text-emerald-400 text-sm font-semibold opacity-90 group-hover:opacity-100 whitespace-nowrap">
-              Launch
-              <svg class="w-4 h-4 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
-            </span>
-          </a>
+    <section class="container mx-auto px-4 -mt-6 md:-mt-10 relative z-20">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-3 md:gap-4 max-w-6xl mx-auto">
+        <div class="signal-strip-card rounded-xl px-4 py-3">
+          <p class="text-[10px] uppercase tracking-widest text-gray-500 mb-1">System Status</p>
+          <p class="text-sm text-gray-200"><span class="signal-dot"></span>Operational</p>
+        </div>
+        <div class="signal-strip-card rounded-xl px-4 py-3">
+          <p class="text-[10px] uppercase tracking-widest text-gray-500 mb-1">Guild Workflow</p>
+          <p class="text-sm text-gray-200">Search -> Track -> Leaderboard</p>
+        </div>
+        <div class="signal-strip-card rounded-xl px-4 py-3">
+          <p class="text-[10px] uppercase tracking-widest text-gray-500 mb-1">Data Source</p>
+          <p class="text-sm text-gray-200">Wynncraft API v3</p>
+        </div>
+        <div class="signal-strip-card rounded-xl px-4 py-3">
+          <p class="text-[10px] uppercase tracking-widest text-gray-500 mb-1">Collaboration</p>
+          <p class="text-sm text-gray-200">Public event code sharing</p>
         </div>
       </div>
-    </div>
+    </section>
+
+    <section class="container mx-auto px-4 py-14 md:py-16">
+      <div class="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-7">
+        <a href="/item" class="feature-spotlight p-7 md:p-8">
+          <div class="feature-glow"></div>
+          <div class="relative">
+            <div class="menu-card-icon mb-5">⚔️</div>
+            <h3 class="text-2xl font-extrabold text-white mb-2">Item Database</h3>
+            <p class="text-gray-300 text-sm leading-relaxed mb-5">
+              Browse weapons, armor, and accessories with stat-first clarity for fast build iteration.
+            </p>
+            <span class="text-violet-300 text-sm font-semibold">Enter database -></span>
+          </div>
+        </a>
+
+        <a href="/guild" class="feature-spotlight p-7 md:p-8">
+          <div class="feature-glow"></div>
+          <div class="relative">
+            <div class="menu-card-icon mb-5">🏰</div>
+            <h3 class="text-2xl font-extrabold text-white mb-2">Guild Tracker</h3>
+            <p class="text-gray-300 text-sm leading-relaxed mb-5">
+              Track members, launch event runs, and monitor wars, XP, and raids in one streamlined flow.
+            </p>
+            <span class="text-cyan-300 text-sm font-semibold">Open tracker -></span>
+          </div>
+        </a>
+
+        <a href="https://wynnitem-territory.vercel.app/" target="_blank" rel="noopener noreferrer" class="feature-spotlight p-7 md:p-8">
+          <div class="feature-glow"></div>
+          <div class="relative">
+            <div class="menu-card-icon mb-5">🗺️</div>
+            <h3 class="text-2xl font-extrabold text-white mb-2">Territory Map</h3>
+            <p class="text-gray-300 text-sm leading-relaxed mb-5">
+              View live territory control and economy simulation on an external interactive command map.
+            </p>
+            <span class="text-emerald-300 text-sm font-semibold">Launch map -></span>
+          </div>
+        </a>
+      </div>
+    </section>
+
+    <section class="container mx-auto px-4 pb-16">
+      <div class="max-w-5xl mx-auto story-panel rounded-2xl px-6 py-8 md:px-10 md:py-10">
+        <p class="hero-kicker mb-3">Why this exists</p>
+        <h3 class="text-2xl md:text-3xl font-bold text-white mb-4">Built for players who move fast.</h3>
+        <p class="text-gray-300 leading-relaxed mb-6">
+          Wynncraft strategy works best when data is readable, shareable, and fast. This portal combines item discovery with guild event orchestration so your team spends less time digging through menus and more time executing.
+        </p>
+        <div class="flex flex-wrap gap-3">
+          <a href="/item" class="theme-btn-primary px-5 py-2.5 rounded-lg text-sm font-semibold">Browse Items</a>
+          <a href="/guild" class="theme-btn px-5 py-2.5 rounded-lg text-sm font-semibold">Track Guild</a>
+          <a href="/login" class="theme-btn px-5 py-2.5 rounded-lg text-sm font-semibold">Login</a>
+        </div>
+      </div>
+    </section>
   </main>
 
   <footer class="bg-[rgba(22,22,22,0.98)] border-t border-[rgba(50,50,50,0.5)] mt-auto">
