@@ -397,18 +397,18 @@
           </div>
 
           <!-- Player Selection for Tracking -->
-          <div id="playerSelectSection" class="mb-4 theme-panel p-4 rounded-lg">
-            <div class="flex justify-between items-center mb-3">
-              <h4 class="text-white font-medium">Select Players to Track</h4>
-              <div class="flex gap-2">
-                <button type="button" id="selectAllPlayersBtn" class="text-xs text-purple-400 hover:text-purple-300">Select All</button>
-                <button type="button" id="clearPlayersBtn" class="text-xs text-red-400 hover:text-red-300">Clear All</button>
+          <div id="playerSelectSection" class="mb-4 border border-gray-700/50 rounded-lg p-4 bg-black/20">
+            <h5 class="text-white text-sm font-bold mb-3 flex items-center justify-between">
+              Select Players to Track
+              <div class="flex gap-3">
+                <button type="button" id="selectAllPlayersBtn" class="text-[10px] text-purple-400 hover:text-purple-300 uppercase font-bold tracking-wider transition-colors">Select All</button>
+                <button type="button" id="clearPlayersBtn" class="text-[10px] text-red-400 hover:text-red-300 uppercase font-bold tracking-wider transition-colors">Clear All</button>
               </div>
+            </h5>
+            <div id="playerCheckboxes" class="max-h-64 overflow-y-auto space-y-px hide-scrollbar bg-gray-900/40 rounded border border-gray-800/50">
+              <p class="text-gray-600 text-xs p-3 italic">Search for a guild to see members</p>
             </div>
-            <div id="playerCheckboxes" class="max-h-64 overflow-y-auto space-y-1 mb-3">
-              <p class="text-gray-500 text-sm">Search for a guild to see members</p>
-            </div>
-            <p class="text-xs text-gray-500 mt-2">Used only when scope is set to Selected Players.</p>
+            <p class="text-[10px] text-gray-500 mt-2 italic font-medium">Used only when scope is set to Selected Players.</p>
           </div>
 
           <button type="button" id="startEventBtn" class="theme-btn-primary w-full px-4 py-2 rounded-lg text-sm font-medium mb-4">Start Event</button>

@@ -489,13 +489,25 @@ function renderPlayerSelection(players) {
     container.innerHTML = '<p class="text-gray-500 text-sm">No members available</p>';
     return;
   }
-  container.innerHTML = players.map((player) => `
-    <label class="flex items-center gap-2 p-2 hover:bg-gray-800/50 rounded cursor-pointer">
-      <input type="checkbox" value="${escapeHtml(player.username)}" class="accent-purple-500">
-      <span class="text-white text-sm">${escapeHtml(player.username)}</span>
-      <span class="text-gray-500 text-xs ml-auto">${Number(player.contributed).toLocaleString()} XP${formatRaidsSuffix(player.guildRaids)}${formatWarsSuffix(player.wars)}</span>
-    </label>
-  `).join('');
+  container.innerHTML = players.map((player) => {
+    const rc = getRankConfig(player.rank);
+    const stars = '★'.repeat(rc.stars).padEnd(5, ' ');
+    return `
+      <label class="flex items-center gap-3 px-3 py-2 hover:bg-gray-800/50 rounded cursor-pointer transition-all border-b border-gray-700/20 last:border-0 group">
+        <input type="checkbox" value="${escapeHtml(player.username)}" class="w-4 h-4 accent-purple-500">
+        <div class="flex flex-col min-w-[70px]">
+           <span style="color: ${rc.color}" class="text-[9px] font-bold leading-none uppercase">${rc.label}</span>
+           <span class="text-[8px] opacity-60" style="color: ${rc.color}">${stars}</span>
+        </div>
+        <span class="text-white text-sm font-medium group-hover:text-purple-300 transition-colors">${escapeHtml(player.username)}</span>
+        <div class="ml-auto text-right flex items-center gap-3">
+          <span class="text-[10px] font-mono text-violet-400/70">${formatCompactNumber(player.contributed)} XP</span>
+          <span class="text-[10px] font-mono text-orange-400/70">${player.wars ?? 0}W</span>
+          <span class="text-[10px] font-mono text-cyan-400/70">${player.guildRaids ?? 0}R</span>
+        </div>
+      </label>
+    `;
+  }).join('');
 }
 
 function hideAmbiguousGuildResults() {
