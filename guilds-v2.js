@@ -442,11 +442,12 @@ function renderMembersList(players) {
   }
 
   const tableHeader = `
-    <div class="grid grid-cols-[80px_1fr_80px_80px] gap-2 px-3 py-2 border-b border-gray-700/50 text-[10px] uppercase tracking-wider font-bold text-gray-500 mb-1">
+    <div class="grid grid-cols-[80px_1fr_70px_40px_40px] gap-2 px-3 py-2 border-b border-gray-700/50 text-[10px] uppercase tracking-wider font-bold text-gray-500 mb-1">
       <span>Rank</span>
       <span>Member</span>
-      <span class="text-right">XP Contributed</span>
-      <span class="text-right">Joined</span>
+      <span class="text-right">XP</span>
+      <span class="text-right">Wars</span>
+      <span class="text-right">Raids</span>
     </div>
   `;
 
@@ -456,7 +457,7 @@ function renderMembersList(players) {
     const onlineIndicator = player.online ? '<span class="w-1.5 h-1.5 rounded-full bg-green-500 inline-block ml-1"></span>' : '';
     
     return `
-      <div class="grid grid-cols-[80px_1fr_80px_80px] gap-2 px-3 py-1.5 hover:bg-gray-800/30 rounded transition-colors text-[11px] items-center">
+      <div class="grid grid-cols-[80px_1fr_70px_40px_40px] gap-2 px-3 py-1.5 hover:bg-gray-800/30 rounded transition-colors text-[11px] items-center">
         <div class="flex flex-col">
           <span style="color: ${rc.color}" class="font-bold">${rc.label}</span>
           <span class="text-[8px] mt-[-2px]" style="color: ${rc.color}; opacity: 0.8">${stars}</span>
@@ -468,8 +469,11 @@ function renderMembersList(players) {
         <div class="text-right font-mono text-violet-300">
           ${formatCompactNumber(player.contributed)}
         </div>
-        <div class="text-right text-gray-500 text-[10px]">
-          ${formatRelativeTime(player.joined)}
+        <div class="text-right font-mono text-orange-300">
+          ${player.wars ?? 0}
+        </div>
+        <div class="text-right font-mono text-cyan-300">
+          ${player.guildRaids ?? 0}
         </div>
       </div>
     `;
