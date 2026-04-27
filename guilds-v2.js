@@ -2236,48 +2236,71 @@ window.closePlayerProfile = function() {
 function renderFullPlayerProfile(data) {
   const content = document.getElementById('profileContent');
   const g = data.globalData || {};
-  const rankings = data.rankings || {};
-  
-  // Format dates/strings
-  const joinedDate = data.joined ? new Date(data.joined).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }) : 'Unknown';
+  const ranking = data.ranking || {};
+
+  const formatDateTime = (value) => {
+    if (!value) return 'Unknown';
+    const dt = new Date(value);
+    if (Number.isNaN(dt.getTime())) return 'Unknown';
+    return dt.toLocaleString();
+  };
+
+  const joinedDate = formatDateTime(data.firstJoin);
+  const lastJoinDate = formatDateTime(data.lastJoin);
   const playtime = Math.round(data.playtime || 0);
   const guildName = data.guild?.name || 'No Guild';
   const guildRank = data.guild?.rank || '';
   const grc = getRankConfig(guildRank);
+  const onlineLabel = data.online ? `Online (${data.server || 'Unknown'})` : 'Offline';
+  const accountRank = data.supportRank || data.rank || 'Player';
 
-  // Stats Grid
   const stats = [
-    { label: 'Rank', value: data.supportRank || 'Player', color: 'neon-pink' },
+    { label: 'Rank', value: accountRank, color: 'neon-pink' },
+    { label: 'Online', value: onlineLabel, color: data.online ? 'text-green-400' : 'text-gray-300' },
     { label: 'Playtime', value: `${playtime.toLocaleString()}h`, color: 'neon-cyan' },
     { label: 'Mobs Killed', value: formatCompactNumber(g.mobsKilled || 0), color: 'text-gray-200' },
     { label: 'Total Level', value: (g.totalLevel || 0).toLocaleString(), color: 'neon-gold' },
     { label: 'Chests Found', value: formatCompactNumber(g.chestsFound || 0), color: 'text-gray-200' },
-    { label: 'Wars', value: (g.wars || 0).toLocaleString(), color: 'text-orange-400' }
+    { label: 'Wars', value: (g.wars || 0).toLocaleString(), color: 'text-orange-400' },
+    { label: 'World Events', value: (g.worldEvents || 0).toLocaleString(), color: 'text-fuchsia-300' },
+    { label: 'Lootruns', value: (g.lootruns || 0).toLocaleString(), color: 'text-cyan-300' },
+    { label: 'Caves', value: (g.caves || 0).toLocaleString(), color: 'text-violet-300' },
+    { label: 'Quests', value: (g.completedQuests || 0).toLocaleString(), color: 'text-yellow-300' },
+    { label: 'Guild Raids', value: Number(g.guildRaids?.total || 0).toLocaleString(), color: 'text-indigo-300' }
   ];
 
-  const rankingCards = [
-    { label: 'Combat Solo Level', value: rankings.combatSoloLevel },
-    { label: 'Combat Global Level', value: rankings.combatOverallLevel },
-    { label: 'Total Solo Level', value: rankings.totalSoloLevel },
-    { label: 'Total Global Level', value: rankings.totalOverallLevel },
-    { label: 'Professions Solo Level', value: rankings.professionsSoloLevel },
-    { label: 'Professions Global Level', value: rankings.professionsOverallLevel }
-  ];
+  const topRankingCards = Object.entries(ranking)
+    .filter(([, value]) => Number.isFinite(Number(value)) && Number(value) > 0)
+    .sort((a, b) => Number(a[1]) - Number(b[1]))
+    .slice(0, 8)
+    .map(([key, value]) => {
+      const label = key
+        .replace(/([A-Z])/g, ' $1')
+        .replace(/^./, (c) => c.toUpperCase())
+        .trim();
+      return { label, value: Number(value) };
+    });
 
-  // Raid icons/completions from data
-  // v3 API character summaries usually have dungeons/raids
-  // For simplicity since it's v3 Player, we aggregate across characters or use the global field if available
-  // Actually v3 Player response root has dungeons and raids
-  const raidList = data.raids || {};
-  const raidDisplay = Object.entries(raidList).map(([name, count]) => {
-     const cleanName = name.replace(/([A-Z])/g, ' $1').trim();
-     return `
+  const raidList = g.raids?.list || {};
+  const guildRaidList = g.guildRaids?.list || {};
+  const raidDisplay = Object.entries(raidList).map(([name, count]) => `
        <div class="flex flex-col items-center justify-center p-3 profile-stat-card rounded-xl">
-         <span class="text-white font-bold text-lg leading-none">${count}</span>
-         <span class="text-[9px] text-gray-500 uppercase font-bold mt-1 text-center whitespace-nowrap">${cleanName}</span>
+        <span class="text-white font-bold text-lg leading-none">${Number(count || 0).toLocaleString()}</span>
+        <span class="text-[9px] text-gray-500 uppercase font-bold mt-1 text-center">${escapeHtml(name)}</span>
        </div>
-     `;
-  }).join('');
+    `).join('');
+
+  const guildRaidDisplay = Object.entries(guildRaidList).map(([name, count]) => `
+      <div class="flex flex-col items-center justify-center p-3 profile-stat-card rounded-xl">
+        <span class="text-white font-bold text-lg leading-none">${Number(count || 0).toLocaleString()}</span>
+        <span class="text-[9px] text-gray-500 uppercase font-bold mt-1 text-center">${escapeHtml(name)}</span>
+      </div>
+    `).join('');
+
+  const restrictionFlags = data.restrictions || {};
+  const restrictedFields = Object.entries(restrictionFlags)
+    .filter(([, hidden]) => Boolean(hidden))
+    .map(([key]) => key);
 
   content.innerHTML = `
     <div class="relative">
@@ -2286,13 +2309,15 @@ function renderFullPlayerProfile(data) {
       </button>
 
       <div class="mb-8 pr-10">
-        <h2 class="text-3xl font-black text-white italic tracking-tighter uppercase mb-1">Guild Information</h2>
+        <h2 class="text-3xl font-black text-white italic tracking-tighter uppercase mb-1">Player Information</h2>
         <p class="text-red-500 font-bold text-xs uppercase tracking-widest mb-3">${escapeHtml(data.username)}</p>
         <div class="flex items-center gap-2">
            <span style="color: ${grc.color}" class="font-bold text-sm uppercase">${grc.label}</span>
            <span class="text-gray-500 text-sm">of</span>
            <span class="text-white font-bold text-sm">${escapeHtml(guildName)}</span>
         </div>
+        <p class="text-gray-500 text-xs mt-2">UUID: <span class="text-gray-300">${escapeHtml(data.uuid || 'Unknown')}</span></p>
+        <p class="text-gray-500 text-xs">Active Character: <span class="text-gray-300">${escapeHtml(data.activeCharacter || 'Unknown')}</span></p>
       </div>
 
       <div class="mb-8 pt-6 border-t border-gray-800/50">
@@ -2308,24 +2333,40 @@ function renderFullPlayerProfile(data) {
       </div>
 
       <div class="mb-8">
-        <h3 class="text-gray-400 uppercase text-[10px] tracking-widest font-black mb-4">Rankings</h3>
+        <h3 class="text-gray-400 uppercase text-[10px] tracking-widest font-black mb-4">Best Rankings</h3>
         <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
-          ${rankingCards.filter(c => c.value).map(c => `
+          ${topRankingCards.length ? topRankingCards.map(c => `
             <div class="profile-rank-card p-4 rounded-xl text-center">
               <span class="text-gray-500 text-[8px] uppercase font-bold block mb-1">${c.label}</span>
               <span class="text-xl font-black text-white tracking-tighter">#${c.value.toLocaleString()}</span>
             </div>
-          `).join('')}
+          `).join('') : '<p class="text-gray-600 text-[10px] italic">No ranking data available</p>'}
         </div>
       </div>
 
-      <div>
+      <div class="mb-8">
         <h3 class="text-gray-400 uppercase text-[10px] tracking-widest font-black mb-4">Raid Completions</h3>
         <div class="grid grid-cols-3 md:grid-cols-4 gap-3">
           ${raidDisplay || '<p class="text-gray-600 text-[10px] italic">No recorded raid completions</p>'}
         </div>
       </div>
-      
+
+      <div class="mb-8">
+        <h3 class="text-gray-400 uppercase text-[10px] tracking-widest font-black mb-4">Guild Raid Completions</h3>
+        <div class="grid grid-cols-3 md:grid-cols-4 gap-3">
+          ${guildRaidDisplay || '<p class="text-gray-600 text-[10px] italic">No recorded guild raid completions</p>'}
+        </div>
+      </div>
+
+      <div class="mb-6 profile-stat-card p-4 rounded-xl">
+        <h3 class="text-gray-400 uppercase text-[10px] tracking-widest font-black mb-3">Account Details</h3>
+        <p class="text-xs text-gray-300 mb-1">First Join: ${joinedDate}</p>
+        <p class="text-xs text-gray-300 mb-1">Last Join: ${lastJoinDate}</p>
+        <p class="text-xs text-gray-300 mb-1">Guild Rank Stars: ${escapeHtml(data.guild?.rankStars || 'N/A')}</p>
+        <p class="text-xs text-gray-300 mb-1">Veteran: ${data.veteran == null ? 'Unknown' : (data.veteran ? 'Yes' : 'No')}</p>
+        <p class="text-xs text-gray-300">Restricted Fields: ${restrictedFields.length ? escapeHtml(restrictedFields.join(', ')) : 'None'}</p>
+      </div>
+
       <div class="mt-8 pt-4 border-t border-gray-800/30 flex justify-between items-center text-[9px] text-gray-600 font-medium">
          <span>Account Created: ${joinedDate}</span>
          <span class="uppercase tracking-widest">Wynncraft Archive v3</span>
