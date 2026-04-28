@@ -221,6 +221,10 @@ async function promoteLastGoodSnapshot() {
 }
 
 module.exports = async function handler(req, res) {
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+
   // Allow either cron trigger or explicit admin token.
   const isCron = req.headers['x-vercel-cron'] === '1';
   const providedAdminToken = String(req.headers['x-cache-admin-token'] || req.query.token || '');

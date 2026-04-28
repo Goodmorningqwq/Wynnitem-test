@@ -320,8 +320,11 @@ export async function triggerItemRefresh(adminToken, mode = 'quick') {
   const url = buildUrl(REFRESH_ENDPOINT);
   const refreshMode = mode === 'full' ? 'full' : 'quick';
   url.searchParams.set('mode', refreshMode);
+  // Add a nonce so each admin refresh request bypasses any intermediary cache.
+  url.searchParams.set('_ts', String(Date.now()));
   const response = await fetch(url.toString(), {
-    method: 'GET',
+    method: 'POST',
+    cache: 'no-store',
     headers: {
       'x-cache-admin-token': token
     }
