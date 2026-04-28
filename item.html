@@ -586,6 +586,31 @@
             <span class="inline-flex items-center gap-2">🔍 Browse Items</span>
           </button>
         </div>
+
+        <div id="itemAdminRefreshRow" class="hidden mt-4 border-t border-gray-700/60 pt-4">
+          <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div>
+              <p class="text-[10px] text-gray-500 uppercase tracking-widest font-semibold">Admin Tools</p>
+              <p id="itemAdminRefreshStatus" class="text-xs text-gray-400">Ready to force refresh item snapshots.</p>
+            </div>
+            <div class="flex gap-2">
+              <button
+                id="itemAdminRefreshBtn"
+                type="button"
+                class="theme-btn-primary px-4 py-2 rounded-lg text-xs font-semibold"
+              >
+                Force Refresh DB
+              </button>
+              <button
+                id="itemAdminClearTokenBtn"
+                type="button"
+                class="theme-btn px-4 py-2 rounded-lg text-xs"
+              >
+                Clear Token
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
     
@@ -792,6 +817,6 @@
   </footer>
 
   <!-- Scripts -->
-  <script type="module" src="/app.js?v=20260325a"></script>
+  <script type="module" src="/app.js?v=20260428a"></script>
 </body>
 </html>

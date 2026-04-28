@@ -202,25 +202,37 @@ async function buildFullDatabase() {
 }
 
 module.exports = async function handler(req, res) {
-  // Only allow cron-triggered calls (Vercel sets this header)
+  // Allow either cron trigger or explicit admin token.
   const isCron = req.headers['x-vercel-cron'] === '1';
-  
-  if (!isCron) {
-    console.log(`[Refresh] Unauthorized access attempt blocked`);
-    return res.status(403).json({ error: 'Forbidden - cron only' });
+  const providedAdminToken = String(req.headers['x-cache-admin-token'] || req.query.token || '');
+  const expectedAdminToken = String(process.env.CACHE_ADMIN_TOKEN || '');
+  const isManualAdmin = Boolean(expectedAdminToken) && providedAdminToken === expectedAdminToken;
+
+  if (!isCron && !isManualAdmin) {
+    console.log('[Refresh] Unauthorized access attempt blocked');
+    return res.status(403).json({
+      success: false,
+      error: 'Forbidden - requires cron header or valid admin token'
+    });
   }
   
-  console.log(`[Refresh] Cron triggered at ${new Date().toISOString()}`);
+  const triggerType = isCron ? 'cron' : 'manual-admin';
+  console.log(`[Refresh] ${triggerType} triggered at ${new Date().toISOString()}`);
   
   const lockAcquired = await acquireRefreshLock();
   if (!lockAcquired) {
-    return res.status(409).json({ error: 'Refresh already running' });
+    return res.status(409).json({
+      success: false,
+      alreadyRunning: true,
+      error: 'Refresh already running'
+    });
   }
 
   try {
     const result = await buildFullDatabase();
     return res.status(200).json({
       success: true,
+      trigger: triggerType,
       items: result.fullDb.controller.total,
       pages: result.discoveredPageCount,
       commands: result.stats.commands,
@@ -231,7 +243,11 @@ module.exports = async function handler(req, res) {
     });
   } catch (e) {
     console.error(`[Refresh] Error: ${e.message}`);
-    return res.status(500).json({ error: e.message });
+    return res.status(500).json({
+      success: false,
+      alreadyRunning: false,
+      error: e.message
+    });
   } finally {
     await releaseRefreshLock();
   }

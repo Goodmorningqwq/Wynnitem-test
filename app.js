@@ -1,6 +1,6 @@
 // Main Application Logic
 
-import { cache, filterAndSortItems, filterByCategory, filterByArmourType, fetchItemPages, getAllFetchedItems, clearPageCache, fetchFilteredItems } from './api.js';
+import { cache, filterAndSortItems, filterByCategory, filterByArmourType, fetchItemPages, getAllFetchedItems, clearPageCache, fetchFilteredItems, triggerItemRefresh } from './api.js';
 
 // App State
 const AppState = {
@@ -13,6 +13,7 @@ const ITEMS_PER_PAGE = 50;
 const TOTAL_PAGES = 276;
 const BATCH_SIZE = 5;
 const PAGES_PER_MINUTE = 15;
+const ADMIN_TOKEN_STORAGE_KEY = 'cacheAdminToken';
 
 // State variables
 let currentState = AppState.SEARCH;
@@ -37,6 +38,8 @@ let weaponTypeFiltersEl, armorTypeFiltersEl, accessoryTypeFiltersEl, miscTypeFil
 let weaponTypeBtns, armorTypeBtns, accessoryTypeBtns, miscTypeBtns;
 let tierFilterResultsEl, levelMinFilterResultsEl, levelMaxFilterResultsEl;
 let headerItemCountEl, itemModal, modalTitle, modalContent, closeModalBtn;
+let itemAdminRefreshRowEl, itemAdminRefreshBtnEl, itemAdminRefreshStatusEl, itemAdminClearTokenBtnEl;
+let itemAdminRefreshInFlight = false;
 
 // TIER_COLORS - Updated palette
 const TIER_COLORS = {
@@ -579,6 +582,76 @@ function clearFilters() {
   levelMaxFilterResultsEl.value = '';
 }
 
+function getAdminToken() {
+  try {
+    return String(localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) || '').trim();
+  } catch {
+    return '';
+  }
+}
+
+function setAdminRefreshStatus(message, tone = 'neutral') {
+  if (!itemAdminRefreshStatusEl) return;
+  itemAdminRefreshStatusEl.textContent = message;
+  itemAdminRefreshStatusEl.classList.remove('text-gray-400', 'text-emerald-300', 'text-red-300', 'text-violet-300', 'text-amber-300');
+  if (tone === 'success') {
+    itemAdminRefreshStatusEl.classList.add('text-emerald-300');
+  } else if (tone === 'error') {
+    itemAdminRefreshStatusEl.classList.add('text-red-300');
+  } else if (tone === 'progress') {
+    itemAdminRefreshStatusEl.classList.add('text-violet-300');
+  } else if (tone === 'warn') {
+    itemAdminRefreshStatusEl.classList.add('text-amber-300');
+  } else {
+    itemAdminRefreshStatusEl.classList.add('text-gray-400');
+  }
+}
+
+function updateAdminRefreshVisibility() {
+  const token = getAdminToken();
+  if (!itemAdminRefreshRowEl) return;
+  const hasToken = token.length > 0;
+  itemAdminRefreshRowEl.classList.toggle('hidden', !hasToken);
+  if (hasToken) {
+    setAdminRefreshStatus('Ready to force refresh item snapshots.', 'neutral');
+  }
+}
+
+async function handleItemAdminRefresh() {
+  if (itemAdminRefreshInFlight) return;
+  const token = getAdminToken();
+  if (!token) {
+    setAdminRefreshStatus('Admin token missing. Add cacheAdminToken in localStorage.', 'warn');
+    updateAdminRefreshVisibility();
+    return;
+  }
+
+  itemAdminRefreshInFlight = true;
+  if (itemAdminRefreshBtnEl) itemAdminRefreshBtnEl.disabled = true;
+  setAdminRefreshStatus('Refresh running...', 'progress');
+
+  try {
+    const payload = await triggerItemRefresh(token);
+    const itemCount = Number(payload?.items || 0).toLocaleString();
+    const pages = Number(payload?.pages || 0);
+    const duration = payload?.duration || '?';
+    setAdminRefreshStatus(`Refresh complete: ${itemCount} items across ${pages} pages (${duration}).`, 'success');
+  } catch (err) {
+    const status = Number(err?.status || 0);
+    const alreadyRunning = Boolean(err?.payload?.alreadyRunning);
+    if (alreadyRunning || status === 409) {
+      setAdminRefreshStatus('Refresh already running. Try again shortly.', 'warn');
+    } else if (status === 403) {
+      setAdminRefreshStatus('Invalid admin token. Clear token and set a valid one.', 'error');
+    } else {
+      setAdminRefreshStatus(`Refresh failed: ${err.message || 'unknown error'}`, 'error');
+    }
+  } finally {
+    itemAdminRefreshInFlight = false;
+    if (itemAdminRefreshBtnEl) itemAdminRefreshBtnEl.disabled = false;
+  }
+}
+
 // Loading Functions
 function calculateETA(loaded, total, cachedPages) {
   if (loaded === 0) return 'Calculating...';
@@ -1054,6 +1127,10 @@ document.addEventListener('DOMContentLoaded', () => {
   modalTitle = document.getElementById('modalTitle');
   modalContent = document.getElementById('modalContent');
   closeModalBtn = document.getElementById('closeModal');
+  itemAdminRefreshRowEl = document.getElementById('itemAdminRefreshRow');
+  itemAdminRefreshBtnEl = document.getElementById('itemAdminRefreshBtn');
+  itemAdminRefreshStatusEl = document.getElementById('itemAdminRefreshStatus');
+  itemAdminClearTokenBtnEl = document.getElementById('itemAdminClearTokenBtn');
   
   // Event Listeners
   categoryButtons.forEach(btn => {
@@ -1232,6 +1309,18 @@ document.addEventListener('DOMContentLoaded', () => {
   itemModal.addEventListener('click', (e) => {
     if (e.target === itemModal) closeModal();
   });
+
+  itemAdminRefreshBtnEl?.addEventListener('click', handleItemAdminRefresh);
+  itemAdminClearTokenBtnEl?.addEventListener('click', () => {
+    try {
+      localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
+    } catch {
+      // ignore storage errors
+    }
+    updateAdminRefreshVisibility();
+  });
+
+  updateAdminRefreshVisibility();
 
   showSearchPanel();
 });

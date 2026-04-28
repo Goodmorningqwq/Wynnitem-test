@@ -9,6 +9,7 @@ const APP_VERSION = '1.1.0';
 const DATABASE_ENDPOINT = `${API_BASE}/database?v=${APP_VERSION}`;
 const METADATA_ENDPOINT = `${API_BASE}/metadata?v=${APP_VERSION}`;
 const SEARCH_ENDPOINT = `${API_BASE}/database?v=${APP_VERSION}`;
+const REFRESH_ENDPOINT = `${API_BASE}/refresh?v=${APP_VERSION}`;
 
 // Wynncraft Search API endpoints (for reference)
 // GET https://api.wynncraft.com/v3/item/search/<str:query>
@@ -309,6 +310,36 @@ export async function quickSearch(query) {
   const data = await response.json();
   console.log('[DEBUG] quickSearch response keys:', Object.keys(data));
   return data;
+}
+
+export async function triggerItemRefresh(adminToken) {
+  const token = String(adminToken || '').trim();
+  if (!token) {
+    throw new Error('Missing admin token');
+  }
+  const url = buildUrl(REFRESH_ENDPOINT);
+  const response = await fetch(url.toString(), {
+    method: 'GET',
+    headers: {
+      'x-cache-admin-token': token
+    }
+  });
+
+  let payload = null;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = {};
+  }
+
+  if (!response.ok) {
+    const err = new Error(payload?.error || `API Error: ${response.status}`);
+    err.status = response.status;
+    err.payload = payload;
+    throw err;
+  }
+
+  return payload;
 }
 
 /**
