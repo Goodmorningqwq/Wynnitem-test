@@ -201,6 +201,25 @@ async function buildFullDatabase() {
   return { fullDb, stats, discoveredPageCount: fullDb.controller.count, totalTime: Date.now() - startTime };
 }
 
+async function promoteLastGoodSnapshot() {
+  const raw = await redis.get(LAST_GOOD_DB_KEY);
+  const snapshot = safeParse(raw);
+  if (!snapshot?.results || !Array.isArray(snapshot.results)) {
+    return { ok: false, error: 'No last-good snapshot available' };
+  }
+
+  await redis.set(FULL_DB_KEY, JSON.stringify(snapshot), { ex: TTL });
+  if (snapshot?.controller?.count) {
+    await redis.set(DISCOVERED_PAGES_KEY, String(snapshot.controller.count), { ex: LAST_GOOD_TTL });
+  }
+
+  return {
+    ok: true,
+    items: Number(snapshot.controller?.total || snapshot.results.length || 0),
+    pages: Number(snapshot.controller?.count || 0)
+  };
+}
+
 module.exports = async function handler(req, res) {
   // Allow either cron trigger or explicit admin token.
   const isCron = req.headers['x-vercel-cron'] === '1';
@@ -217,6 +236,8 @@ module.exports = async function handler(req, res) {
   }
   
   const triggerType = isCron ? 'cron' : 'manual-admin';
+  const requestedMode = String(req.query.mode || '').toLowerCase();
+  const effectiveMode = isCron ? 'full' : (requestedMode === 'full' ? 'full' : 'quick');
   console.log(`[Refresh] ${triggerType} triggered at ${new Date().toISOString()}`);
   
   const lockAcquired = await acquireRefreshLock();
@@ -229,10 +250,33 @@ module.exports = async function handler(req, res) {
   }
 
   try {
+    if (effectiveMode === 'quick') {
+      const promoted = await promoteLastGoodSnapshot();
+      if (!promoted.ok) {
+        return res.status(503).json({
+          success: false,
+          trigger: triggerType,
+          mode: effectiveMode,
+          alreadyRunning: false,
+          error: promoted.error
+        });
+      }
+      return res.status(200).json({
+        success: true,
+        trigger: triggerType,
+        mode: effectiveMode,
+        fromLastGood: true,
+        items: promoted.items,
+        pages: promoted.pages,
+        duration: 'instant'
+      });
+    }
+
     const result = await buildFullDatabase();
     return res.status(200).json({
       success: true,
       trigger: triggerType,
+      mode: effectiveMode,
       items: result.fullDb.controller.total,
       pages: result.discoveredPageCount,
       commands: result.stats.commands,
@@ -245,6 +289,7 @@ module.exports = async function handler(req, res) {
     console.error(`[Refresh] Error: ${e.message}`);
     return res.status(500).json({
       success: false,
+      mode: effectiveMode,
       alreadyRunning: false,
       error: e.message
     });

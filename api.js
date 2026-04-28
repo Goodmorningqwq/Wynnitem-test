@@ -312,12 +312,14 @@ export async function quickSearch(query) {
   return data;
 }
 
-export async function triggerItemRefresh(adminToken) {
+export async function triggerItemRefresh(adminToken, mode = 'quick') {
   const token = String(adminToken || '').trim();
   if (!token) {
     throw new Error('Missing admin token');
   }
   const url = buildUrl(REFRESH_ENDPOINT);
+  const refreshMode = mode === 'full' ? 'full' : 'quick';
+  url.searchParams.set('mode', refreshMode);
   const response = await fetch(url.toString(), {
     method: 'GET',
     headers: {

@@ -1,6 +1,6 @@
 // Main Application Logic
 
-import { cache, filterAndSortItems, filterByCategory, filterByArmourType, fetchItemPages, getAllFetchedItems, clearPageCache, fetchFilteredItems, triggerItemRefresh } from './api.js?v=20260428b';
+import { cache, filterAndSortItems, filterByCategory, filterByArmourType, fetchItemPages, getAllFetchedItems, clearPageCache, fetchFilteredItems, triggerItemRefresh } from './api.js?v=20260428c';
 
 // App State
 const AppState = {
@@ -631,11 +631,15 @@ async function handleItemAdminRefresh() {
   setAdminRefreshStatus('Refresh running...', 'progress');
 
   try {
-    const payload = await triggerItemRefresh(token);
+    const payload = await triggerItemRefresh(token, 'quick');
     const itemCount = Number(payload?.items || 0).toLocaleString();
     const pages = Number(payload?.pages || 0);
     const duration = payload?.duration || '?';
-    setAdminRefreshStatus(`Refresh complete: ${itemCount} items across ${pages} pages (${duration}).`, 'success');
+    if (payload?.fromLastGood) {
+      setAdminRefreshStatus(`Quick refresh complete from stable snapshot: ${itemCount} items across ${pages} pages.`, 'success');
+    } else {
+      setAdminRefreshStatus(`Refresh complete: ${itemCount} items across ${pages} pages (${duration}).`, 'success');
+    }
   } catch (err) {
     const status = Number(err?.status || 0);
     const alreadyRunning = Boolean(err?.payload?.alreadyRunning);
