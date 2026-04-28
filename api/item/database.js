@@ -211,10 +211,12 @@ module.exports = async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store, max-age=0');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
-  res.setHeader('X-Cache', 'EMPTY');
-  res.setHeader('Retry-After', '60');
-  return res.status(503).json({
-    error: 'Item database snapshot unavailable. Refresh is warming cache.',
-    code: 'ITEM_DB_SNAPSHOT_EMPTY'
+  res.setHeader('X-Cache', 'EMPTY-NONBLOCK');
+  return res.status(200).json({
+    controller: {
+      total: 0,
+      count: 0
+    },
+    results: []
   });
 };
