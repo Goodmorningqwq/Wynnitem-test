@@ -218,9 +218,9 @@ export async function fetchFilteredItems(options = {}, onProgress) {
   onProgress?.(0, 1, 0, 0);
   
   const url = buildUrl(DATABASE_ENDPOINT);
-  const response = await fetch(url.toString());
-  const fetchTime = Date.now() - totalStartTime;
-  const cacheStatus = response.headers.get('X-Cache') || 'UNKNOWN';
+  let response = await fetch(url.toString());
+  let fetchTime = Date.now() - totalStartTime;
+  let cacheStatus = response.headers.get('X-Cache') || 'UNKNOWN';
   
   console.log(`[DEBUG] Full DB fetched: ${cacheStatus} - ${fetchTime}ms`);
   
@@ -232,9 +232,33 @@ export async function fetchFilteredItems(options = {}, onProgress) {
       errorPayload = null;
     }
     if (response.status === 503 && errorPayload?.code === 'ITEM_DB_SNAPSHOT_EMPTY') {
-      throw new Error('Item cache is warming up. Please retry in a minute.');
+      // One-shot cache-bypass retry to avoid stale edge 503s.
+      const retryUrl = buildUrl(DATABASE_ENDPOINT);
+      retryUrl.searchParams.set('_ts', String(Date.now()));
+      const retryStart = Date.now();
+      const retryResponse = await fetch(retryUrl.toString(), { cache: 'no-store' });
+      const retryTime = Date.now() - retryStart;
+      const retryCacheStatus = retryResponse.headers.get('X-Cache') || 'UNKNOWN';
+      console.log(`[DEBUG] Retry full DB fetch: ${retryCacheStatus} - ${retryTime}ms`);
+      if (retryResponse.ok) {
+        response = retryResponse;
+        fetchTime += retryTime;
+        cacheStatus = retryCacheStatus;
+      } else {
+        let retryErrorPayload = null;
+        try {
+          retryErrorPayload = await retryResponse.json();
+        } catch {
+          retryErrorPayload = null;
+        }
+        if (retryResponse.status === 503 && retryErrorPayload?.code === 'ITEM_DB_SNAPSHOT_EMPTY') {
+          throw new Error('Item cache is warming up. Please retry in a minute.');
+        }
+        throw new Error(retryErrorPayload?.error || `API Error: ${retryResponse.status}`);
+      }
+    } else {
+      throw new Error(errorPayload?.error || `API Error: ${response.status}`);
     }
-    throw new Error(errorPayload?.error || `API Error: ${response.status}`);
   }
   
   onProgress?.(1, 1, 0, 0);

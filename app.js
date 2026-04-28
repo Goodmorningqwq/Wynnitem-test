@@ -1,6 +1,6 @@
 // Main Application Logic
 
-import { cache, filterAndSortItems, filterByCategory, filterByArmourType, fetchItemPages, getAllFetchedItems, clearPageCache, fetchFilteredItems, triggerItemRefresh } from './api.js?v=20260428e';
+import { cache, filterAndSortItems, filterByCategory, filterByArmourType, fetchItemPages, getAllFetchedItems, clearPageCache, fetchFilteredItems, triggerItemRefresh } from './api.js?v=20260428g';
 
 // App State
 const AppState = {
@@ -690,16 +690,18 @@ async function loadItemsForCategory(category) {
   const filters = getSearchFilters();
   
   try {
-    const result = await fetchFilteredItems({
+    const requestOptions = {
       category,
-      weaponType: selectedWeaponType || undefined,
-      armourType: selectedArmorType || undefined,
-      accessoryType: selectedAccessoryType || undefined,
-      miscType: selectedMiscType || undefined,
       tier: filters.tier || undefined,
       levelMin: filters.levelMin,
       levelMax: filters.levelMax
-    }, (currentPageNum, totalPagesNum, itemCount, cachedPages = 0) => {
+    };
+    if (category === 'weapon') requestOptions.weaponType = selectedWeaponType || undefined;
+    if (category === 'armour') requestOptions.armourType = selectedArmorType || undefined;
+    if (category === 'accessory') requestOptions.accessoryType = selectedAccessoryType || undefined;
+    if (category === 'misc') requestOptions.miscType = selectedMiscType || undefined;
+
+    const result = await fetchFilteredItems(requestOptions, (currentPageNum, totalPagesNum, itemCount, cachedPages = 0) => {
       if (loadingCancelled) return;
       const percent = Math.round((currentPageNum / totalPagesNum) * 100);
       const eta = calculateETA(currentPageNum, totalPagesNum, cachedPages);
