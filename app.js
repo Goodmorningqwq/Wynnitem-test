@@ -1,6 +1,6 @@
 // Main Application Logic
 
-import { cache, filterAndSortItems, filterByCategory, filterByArmourType, fetchItemPages, getAllFetchedItems, clearPageCache, fetchFilteredItems, triggerItemRefresh } from './api.js?v=20260428h';
+import { cache, filterAndSortItems, filterByCategory, filterByArmourType, fetchItemPages, getAllFetchedItems, clearPageCache, fetchFilteredItems, triggerItemRefresh } from './api.js?v=20260428i';
 
 // App State
 const AppState = {
@@ -39,6 +39,7 @@ let weaponTypeBtns, armorTypeBtns, accessoryTypeBtns, miscTypeBtns;
 let tierFilterResultsEl, levelMinFilterResultsEl, levelMaxFilterResultsEl;
 let headerItemCountEl, itemModal, modalTitle, modalContent, closeModalBtn;
 let itemAdminRefreshRowEl, itemAdminRefreshBtnEl, itemAdminRefreshStatusEl;
+let itemLoadNoticeEl;
 let itemAdminRefreshInFlight = false;
 
 // TIER_COLORS - Updated palette
@@ -582,6 +583,26 @@ function clearFilters() {
   levelMaxFilterResultsEl.value = '';
 }
 
+function setItemLoadNotice(message = '', tone = 'warn') {
+  if (!itemLoadNoticeEl) return;
+  itemLoadNoticeEl.classList.remove('hidden', 'text-amber-300', 'text-red-300', 'text-violet-300', 'text-gray-400');
+  if (!message) {
+    itemLoadNoticeEl.textContent = '';
+    itemLoadNoticeEl.classList.add('hidden');
+    return;
+  }
+  itemLoadNoticeEl.textContent = message;
+  if (tone === 'error') {
+    itemLoadNoticeEl.classList.add('text-red-300');
+  } else if (tone === 'info') {
+    itemLoadNoticeEl.classList.add('text-violet-300');
+  } else if (tone === 'neutral') {
+    itemLoadNoticeEl.classList.add('text-gray-400');
+  } else {
+    itemLoadNoticeEl.classList.add('text-amber-300');
+  }
+}
+
 function getAdminToken() {
   try {
     return String(localStorage.getItem(ADMIN_TOKEN_STORAGE_KEY) || '').trim();
@@ -672,6 +693,7 @@ function calculateETA(loaded, total, cachedPages) {
 }
 
 async function loadItemsForCategory(category) {
+  setItemLoadNotice('');
   loadingCancelled = false;
   currentCategory = category;
   
@@ -739,10 +761,14 @@ async function loadItemsForCategory(category) {
     console.error('Error loading items:', error);
     if (error.message.includes('429') || error.message.includes('rate')) {
       showSearchPanel();
-      alert('Rate limited by the API. Please wait a minute and try again.');
+      setItemLoadNotice('Rate limited by the API. Please wait a minute and try again.', 'warn');
     } else {
       showSearchPanel();
-      alert(`Failed to load items: ${error.message}`);
+      if (error.message.includes('warming up')) {
+        setItemLoadNotice('Item cache is warming up. Please retry in a minute.', 'info');
+      } else {
+        setItemLoadNotice(`Failed to load items: ${error.message}`, 'error');
+      }
     }
   }
 }
@@ -1136,6 +1162,7 @@ document.addEventListener('DOMContentLoaded', () => {
   itemAdminRefreshRowEl = document.getElementById('itemAdminRefreshRow');
   itemAdminRefreshBtnEl = document.getElementById('itemAdminRefreshBtn');
   itemAdminRefreshStatusEl = document.getElementById('itemAdminRefreshStatus');
+  itemLoadNoticeEl = document.getElementById('itemLoadNotice');
   
   // Event Listeners
   categoryButtons.forEach(btn => {
@@ -1162,7 +1189,8 @@ document.addEventListener('DOMContentLoaded', () => {
       alert('Please select a category first');
       return;
     }
-    
+
+    setItemLoadNotice('');
     loadingOverlayEl.classList.remove('hidden');
     searchPanelEl.classList.add('hidden');
     loadItemsForCategory(currentCategory);
