@@ -1,6 +1,6 @@
 // Main Application Logic
 
-import { cache, filterAndSortItems, filterByCategory, filterByArmourType, fetchItemPages, getAllFetchedItems, clearPageCache, fetchFilteredItems, triggerItemRefresh } from './api.js?v=20260428d';
+import { cache, filterAndSortItems, filterByCategory, filterByArmourType, fetchItemPages, getAllFetchedItems, clearPageCache, fetchFilteredItems, triggerItemRefresh } from './api.js?v=20260428e';
 
 // App State
 const AppState = {
@@ -1159,26 +1159,6 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('searchBtn')?.addEventListener('click', () => {
     if (!currentCategory) {
       alert('Please select a category first');
-      return;
-    }
-    
-    if (currentCategory === 'weapon' && !selectedWeaponType) {
-      alert('Please select a weapon type');
-      return;
-    }
-    
-    if (currentCategory === 'armour' && !selectedArmorType) {
-      alert('Please select an armor piece');
-      return;
-    }
-    
-    if (currentCategory === 'accessory' && !selectedAccessoryType) {
-      alert('Please select an accessory type');
-      return;
-    }
-    
-    if (currentCategory === 'misc' && !selectedMiscType) {
-      alert('Please select a misc type');
       return;
     }
     
