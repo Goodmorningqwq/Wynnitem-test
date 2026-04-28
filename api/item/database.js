@@ -33,6 +33,21 @@ function normalizeItems(results) {
   return [];
 }
 
+function normalizeSnapshot(snapshot) {
+  if (!snapshot || typeof snapshot !== 'object') return null;
+  const items = normalizeItems(snapshot.results);
+  if (!items.length) return null;
+  const count = Number(snapshot?.controller?.count || 0);
+  const total = Number(snapshot?.controller?.total || items.length);
+  return {
+    controller: {
+      total: Number.isFinite(total) && total > 0 ? total : items.length,
+      count: Number.isFinite(count) && count > 0 ? count : 1
+    },
+    results: items
+  };
+}
+
 function buildPageKeys(maxPage) {
   const keys = [];
   for (let page = 1; page <= maxPage; page += 1) {
@@ -144,22 +159,26 @@ module.exports = async function handler(req, res) {
     const lastGoodDb = safeParse(lastGoodRaw);
     const discoveredPages = Number(discoveredPagesRaw || 0);
 
-    if (Array.isArray(fullDb?.results) && fullDb.results.length > 0) {
+    const normalizedFullDb = normalizeSnapshot(fullDb);
+    if (normalizedFullDb) {
       res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=900, stale-while-revalidate=1800');
       res.setHeader('X-Cache', 'FULL-HIT');
-      if (Number.isFinite(discoveredPages) && discoveredPages > 0) {
-        res.setHeader('X-Discovered-Pages', String(discoveredPages));
-      }
-      return res.status(200).json(fullDb);
+      const resolvedPages = Number.isFinite(discoveredPages) && discoveredPages > 0
+        ? discoveredPages
+        : Number(normalizedFullDb?.controller?.count || 1);
+      res.setHeader('X-Discovered-Pages', String(resolvedPages));
+      return res.status(200).json(normalizedFullDb);
     }
 
-    if (Array.isArray(lastGoodDb?.results) && lastGoodDb.results.length > 0) {
+    const normalizedLastGoodDb = normalizeSnapshot(lastGoodDb);
+    if (normalizedLastGoodDb) {
       res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=900, stale-while-revalidate=1800');
       res.setHeader('X-Cache', 'LAST-GOOD-HIT');
-      if (Number.isFinite(discoveredPages) && discoveredPages > 0) {
-        res.setHeader('X-Discovered-Pages', String(discoveredPages));
-      }
-      return res.status(200).json(lastGoodDb);
+      const resolvedPages = Number.isFinite(discoveredPages) && discoveredPages > 0
+        ? discoveredPages
+        : Number(normalizedLastGoodDb?.controller?.count || 1);
+      res.setHeader('X-Discovered-Pages', String(resolvedPages));
+      return res.status(200).json(normalizedLastGoodDb);
     }
 
     // Self-heal path: rebuild a temporary full snapshot from cached pages.

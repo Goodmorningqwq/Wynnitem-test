@@ -1,6 +1,6 @@
 // Main Application Logic
 
-import { cache, filterAndSortItems, filterByCategory, filterByArmourType, fetchItemPages, getAllFetchedItems, clearPageCache, fetchFilteredItems, triggerItemRefresh } from './api.js?v=20260428g';
+import { cache, filterAndSortItems, filterByCategory, filterByArmourType, fetchItemPages, getAllFetchedItems, clearPageCache, fetchFilteredItems, triggerItemRefresh } from './api.js?v=20260428h';
 
 // App State
 const AppState = {
@@ -38,7 +38,7 @@ let weaponTypeFiltersEl, armorTypeFiltersEl, accessoryTypeFiltersEl, miscTypeFil
 let weaponTypeBtns, armorTypeBtns, accessoryTypeBtns, miscTypeBtns;
 let tierFilterResultsEl, levelMinFilterResultsEl, levelMaxFilterResultsEl;
 let headerItemCountEl, itemModal, modalTitle, modalContent, closeModalBtn;
-let itemAdminRefreshRowEl, itemAdminRefreshBtnEl, itemAdminRefreshStatusEl, itemAdminClearTokenBtnEl;
+let itemAdminRefreshRowEl, itemAdminRefreshBtnEl, itemAdminRefreshStatusEl;
 let itemAdminRefreshInFlight = false;
 
 // TIER_COLORS - Updated palette
@@ -1136,7 +1136,6 @@ document.addEventListener('DOMContentLoaded', () => {
   itemAdminRefreshRowEl = document.getElementById('itemAdminRefreshRow');
   itemAdminRefreshBtnEl = document.getElementById('itemAdminRefreshBtn');
   itemAdminRefreshStatusEl = document.getElementById('itemAdminRefreshStatus');
-  itemAdminClearTokenBtnEl = document.getElementById('itemAdminClearTokenBtn');
   
   // Event Listeners
   categoryButtons.forEach(btn => {
@@ -1297,15 +1296,6 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   itemAdminRefreshBtnEl?.addEventListener('click', handleItemAdminRefresh);
-  itemAdminClearTokenBtnEl?.addEventListener('click', () => {
-    try {
-      localStorage.removeItem(ADMIN_TOKEN_STORAGE_KEY);
-    } catch {
-      // ignore storage errors
-    }
-    updateAdminRefreshVisibility();
-  });
-
   updateAdminRefreshVisibility();
 
   showSearchPanel();
