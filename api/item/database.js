@@ -149,15 +149,19 @@ async function rebuildSnapshotFromUpstream(knownPages) {
 module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
 
+  let discoveredPages = 0;
   try {
-    const [fullDbRaw, lastGoodRaw, discoveredPagesRaw] = await redis.mget([
-      FULL_DB_KEY,
-      LAST_GOOD_DB_KEY,
-      DISCOVERED_PAGES_KEY
-    ]);
+    // Read discovered pages separately; avoid coupling large snapshot reads to multi-key responses.
+    const discoveredPagesRaw = await redis.get(DISCOVERED_PAGES_KEY);
+    discoveredPages = Number(discoveredPagesRaw || 0);
+  } catch (e) {
+    console.error(`[Vercel/database] Failed reading discovered pages: ${e.message}`);
+  }
+
+  try {
+    // Prefer direct single-key reads for large snapshots.
+    const fullDbRaw = await redis.get(FULL_DB_KEY);
     const fullDb = safeParse(fullDbRaw);
-    const lastGoodDb = safeParse(lastGoodRaw);
-    const discoveredPages = Number(discoveredPagesRaw || 0);
 
     const normalizedFullDb = normalizeSnapshot(fullDb);
     if (normalizedFullDb) {
@@ -169,7 +173,13 @@ module.exports = async function handler(req, res) {
       res.setHeader('X-Discovered-Pages', String(resolvedPages));
       return res.status(200).json(normalizedFullDb);
     }
+  } catch (e) {
+    console.error(`[Vercel/database] Full snapshot read error: ${e.message}`);
+  }
 
+  try {
+    const lastGoodRaw = await redis.get(LAST_GOOD_DB_KEY);
+    const lastGoodDb = safeParse(lastGoodRaw);
     const normalizedLastGoodDb = normalizeSnapshot(lastGoodDb);
     if (normalizedLastGoodDb) {
       res.setHeader('Cache-Control', 'public, max-age=0, s-maxage=900, stale-while-revalidate=1800');
@@ -180,7 +190,11 @@ module.exports = async function handler(req, res) {
       res.setHeader('X-Discovered-Pages', String(resolvedPages));
       return res.status(200).json(normalizedLastGoodDb);
     }
+  } catch (e) {
+    console.error(`[Vercel/database] Last-good snapshot read error: ${e.message}`);
+  }
 
+  try {
     // Self-heal path: rebuild a temporary full snapshot from cached pages.
     const rebuilt = await rebuildSnapshotFromPageCache(discoveredPages);
     if (rebuilt?.results?.length) {
@@ -205,7 +219,7 @@ module.exports = async function handler(req, res) {
       return res.status(200).json(rebuiltFromUpstream);
     }
   } catch (e) {
-    console.error(`[Vercel/database] Snapshot read error: ${e.message}`);
+    console.error(`[Vercel/database] Rebuild fallback error: ${e.message}`);
   }
 
   res.setHeader('Cache-Control', 'no-store, max-age=0');
