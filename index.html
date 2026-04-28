@@ -25,6 +25,13 @@
         linear-gradient(180deg, #1a1a1a 0%, #111 100%);
       color: var(--game-text);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      transition: opacity 180ms ease, transform 220ms ease, filter 220ms ease;
+    }
+
+    body.page-leaving {
+      opacity: 0.88;
+      transform: translateY(4px);
+      filter: blur(2px);
     }
 
     .theme-btn {
@@ -333,6 +340,16 @@
       opacity: 0.95;
     }
 
+    .menu-card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(120deg, transparent 15%, rgba(255, 255, 255, 0.08) 40%, transparent 65%);
+      transform: translateX(-135%);
+      animation: shimmerSweep 5.2s ease-in-out infinite;
+    }
+
     .menu-card--items::before {
       background: linear-gradient(90deg, #EC4899, #A855F7);
     }
@@ -341,8 +358,16 @@
       background: linear-gradient(90deg, #2ce8ff, #818cf8);
     }
 
+    .menu-card--guild::after {
+      animation-delay: 0.8s;
+    }
+
     .menu-card--territory::before {
       background: linear-gradient(90deg, #34d399, #10b981);
+    }
+
+    .menu-card--territory::after {
+      animation-delay: 1.6s;
     }
 
     .menu-card:hover {
@@ -451,8 +476,12 @@
       }
       .home-blob,
       .quick-guild-search::before,
-      .hero-chip-animate {
+      .hero-chip-animate,
+      .menu-card::after {
         animation: none !important;
+      }
+      body {
+        transition: none !important;
       }
     }
   </style>
@@ -633,6 +662,18 @@
           window.location.href = '/guild';
         });
       }
+      document.querySelectorAll('.menu-card[href]').forEach(function(link) {
+        link.addEventListener('click', function(e) {
+          if (e.defaultPrevented) return;
+          if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+          if (link.target === '_blank') return;
+          e.preventDefault();
+          document.body.classList.add('page-leaving');
+          setTimeout(function() {
+            window.location.href = link.href;
+          }, 170);
+        });
+      });
     });
   </script>
 </body>
