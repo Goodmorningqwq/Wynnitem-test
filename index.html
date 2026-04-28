@@ -76,6 +76,7 @@
       border-radius: 50%;
       filter: blur(80px);
       opacity: 0.35;
+      animation: blobDrift 12s ease-in-out infinite alternate;
     }
 
     .home-blob--1 {
@@ -92,6 +93,7 @@
       background: rgba(44, 232, 255, 0.25);
       bottom: 5%;
       right: -10%;
+      animation-delay: 1.4s;
     }
 
     .home-blob--3 {
@@ -100,6 +102,7 @@
       background: rgba(236, 72, 153, 0.2);
       top: 40%;
       left: 40%;
+      animation-delay: 2.2s;
     }
 
     .hero-title-shell {
@@ -280,6 +283,23 @@
       }
     }
 
+    @keyframes blobDrift {
+      0% { transform: translate3d(0, 0, 0) scale(1); }
+      100% { transform: translate3d(10px, -12px, 0) scale(1.05); }
+    }
+
+    @keyframes shimmerSweep {
+      0% { transform: translateX(-130%); opacity: 0; }
+      25% { opacity: 1; }
+      65% { opacity: 0.7; }
+      100% { transform: translateX(130%); opacity: 0; }
+    }
+
+    @keyframes chipFloat {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-2px); }
+    }
+
     .feature-chip {
       display: inline-flex;
       align-items: center;
@@ -330,6 +350,44 @@
       border-color: var(--game-accent);
       box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45), 0 0 36px rgba(143, 95, 216, 0.25);
     }
+
+    .quick-guild-search {
+      position: relative;
+      border: 1px solid rgba(143, 95, 216, 0.38);
+      background: linear-gradient(180deg, rgba(31, 16, 49, 0.9), rgba(21, 11, 34, 0.92));
+      box-shadow: inset 0 0 0 1px rgba(75, 43, 108, 0.48), 0 12px 28px rgba(0, 0, 0, 0.28);
+      overflow: hidden;
+    }
+
+    .quick-guild-search::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: linear-gradient(120deg, transparent 15%, rgba(255, 255, 255, 0.08) 40%, transparent 65%);
+      transform: translateX(-130%);
+      animation: shimmerSweep 4.8s ease-in-out infinite;
+    }
+
+    .quick-guild-search-input {
+      background: rgba(22, 10, 34, 0.95);
+      border: 1px solid rgba(143, 95, 216, 0.45);
+      transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+    }
+
+    .quick-guild-search-input:focus {
+      border-color: rgba(167, 116, 255, 0.9);
+      box-shadow: 0 0 0 3px rgba(143, 95, 216, 0.2);
+      transform: translateY(-1px);
+    }
+
+    .hero-chip-animate {
+      animation: chipFloat 5.2s ease-in-out infinite;
+    }
+
+    .hero-chip-animate:nth-child(2) { animation-delay: 0.45s; }
+    .hero-chip-animate:nth-child(3) { animation-delay: 0.9s; }
+    .hero-chip-animate:nth-child(4) { animation-delay: 1.35s; }
 
     .menu-card:active {
       transform: translateY(-3px);
@@ -390,6 +448,11 @@
       }
       .group:hover .group-hover\:translate-x-0\.5 {
         transform: none !important;
+      }
+      .home-blob,
+      .quick-guild-search::before,
+      .hero-chip-animate {
+        animation: none !important;
       }
     }
   </style>
@@ -463,11 +526,23 @@
           <p class="hero-subtitle text-lg md:text-xl max-w-2xl mx-auto leading-relaxed mb-8">
             One place for the item database and guild tracking—wars, XP, raids, and event leaderboards built for active guilds.
           </p>
+          <form action="/guild/search" method="get" class="quick-guild-search rounded-xl p-3 md:p-4 max-w-2xl mx-auto mb-8">
+            <p class="text-gray-400 text-[11px] uppercase tracking-widest font-semibold mb-2">Quick Guild Search</p>
+            <div class="flex flex-col md:flex-row gap-2">
+              <input
+                type="text"
+                name="q"
+                placeholder="Search guild name, prefix, or UUID..."
+                class="quick-guild-search-input flex-1 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none"
+              >
+              <button type="submit" class="theme-btn-primary px-5 py-3 rounded-lg text-sm font-semibold whitespace-nowrap">Search Guild</button>
+            </div>
+          </form>
           <div class="flex flex-wrap justify-center gap-2 md:gap-3">
-            <span class="feature-chip">Item database</span>
-            <span class="feature-chip">Guild tracker</span>
-            <span class="feature-chip">Territory map</span>
-            <span class="feature-chip">Event leaderboards</span>
+            <span class="feature-chip hero-chip-animate">Item database</span>
+            <span class="feature-chip hero-chip-animate">Guild tracker</span>
+            <span class="feature-chip hero-chip-animate">Territory map</span>
+            <span class="feature-chip hero-chip-animate">Event leaderboards</span>
           </div>
         </div>
 

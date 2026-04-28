@@ -2054,29 +2054,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.location.href = '/login';
   });
 
-  // Mode button toggle
-  document.querySelectorAll('.guild-mode-btn').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      document.querySelectorAll('.guild-mode-btn').forEach((b) => b.classList.remove('guild-mode-btn--active'));
-      btn.classList.add('guild-mode-btn--active');
-      guildSearchMode = btn.getAttribute('data-mode') || 'auto';
-      const placeholders = {
-        auto: 'Enter guild name, prefix, or UUID...',
-        name: 'Enter guild name...',
-        prefix: 'Enter guild prefix (e.g. ANO)...',
-        uuid: 'Enter guild UUID...'
-      };
-      const input = document.getElementById('guildSearchInput');
-      if (input) input.placeholder = placeholders[guildSearchMode] || 'Enter guild name, prefix, or UUID...';
-    });
-  });
+  // Keep guild search in auto-detect mode only.
+  guildSearchMode = 'auto';
+  const guildSearchInput = document.getElementById('guildSearchInput');
+  if (guildSearchInput) {
+    guildSearchInput.placeholder = 'Enter guild name, prefix, or UUID...';
+  }
 
   document.getElementById('guildSearchBtn').addEventListener('click', () => {
-    searchGuild(document.getElementById('guildSearchInput').value, guildSearchMode);
+    searchGuild(document.getElementById('guildSearchInput').value, 'auto');
   });
   document.getElementById('guildSearchInput').addEventListener('keypress', (e) => {
     if (e.key === 'Enter') {
-      searchGuild(document.getElementById('guildSearchInput').value, guildSearchMode);
+      searchGuild(document.getElementById('guildSearchInput').value, 'auto');
     }
   });
   document.getElementById('dashboardOpenSearchBtn')?.addEventListener('click', () => {
@@ -2169,6 +2159,17 @@ document.addEventListener('DOMContentLoaded', async () => {
     const userData = await loadUserData({ includeEvents: false });
     await loadUserDashboard(userData);
     updateTrackedGuildsList(userData?.guildName || null);
+  }
+
+  // Support quick guild search handoff from homepage.
+  if (isSearchPage) {
+    const url = new URL(window.location.href);
+    const quickQuery = (url.searchParams.get('q') || '').trim();
+    if (quickQuery) {
+      const input = document.getElementById('guildSearchInput');
+      if (input) input.value = quickQuery;
+      searchGuild(quickQuery, 'auto', { render: true, hydrateWars: true });
+    }
   }
 
   // Handle modal closing

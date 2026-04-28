@@ -76,6 +76,34 @@
       color: #fff;
     }
 
+    .guild-hero-animate {
+      animation: guildHeroPulse 5.5s ease-in-out infinite;
+    }
+
+    .search-panel-animate {
+      animation: panelLiftIn 380ms cubic-bezier(0.2, 0.7, 0.2, 1);
+    }
+
+    @keyframes panelLiftIn {
+      0% {
+        opacity: 0;
+        transform: translateY(8px) scale(0.99);
+      }
+      100% {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    @keyframes guildHeroPulse {
+      0%, 100% {
+        text-shadow: 0 0 0 rgba(167, 116, 255, 0);
+      }
+      50% {
+        text-shadow: 0 0 18px rgba(167, 116, 255, 0.25);
+      }
+    }
+
     .hide-scrollbar::-webkit-scrollbar {
       display: none;
     }
@@ -299,21 +327,16 @@
       </div>
       
       <!-- Guild Search -->
-      <div id="searchSection" class="theme-panel p-6 rounded-xl mb-6">
+      <div id="searchSection" class="theme-panel p-6 rounded-xl mb-6 search-panel-animate">
         <div class="flex items-center justify-between mb-3">
-          <h2 class="hero-title text-center flex-1">Guild Tracker</h2>
+          <h2 class="hero-title guild-hero-animate text-center flex-1">Guild Tracker</h2>
           <button type="button" id="backToDashboardBtn" class="theme-btn px-4 py-2 rounded-lg text-sm ml-4">Back to Dashboard</button>
         </div>
         <p class="text-gray-400 text-center mb-6">Search by guild name or prefix and track XP or war progress</p>
         
         <div class="mb-3">
           <label class="text-gray-400 text-xs uppercase tracking-widest font-semibold mb-1 block">Search Mode</label>
-          <div class="flex gap-2">
-            <button type="button" data-mode="auto" class="guild-mode-btn flex-1 px-3 py-2 rounded-lg text-sm border border-[rgba(143,95,216,0.45)] text-gray-300 hover:border-violet-400 hover:text-white transition-colors bg-[rgba(26,12,40,0.95)] guild-mode-btn--active">Auto-detect</button>
-            <button type="button" data-mode="name" class="guild-mode-btn flex-1 px-3 py-2 rounded-lg text-sm border border-[rgba(143,95,216,0.45)] text-gray-400 hover:border-violet-400 hover:text-white transition-colors bg-[rgba(26,12,40,0.95)]">By Name</button>
-            <button type="button" data-mode="prefix" class="guild-mode-btn flex-1 px-3 py-2 rounded-lg text-sm border border-[rgba(143,95,216,0.45)] text-gray-400 hover:border-violet-400 hover:text-white transition-colors bg-[rgba(26,12,40,0.95)]">By Prefix</button>
-            <button type="button" data-mode="uuid" class="guild-mode-btn flex-1 px-3 py-2 rounded-lg text-sm border border-[rgba(143,95,216,0.45)] text-gray-400 hover:border-violet-400 hover:text-white transition-colors bg-[rgba(26,12,40,0.95)]">By UUID</button>
-          </div>
+          <div class="guild-mode-btn guild-mode-btn--active w-full px-3 py-2 rounded-lg text-sm border border-[rgba(143,95,216,0.45)] text-center bg-[rgba(26,12,40,0.95)]">Auto-detect</div>
         </div>
         <div class="flex gap-4">
           <input 
@@ -580,6 +603,6 @@
     </div>
   </div>
 
-  <script type="module" src="/guilds-v2.js?v=20260427h"></script>
+  <script type="module" src="/guilds-v2.js?v=20260428a"></script>
 </body>
 </html>
