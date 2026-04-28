@@ -219,12 +219,21 @@ export async function fetchFilteredItems(options = {}, onProgress) {
   const url = buildUrl(DATABASE_ENDPOINT);
   const response = await fetch(url.toString());
   const fetchTime = Date.now() - totalStartTime;
-  const cacheStatus = response.headers.get('X-Cache');
+  const cacheStatus = response.headers.get('X-Cache') || 'UNKNOWN';
   
   console.log(`[DEBUG] Full DB fetched: ${cacheStatus} - ${fetchTime}ms`);
   
   if (!response.ok) {
-    throw new Error(`API Error: ${response.status}`);
+    let errorPayload = null;
+    try {
+      errorPayload = await response.json();
+    } catch {
+      errorPayload = null;
+    }
+    if (response.status === 503 && errorPayload?.code === 'ITEM_DB_SNAPSHOT_EMPTY') {
+      throw new Error('Item cache is warming up. Please retry in a minute.');
+    }
+    throw new Error(errorPayload?.error || `API Error: ${response.status}`);
   }
   
   onProgress?.(1, 1, 0, 0);
@@ -275,7 +284,9 @@ export async function fetchFilteredItems(options = {}, onProgress) {
   return {
     items: filteredItems,
     totalCount: Object.keys(filteredItems).length,
-    cachedPages: cacheStatus?.includes('HIT') ? 276 : 0
+    cachedPages: cacheStatus.includes('HIT') ? 1 : 0,
+    cacheMode: cacheStatus,
+    staleSnapshot: cacheStatus === 'LAST-GOOD-HIT'
   };
 }
 

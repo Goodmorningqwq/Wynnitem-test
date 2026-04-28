@@ -633,6 +633,10 @@ async function loadItemsForCategory(category) {
       showSearchPanel();
       return;
     }
+
+    if (result.staleSnapshot) {
+      loadingSubtitleEl.textContent = 'Using last stable cache snapshot while refresh runs';
+    }
     
     allLoadedItems = Object.entries(result.items).map(([name, item]) => ({ name: item.displayName || item.internalName || item.name || name, ...item }));
     allLoadedItems.sort((a, b) => {
