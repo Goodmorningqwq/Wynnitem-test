@@ -79,7 +79,12 @@ async function fetchGuildPrefix(prefix) {
   // Disambiguate multiple matches
   const options = {};
   for (const match of matches) {
-    options[match.name] = { name: match.name, prefix: match.prefix };
+    const sourceInfo = listData[match.name] || {};
+    options[match.name] = {
+      name: match.name,
+      prefix: match.prefix,
+      uuid: sourceInfo.uuid || sourceInfo.id || ''
+    };
   }
   return { response: { ok: false, status: 300 }, data: options };
 }

@@ -15,9 +15,26 @@ const elements = {
   coreStatsGrid: document.getElementById('coreStatsGrid'),
   classCards: document.getElementById('classCards'),
   progressionGrid: document.getElementById('progressionGrid')
+  ,
+  ambiguousBox: document.getElementById('ambiguousPlayerResult'),
+  ambiguousMeta: document.getElementById('ambiguousPlayerMeta'),
+  ambiguousList: document.getElementById('ambiguousPlayerList')
 };
 
 let inFlight = false;
+
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (ch) => {
+    switch (ch) {
+      case '&': return '&amp;';
+      case '<': return '&lt;';
+      case '>': return '&gt;';
+      case '"': return '&quot;';
+      case '\'': return '&#39;';
+      default: return ch;
+    }
+  });
+}
 
 function setStatus(message, tone = 'neutral') {
   elements.status.textContent = message;
@@ -31,6 +48,59 @@ function setStatus(message, tone = 'neutral') {
   } else {
     elements.status.classList.add('text-[var(--text-muted)]');
   }
+}
+
+function hideAmbiguousPlayers() {
+  if (!elements.ambiguousBox || !elements.ambiguousList) return;
+  elements.ambiguousList.innerHTML = '';
+  elements.ambiguousBox.classList.add('hidden');
+}
+
+function normalizeAmbiguousOptions(options) {
+  if (!options || typeof options !== 'object') return [];
+  return Object.entries(options).map(([key, value]) => {
+    if (value && typeof value === 'object') {
+      return {
+        identifier: key,
+        name: value.storedName || value.username || value.name || key,
+        rank: value.rank || value.supportRank || 'Player'
+      };
+    }
+    return {
+      identifier: key,
+      name: String(value || key),
+      rank: 'Player'
+    };
+  });
+}
+
+function renderAmbiguousPlayers(query, options) {
+  if (!elements.ambiguousBox || !elements.ambiguousList || !elements.ambiguousMeta) return;
+  const normalized = normalizeAmbiguousOptions(options);
+  if (!normalized.length) {
+    hideAmbiguousPlayers();
+    return;
+  }
+  elements.ambiguousMeta.textContent = `"${query}" matched ${normalized.length} players`;
+  elements.ambiguousList.innerHTML = normalized.map((opt) => `
+    <button type="button" class="w-full text-left rounded-lg border border-[rgba(192,132,252,0.35)] bg-[rgba(15,8,28,0.75)] hover:bg-[rgba(30,16,54,0.9)] p-3 transition-colors player-ambiguous-option" data-identifier="${escapeHtml(opt.identifier)}">
+      <div class="flex items-center justify-between gap-2">
+        <span class="text-white font-medium">${escapeHtml(opt.name)}</span>
+        <span class="text-xs text-pink-200">${escapeHtml(opt.rank)}</span>
+      </div>
+      <p class="text-xs text-[var(--text-muted)] mt-1">Select this player</p>
+    </button>
+  `).join('');
+
+  elements.ambiguousList.querySelectorAll('.player-ambiguous-option').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const identifier = String(btn.getAttribute('data-identifier') || '').trim();
+      if (!identifier) return;
+      elements.input.value = identifier;
+      searchPlayer(identifier);
+    });
+  });
+  elements.ambiguousBox.classList.remove('hidden');
 }
 
 function numberText(value) {
@@ -157,14 +227,15 @@ function renderProfile(profile) {
   elements.content.classList.remove('hidden');
 }
 
-async function searchPlayer() {
+async function searchPlayer(overrideQuery = '') {
   if (inFlight) return;
-  const query = String(elements.input.value || '').trim();
+  const query = String(overrideQuery || elements.input.value || '').trim();
   if (!query) {
     setStatus('Enter a player name or UUID first.', 'error');
     return;
   }
 
+  hideAmbiguousPlayers();
   inFlight = true;
   elements.button.disabled = true;
   setStatus('Fetching live player profile from Vercel API...', 'progress');
@@ -182,6 +253,13 @@ async function searchPlayer() {
       payload = await response.json();
     } catch {
       payload = null;
+    }
+
+    if (response.status === 300 && payload?.ambiguous) {
+      elements.content.classList.add('hidden');
+      renderAmbiguousPlayers(query, payload.options || {});
+      setStatus('Multiple players matched query. Pick one below.', 'neutral');
+      return;
     }
 
     if (!response.ok || !payload) {

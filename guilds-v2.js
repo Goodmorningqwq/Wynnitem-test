@@ -534,6 +534,7 @@ function normalizeAmbiguousOptions(options) {
         key,
         name: value.name || key,
         prefix: value.prefix || key,
+        uuid: value.uuid || '',
         stats: value
       };
     }
@@ -564,7 +565,7 @@ function renderAmbiguousGuildResults(query, searchType, options) {
     const level = option.stats?.level != null ? `Lv.${option.stats.level}` : '';
     const wars = option.stats?.wars != null ? `${option.stats.wars} wars` : '';
     return `
-      <button type="button" class="w-full text-left bg-gray-800/50 hover:bg-gray-700/50 border border-gray-700 rounded p-3 transition-colors guild-ambiguous-option" data-prefix="${escapeHtml(option.prefix)}">
+      <button type="button" class="w-full text-left bg-gray-800/50 hover:bg-gray-700/50 border border-gray-700 rounded p-3 transition-colors guild-ambiguous-option" data-prefix="${escapeHtml(option.prefix)}" data-name="${escapeHtml(option.name)}" data-uuid="${escapeHtml(option.uuid || '')}">
         <div class="flex items-center justify-between">
           <span class="text-white font-medium">${escapeHtml(option.name)}</span>
           <span class="text-violet-300 text-sm">[${escapeHtml(option.prefix)}]</span>
@@ -576,8 +577,16 @@ function renderAmbiguousGuildResults(query, searchType, options) {
 
   list.querySelectorAll('.guild-ambiguous-option').forEach((btn) => {
     btn.addEventListener('click', () => {
+      const uuid = btn.getAttribute('data-uuid') || '';
+      const exactName = btn.getAttribute('data-name') || '';
       const prefix = btn.getAttribute('data-prefix') || '';
-      searchGuild(prefix, 'prefix');
+      if (uuid) {
+        searchGuild(uuid, 'uuid');
+      } else if (exactName) {
+        searchGuild(exactName, 'name');
+      } else {
+        searchGuild(prefix, 'prefix');
+      }
     });
   });
 

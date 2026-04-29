@@ -103,6 +103,13 @@
         <button id="playerSearchBtn" type="button" class="neon-btn rounded-xl px-6 py-3 font-semibold">Fetch Stats</button>
       </div>
       <p id="statusMessage" class="text-sm text-[var(--text-muted)] mt-3">Ready.</p>
+      <div id="ambiguousPlayerResult" class="hidden mt-4 neon-panel-soft rounded-xl p-4">
+        <div class="flex items-center justify-between mb-2">
+          <p class="text-sm font-semibold text-white">Multiple players matched</p>
+          <span id="ambiguousPlayerMeta" class="text-xs text-[var(--text-muted)]">Select one</span>
+        </div>
+        <div id="ambiguousPlayerList" class="space-y-2 max-h-56 overflow-y-auto"></div>
+      </div>
     </section>
 
     <section id="playerContent" class="hidden space-y-6">
@@ -140,6 +147,6 @@
     </section>
   </main>
 
-  <script type="module" src="/player-stats.js?v=20260429a"></script>
+  <script type="module" src="/player-stats.js?v=20260429b"></script>
 </body>
 </html>
