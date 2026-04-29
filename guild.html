@@ -9,20 +9,25 @@
 
   <style>
     :root {
-      --game-bg: rgba(20, 8, 30, 0.9);
-      --game-border: rgba(120, 68, 190, 0.7);
-      --game-border-soft: rgba(120, 68, 190, 0.35);
-      --game-text: #e8e4ef;
-      --game-muted: #9ca3af;
-      --game-accent: #8f5fd8;
-      --game-accent-strong: #a774ff;
+      --bg-main: #07050d;
+      --panel-bg: rgba(20, 10, 34, 0.9);
+      --panel-bg-soft: rgba(18, 9, 30, 0.84);
+      --panel-border: rgba(211, 95, 255, 0.4);
+      --panel-border-soft: rgba(168, 85, 247, 0.24);
+      --game-text: #ede8ff;
+      --game-muted: #a39abf;
+      --game-accent: #ff4fd8;
+      --game-accent-strong: #c084fc;
+      --game-purple: #a855f7;
+      --game-violet: #7c3aed;
     }
 
     body {
       background:
-        radial-gradient(circle at 15% 15%, rgba(118, 63, 186, 0.14), transparent 36%),
-        radial-gradient(circle at 85% 10%, rgba(44, 232, 255, 0.1), transparent 30%),
-        linear-gradient(180deg, #1a1a1a 0%, #111 100%);
+        radial-gradient(circle at 14% 18%, rgba(255, 79, 216, 0.14), transparent 32%),
+        radial-gradient(circle at 82% 8%, rgba(168, 85, 247, 0.2), transparent 35%),
+        radial-gradient(circle at 74% 76%, rgba(124, 58, 237, 0.12), transparent 38%),
+        var(--bg-main);
       color: var(--game-text);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
     }
@@ -37,14 +42,14 @@
     }
 
     .theme-panel {
-      background: linear-gradient(180deg, rgba(39, 18, 57, 0.95), rgba(27, 12, 42, 0.95));
-      border: 1px solid var(--game-border-soft);
-      box-shadow: inset 0 0 0 1px rgba(73, 38, 102, 0.55);
+      background: linear-gradient(180deg, rgba(24, 12, 39, 0.96), rgba(14, 8, 26, 0.94));
+      border: 1px solid var(--panel-border);
+      box-shadow: inset 0 0 0 1px rgba(236, 72, 153, 0.08), 0 10px 28px rgba(0, 0, 0, 0.42);
     }
 
     .theme-btn {
-      background: linear-gradient(180deg, rgba(60, 60, 60, 0.95), rgba(45, 45, 45, 0.95));
-      border: 1px solid rgba(80, 80, 80, 0.5);
+      background: linear-gradient(180deg, rgba(38, 21, 62, 0.94), rgba(28, 14, 46, 0.94));
+      border: 1px solid rgba(192, 132, 252, 0.35);
       color: var(--game-text);
       transition: all 180ms ease;
       touch-action: manipulation;
@@ -57,23 +62,92 @@
     }
 
     .theme-btn-primary {
-      background: linear-gradient(180deg, rgba(130, 75, 206, 0.95), rgba(96, 52, 165, 0.95));
-      border: 1px solid rgba(180, 132, 255, 0.6);
+      background: linear-gradient(160deg, rgba(255, 79, 216, 0.88), rgba(124, 58, 237, 0.92));
+      border: 1px solid rgba(232, 121, 249, 0.75);
       color: #fff;
       touch-action: manipulation;
       cursor: pointer;
     }
 
     .theme-btn-primary:hover {
-      background: linear-gradient(180deg, rgba(147, 93, 224, 1), rgba(109, 62, 181, 1));
-      border-color: rgba(200, 160, 255, 0.8);
+      box-shadow: 0 0 22px rgba(236, 72, 153, 0.35);
       transform: translateY(-2px);
     }
 
     .guild-mode-btn--active {
-      background: linear-gradient(180deg, rgba(100, 55, 175, 0.6), rgba(70, 38, 130, 0.6));
-      border-color: rgba(167, 116, 255, 0.8);
+      background: linear-gradient(180deg, rgba(255, 79, 216, 0.22), rgba(124, 58, 237, 0.28));
+      border-color: rgba(232, 121, 249, 0.72);
       color: #fff;
+    }
+
+    .hero-title {
+      background: linear-gradient(130deg, #f5d0fe 0%, #f472b6 40%, #c084fc 74%, #a78bfa 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    header, #userMenu {
+      background: rgba(8, 5, 14, 0.92) !important;
+      border-color: rgba(130, 86, 188, 0.35) !important;
+      backdrop-filter: blur(8px);
+    }
+
+    main [class*="bg-gray-800/50"],
+    main [class*="bg-gray-900/40"],
+    main [class*="bg-gray-900/30"],
+    main [class*="bg-black/20"] {
+      background: var(--panel-bg-soft) !important;
+      border-color: var(--panel-border-soft) !important;
+      box-shadow: inset 0 0 0 1px rgba(255, 79, 216, 0.05);
+    }
+
+    #guildSearchInput,
+    #dashboardEventCodeInput,
+    #eventWebhookUrlInput,
+    #trackMetricSelect,
+    #trackScopeSelect {
+      background: rgba(10, 6, 20, 0.92) !important;
+      border-color: rgba(192, 132, 252, 0.45) !important;
+      color: #fff !important;
+    }
+
+    #guildSearchInput:focus,
+    #dashboardEventCodeInput:focus,
+    #eventWebhookUrlInput:focus,
+    #trackMetricSelect:focus,
+    #trackScopeSelect:focus {
+      border-color: rgba(232, 121, 249, 0.9) !important;
+      box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.2);
+      outline: none;
+    }
+
+    #guildAmbiguousResult {
+      background: var(--panel-bg-soft) !important;
+      border-color: var(--panel-border-soft) !important;
+    }
+
+    #guildResult .grid.grid-cols-2.md\:grid-cols-4.gap-4.mb-4 > div,
+    #guildResult #eventInfo > .grid.grid-cols-2.gap-4.mb-3 > div {
+      background: linear-gradient(180deg, rgba(22, 12, 38, 0.9), rgba(16, 9, 28, 0.9)) !important;
+      border: 1px solid rgba(192, 132, 252, 0.24);
+      border-radius: 0.75rem;
+    }
+
+    #guildResult [class*="text-gray-500"],
+    #guildResult [class*="text-gray-400"],
+    #dashboardEventSection [class*="text-gray-500"],
+    #dashboardEventSection [class*="text-gray-400"] {
+      color: var(--game-muted) !important;
+    }
+
+    #guildResult [class*="border-gray-700"],
+    #dashboardEventSection [class*="border-gray-700"],
+    #dashboardJoinCodeSection,
+    #dashboardQuickEventCodeRow,
+    #eventPlayerBreakdownSection,
+    #dashboardEventPlayerBreakdownSection {
+      border-color: var(--panel-border-soft) !important;
     }
 
     .guild-hero-animate {
@@ -603,6 +677,6 @@
     </div>
   </div>
 
-  <script type="module" src="/guilds-v2.js?v=20260429a"></script>
+  <script type="module" src="/guilds-v2.js?v=20260429b"></script>
 </body>
 </html>

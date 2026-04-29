@@ -442,7 +442,7 @@ function renderMembersList(players) {
   }
 
   const tableHeader = `
-    <div class="grid grid-cols-[80px_1fr_70px_40px_40px] gap-2 px-3 py-2 border-b border-gray-700/50 text-[10px] uppercase tracking-wider font-bold text-gray-500 mb-1">
+    <div class="grid grid-cols-[80px_1fr_70px_40px_40px] gap-2 px-3 py-2 border-b border-[rgba(192,132,252,0.24)] text-[10px] uppercase tracking-wider font-bold text-violet-200/60 mb-1">
       <span>Rank</span>
       <span>Member</span>
       <span class="text-right">XP</span>
@@ -461,22 +461,22 @@ function renderMembersList(players) {
         onclick="window.viewPlayerProfileFromElement(this)"
         data-profile-username="${escapeHtml(player.username || '')}"
         data-profile-uuid="${escapeHtml(player.uuid || '')}"
-        class="grid grid-cols-[80px_1fr_70px_40px_40px] gap-2 px-3 py-1.5 hover:bg-white/5 cursor-pointer rounded transition-all text-[11px] items-center group active:scale-[0.98]">
+        class="grid grid-cols-[80px_1fr_70px_40px_40px] gap-2 px-3 py-1.5 hover:bg-[rgba(236,72,153,0.1)] cursor-pointer rounded transition-all text-[11px] items-center group active:scale-[0.98] border border-transparent hover:border-[rgba(192,132,252,0.24)]">
         <div class="flex flex-col">
           <span style="color: ${rc.color}" class="font-bold uppercase text-[9px] leading-tight">${rc.label}</span>
           <span class="text-[8px] mt-[-2px] opacity-60" style="color: ${rc.color}">${stars}</span>
         </div>
         <div class="flex items-center">
-          <span class="text-white truncate font-medium group-hover:text-purple-300 transition-colors">${escapeHtml(player.username)}</span>
+          <span class="text-white truncate font-medium group-hover:text-pink-200 transition-colors">${escapeHtml(player.username)}</span>
           ${onlineIndicator}
         </div>
-        <div class="text-right font-mono text-violet-300/80 group-hover:text-violet-100 italic">
+        <div class="text-right font-mono text-violet-200/80 group-hover:text-white italic">
           ${formatCompactNumber(player.contributed)}
         </div>
-        <div class="text-right font-mono text-orange-300/80 group-hover:text-orange-100">
+        <div class="text-right font-mono text-pink-200/80 group-hover:text-pink-100">
           ${player.wars ?? 0}
         </div>
-        <div class="text-right font-mono text-cyan-300/80 group-hover:text-cyan-100">
+        <div class="text-right font-mono text-purple-200/80 group-hover:text-purple-100">
           ${player.guildRaids ?? 0}
         </div>
       </div>
@@ -490,14 +490,14 @@ function renderPlayerSelection(players) {
   debugLog('pre-fix', 'H5', 'guilds-v2.js:renderPlayerSelection', 'rendering player selection wars state', { players: players.length, resolvedWars: players.filter((p) => p.wars != null).length, placeholderWars: players.filter((p) => p.wars == null).length });
   // #endregion
   if (!players.length) {
-    container.innerHTML = '<p class="text-gray-500 text-sm">No members available</p>';
+    container.innerHTML = '<p class="text-violet-200/60 text-sm p-3">No members available</p>';
     return;
   }
   container.innerHTML = players.map((player) => {
     const rc = getRankConfig(player.rank);
     const stars = '★'.repeat(rc.stars).padEnd(5, ' ');
     return `
-      <label class="flex items-center gap-3 px-3 py-2 hover:bg-gray-800/40 rounded cursor-pointer transition-all border border-transparent has-[:checked]:bg-green-500/10 has-[:checked]:border-green-500/30 group select-none">
+      <label class="flex items-center gap-3 px-3 py-2 hover:bg-[rgba(236,72,153,0.08)] rounded cursor-pointer transition-all border border-transparent has-[:checked]:bg-[rgba(168,85,247,0.16)] has-[:checked]:border-[rgba(232,121,249,0.5)] group select-none">
         <input type="checkbox" value="${escapeHtml(player.username)}" class="hidden peer">
         <div class="flex flex-col min-w-[70px] opacity-80 group-has-[:checked]:opacity-100">
            <span style="color: ${rc.color}" class="text-[9px] font-bold leading-none uppercase">${rc.label}</span>
@@ -508,13 +508,13 @@ function renderPlayerSelection(players) {
           onclick="window.viewPlayerProfileFromElement(this)"
           data-profile-username="${escapeHtml(player.username || '')}"
           data-profile-uuid="${escapeHtml(player.uuid || '')}">
-           <span class="text-white text-sm font-medium group-hover:text-purple-300 transition-colors">${escapeHtml(player.username)}</span>
+           <span class="text-white text-sm font-medium group-hover:text-pink-200 transition-colors">${escapeHtml(player.username)}</span>
            <svg class="w-3.5 h-3.5 text-green-400 opacity-0 peer-checked:opacity-100 transition-opacity shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
         </div>
         <div class="ml-auto text-right flex items-center gap-3 opacity-60 group-hover:opacity-100 transition-opacity">
-          <span class="text-[10px] font-mono text-violet-400/80">${formatCompactNumber(player.contributed)} XP</span>
-          <span class="text-[10px] font-mono text-orange-400/80">${player.wars ?? 0}W</span>
-          <span class="text-[10px] font-mono text-cyan-400/80">${player.guildRaids ?? 0}R</span>
+          <span class="text-[10px] font-mono text-violet-200/80">${formatCompactNumber(player.contributed)} XP</span>
+          <span class="text-[10px] font-mono text-pink-200/80">${player.wars ?? 0}W</span>
+          <span class="text-[10px] font-mono text-purple-200/80">${player.guildRaids ?? 0}R</span>
         </div>
       </label>
     `;
@@ -565,12 +565,12 @@ function renderAmbiguousGuildResults(query, searchType, options) {
     const level = option.stats?.level != null ? `Lv.${option.stats.level}` : '';
     const wars = option.stats?.wars != null ? `${option.stats.wars} wars` : '';
     return `
-      <button type="button" class="w-full text-left bg-gray-800/50 hover:bg-gray-700/50 border border-gray-700 rounded p-3 transition-colors guild-ambiguous-option" data-prefix="${escapeHtml(option.prefix)}" data-name="${escapeHtml(option.name)}" data-uuid="${escapeHtml(option.uuid || '')}">
+      <button type="button" class="w-full text-left bg-[rgba(18,9,30,0.84)] hover:bg-[rgba(30,16,54,0.92)] border border-[rgba(192,132,252,0.28)] rounded p-3 transition-colors guild-ambiguous-option" data-prefix="${escapeHtml(option.prefix)}" data-name="${escapeHtml(option.name)}" data-uuid="${escapeHtml(option.uuid || '')}">
         <div class="flex items-center justify-between">
           <span class="text-white font-medium">${escapeHtml(option.name)}</span>
-          <span class="text-violet-300 text-sm">[${escapeHtml(option.prefix)}]</span>
+          <span class="text-pink-200 text-sm">[${escapeHtml(option.prefix)}]</span>
         </div>
-        <p class="text-xs text-gray-400 mt-1">${escapeHtml([level, wars].filter(Boolean).join(' · ') || 'Select this guild')}</p>
+        <p class="text-xs text-violet-200/60 mt-1">${escapeHtml([level, wars].filter(Boolean).join(' · ') || 'Select this guild')}</p>
       </button>
     `;
   }).join('');
