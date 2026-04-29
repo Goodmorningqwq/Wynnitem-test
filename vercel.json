@@ -8,6 +8,7 @@
     { "source": "/guild/event_history", "destination": "/guild-event-history.html" },
     { "source": "/guild/search", "destination": "/guild.html" },
     { "source": "/guild", "destination": "/guild.html" },
+    { "source": "/player-stats", "destination": "/player-stats.html" },
     { "source": "/login", "destination": "/login.html" },
     { "source": "/api/item(.*)", "destination": "/api/item$1" },
     { "source": "/api/guild(.*)", "destination": "/api/guild$1" },

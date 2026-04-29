@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wynncraft Player Stats</title>
+  <link rel="stylesheet" href="/output.css">
+  <style>
+    :root {
+      --bg-main: #07050d;
+      --panel-bg: rgba(20, 10, 34, 0.88);
+      --panel-border: rgba(211, 95, 255, 0.42);
+      --text-main: #ede8ff;
+      --text-muted: #a39abf;
+      --pink: #ff4fd8;
+      --purple: #a855f7;
+      --violet: #7c3aed;
+    }
+
+    body {
+      background:
+        radial-gradient(circle at 14% 18%, rgba(255, 79, 216, 0.14), transparent 32%),
+        radial-gradient(circle at 82% 7%, rgba(168, 85, 247, 0.2), transparent 34%),
+        radial-gradient(circle at 70% 72%, rgba(124, 58, 237, 0.13), transparent 36%),
+        var(--bg-main);
+      color: var(--text-main);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .neon-panel {
+      background: linear-gradient(180deg, rgba(24, 12, 39, 0.95), rgba(14, 8, 26, 0.95));
+      border: 1px solid var(--panel-border);
+      box-shadow: 0 0 0 1px rgba(236, 72, 153, 0.08), 0 10px 28px rgba(0, 0, 0, 0.45);
+    }
+
+    .neon-panel-soft {
+      background: var(--panel-bg);
+      border: 1px solid rgba(168, 85, 247, 0.25);
+      box-shadow: inset 0 0 0 1px rgba(255, 79, 216, 0.05);
+    }
+
+    .neon-title {
+      background: linear-gradient(130deg, #f5d0fe 0%, #f472b6 40%, #c084fc 74%, #a78bfa 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .neon-btn {
+      background: linear-gradient(160deg, rgba(255, 79, 216, 0.88), rgba(124, 58, 237, 0.92));
+      border: 1px solid rgba(232, 121, 249, 0.75);
+      color: white;
+      transition: transform 160ms ease, box-shadow 160ms ease;
+    }
+
+    .neon-btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 0 22px rgba(236, 72, 153, 0.35);
+    }
+
+    .stat-card {
+      background: linear-gradient(180deg, rgba(22, 12, 38, 0.9), rgba(16, 9, 28, 0.9));
+      border: 1px solid rgba(192, 132, 252, 0.24);
+    }
+
+    .avatar-ring {
+      border: 1px solid rgba(255, 79, 216, 0.42);
+      box-shadow: 0 0 16px rgba(255, 79, 216, 0.25);
+    }
+  </style>
+</head>
+<body class="min-h-screen">
+  <header class="border-b border-[rgba(130,86,188,0.35)] bg-[rgba(8,5,14,0.92)] backdrop-blur-sm sticky top-0 z-20">
+    <div class="container mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="/" class="flex items-center gap-3">
+        <span class="text-xl">🎮</span>
+        <div>
+          <h1 class="font-semibold text-white">Wynncraft Database</h1>
+          <p class="text-xs text-[var(--text-muted)]">Player Stats</p>
+        </div>
+      </a>
+      <nav class="flex items-center gap-4 text-sm">
+        <a href="/item" class="text-[var(--text-muted)] hover:text-white">Items</a>
+        <a href="/guild" class="text-[var(--text-muted)] hover:text-white">Guilds</a>
+        <a href="/player-stats" class="text-pink-300 font-semibold">Player Stats</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container mx-auto px-4 py-8">
+    <section class="neon-panel rounded-2xl p-6 mb-6">
+      <p class="text-xs uppercase tracking-[0.24em] text-[var(--text-muted)] mb-2">WynnCraft Player Intelligence</p>
+      <h2 class="neon-title text-3xl md:text-4xl font-extrabold mb-3">Neon Player Statistics Dashboard</h2>
+      <p class="text-[var(--text-muted)] mb-5">Search any player to view detailed combat, progression, class, and profile metrics.</p>
+
+      <div class="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-3">
+        <input
+          id="playerQueryInput"
+          type="text"
+          placeholder="Enter player username or UUID..."
+          class="w-full rounded-xl bg-[rgba(10,6,20,0.92)] border border-[rgba(192,132,252,0.45)] px-4 py-3 text-white placeholder:text-[var(--text-muted)] focus:outline-none focus:border-pink-300"
+        >
+        <button id="playerSearchBtn" type="button" class="neon-btn rounded-xl px-6 py-3 font-semibold">Fetch Stats</button>
+      </div>
+      <p id="statusMessage" class="text-sm text-[var(--text-muted)] mt-3">Ready.</p>
+    </section>
+
+    <section id="playerContent" class="hidden space-y-6">
+      <div class="neon-panel rounded-2xl p-6">
+        <div class="grid grid-cols-1 md:grid-cols-[auto_1fr] gap-5 items-start">
+          <div class="avatar-ring rounded-2xl p-2 bg-[rgba(12,8,23,0.9)] w-fit">
+            <img id="playerAvatar" src="" alt="Player avatar" class="w-24 h-24 rounded-xl">
+          </div>
+          <div>
+            <div class="flex flex-wrap items-center gap-2 mb-2">
+              <h3 id="playerName" class="text-2xl font-bold text-white">Player</h3>
+              <span id="onlineBadge" class="hidden text-xs px-2 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">Online</span>
+            </div>
+            <p id="playerUuid" class="text-xs text-[var(--text-muted)] break-all mb-2"></p>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
+              <div class="neon-panel-soft rounded-lg p-3"><p class="text-[var(--text-muted)] text-xs">Rank</p><p id="playerRank" class="font-semibold">N/A</p></div>
+              <div class="neon-panel-soft rounded-lg p-3"><p class="text-[var(--text-muted)] text-xs">Guild</p><p id="playerGuild" class="font-semibold">N/A</p></div>
+              <div class="neon-panel-soft rounded-lg p-3"><p class="text-[var(--text-muted)] text-xs">First Join</p><p id="playerFirstJoin" class="font-semibold">N/A</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="coreStatsGrid"></div>
+
+      <div class="neon-panel rounded-2xl p-6">
+        <h4 class="text-lg font-semibold mb-4">Class Breakdown</h4>
+        <div id="classCards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+      </div>
+
+      <div class="neon-panel rounded-2xl p-6">
+        <h4 class="text-lg font-semibold mb-4">Progression & Economy</h4>
+        <div id="progressionGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+      </div>
+    </section>
+  </main>
+
+  <script type="module" src="/player-stats.js?v=20260429a"></script>
+</body>
+</html>

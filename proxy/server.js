@@ -406,7 +406,7 @@ app.use((req, res, next) => {
   const pathname = req.path;
   
   if (req.method === 'GET') {
-    if (pathname === '/' || pathname === '/guild' || pathname === '/item' || pathname === '/login') {
+    if (pathname === '/' || pathname === '/guild' || pathname === '/item' || pathname === '/login' || pathname === '/player-stats') {
       const htmlFile = pathname === '/' ? '/index.html' : `${pathname}.html`;
       return res.sendFile(path.join(repoRoot, htmlFile), (err) => {
         if (err) {

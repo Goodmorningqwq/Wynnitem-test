@@ -7,7 +7,8 @@ module.exports = {
     './guilds.js',
     './guilds-v2.js',
     './guild-leaderboard.js',
-    './guild-event-history.js'
+    './guild-event-history.js',
+    './player-stats.js'
   ],
   theme: {
     extend: {
