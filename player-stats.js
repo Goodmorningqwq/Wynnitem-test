@@ -289,3 +289,16 @@ elements.input?.addEventListener('keydown', (event) => {
     searchPlayer();
   }
 });
+
+function getInitialQueryFromUrl() {
+  const params = new URLSearchParams(window.location.search || '');
+  const query = String(params.get('q') || '').trim();
+  return query;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const initialQuery = getInitialQueryFromUrl();
+  if (!initialQuery || !elements.input) return;
+  elements.input.value = initialQuery;
+  searchPlayer(initialQuery);
+});

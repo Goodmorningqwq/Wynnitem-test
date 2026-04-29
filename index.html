@@ -406,6 +406,64 @@
       transform: translateY(-1px);
     }
 
+    .quick-search-shell {
+      position: relative;
+    }
+
+    .quick-search-dropdown {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: calc(100% + 8px);
+      z-index: 30;
+      border-radius: 0.85rem;
+      border: 1px solid rgba(192, 132, 252, 0.34);
+      background: linear-gradient(180deg, rgba(20, 10, 34, 0.96), rgba(13, 8, 23, 0.97));
+      box-shadow: 0 16px 34px rgba(0, 0, 0, 0.5);
+      max-height: 320px;
+      overflow-y: auto;
+    }
+
+    .quick-search-group-label {
+      font-size: 0.66rem;
+      color: #a39abf;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 0.55rem 0.8rem 0.2rem;
+      font-weight: 700;
+    }
+
+    .quick-search-item {
+      width: 100%;
+      text-align: left;
+      border: 0;
+      background: transparent;
+      color: #e8defd;
+      padding: 0.58rem 0.8rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.6rem;
+      font-size: 0.82rem;
+    }
+
+    .quick-search-item:hover,
+    .quick-search-item.is-active {
+      background: rgba(236, 72, 153, 0.15);
+    }
+
+    .quick-search-pill {
+      font-size: 0.64rem;
+      color: #f5d0fe;
+      border: 1px solid rgba(232, 121, 249, 0.44);
+      border-radius: 9999px;
+      padding: 0.08rem 0.5rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
     .hero-chip-animate {
       animation: chipFloat 5.2s ease-in-out infinite;
     }
@@ -556,16 +614,21 @@
           <p class="hero-subtitle text-lg md:text-xl max-w-2xl mx-auto leading-relaxed mb-8">
             One place for the item database and guild tracking—wars, XP, raids, and event leaderboards built for active guilds.
           </p>
-          <form action="/guild/search" method="get" class="quick-guild-search rounded-xl p-3 md:p-4 max-w-2xl mx-auto mb-8">
+          <form id="homeUnifiedSearchForm" action="/guild/search" method="get" class="quick-guild-search rounded-xl p-3 md:p-4 max-w-2xl mx-auto mb-8">
             <p class="text-gray-400 text-[11px] uppercase tracking-widest font-semibold mb-2">Quick Guild Search</p>
-            <div class="flex flex-col md:flex-row gap-2">
-              <input
-                type="text"
-                name="q"
-                placeholder="Search guild name, prefix, or UUID..."
-                class="quick-guild-search-input flex-1 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none"
-              >
-              <button type="submit" class="theme-btn-primary px-5 py-3 rounded-lg text-sm font-semibold whitespace-nowrap">Search Guild</button>
+            <div class="quick-search-shell">
+              <div class="flex flex-col md:flex-row gap-2">
+                <input
+                  id="homeUnifiedSearchInput"
+                  type="text"
+                  name="q"
+                  autocomplete="off"
+                  placeholder="Search guild name, player name, prefix, or UUID..."
+                  class="quick-guild-search-input flex-1 rounded-lg px-4 py-3 text-sm text-white placeholder-gray-500 focus:outline-none"
+                >
+                <button id="homeUnifiedSearchBtn" type="submit" class="theme-btn-primary px-5 py-3 rounded-lg text-sm font-semibold whitespace-nowrap">Search</button>
+              </div>
+              <div id="homeUnifiedSearchDropdown" class="quick-search-dropdown hidden"></div>
             </div>
           </form>
           <div class="flex flex-wrap justify-center gap-2 md:gap-3">
@@ -678,6 +741,350 @@
           window.location.href = '/guild';
         });
       }
+      var unifiedSearch = (function setupUnifiedSearch() {
+        var form = document.getElementById('homeUnifiedSearchForm');
+        var input = document.getElementById('homeUnifiedSearchInput');
+        var dropdown = document.getElementById('homeUnifiedSearchDropdown');
+        if (!form || !input || !dropdown) return null;
+
+        var RECENT_KEY = 'home_unified_search_recent_v1';
+        var RECENT_LIMIT = 10;
+        var MIN_LIVE_QUERY = 2;
+        var DEBOUNCE_MS = 340;
+        var suggestions = [];
+        var activeIndex = -1;
+        var debounceTimer = null;
+        var requestSeq = 0;
+
+        function escapeHtml(value) {
+          return String(value == null ? '' : value).replace(/[&<>"']/g, function(ch) {
+            if (ch === '&') return '&amp;';
+            if (ch === '<') return '&lt;';
+            if (ch === '>') return '&gt;';
+            if (ch === '"') return '&quot;';
+            return '&#39;';
+          });
+        }
+
+        function readRecent() {
+          try {
+            var parsed = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]');
+            if (!Array.isArray(parsed)) return [];
+            return parsed.filter(function(entry) {
+              return entry && (entry.type === 'guild' || entry.type === 'player') && entry.value;
+            }).slice(0, RECENT_LIMIT);
+          } catch (e) {
+            return [];
+          }
+        }
+
+        function writeRecent(entries) {
+          try {
+            localStorage.setItem(RECENT_KEY, JSON.stringify(entries.slice(0, RECENT_LIMIT)));
+          } catch (e) {
+            // Ignore storage quota/private mode failures.
+          }
+        }
+
+        function pushRecent(entry) {
+          if (!entry || !entry.value) return;
+          var nowEntry = {
+            type: entry.type,
+            value: String(entry.value).trim(),
+            label: String(entry.label || entry.value).trim(),
+            ts: Date.now()
+          };
+          if (!nowEntry.value) return;
+          var merged = [nowEntry].concat(readRecent().filter(function(item) {
+            return !(item.type === nowEntry.type && String(item.value).toLowerCase() === nowEntry.value.toLowerCase());
+          }));
+          writeRecent(merged);
+        }
+
+        function closeDropdown() {
+          suggestions = [];
+          activeIndex = -1;
+          dropdown.innerHTML = '';
+          dropdown.classList.add('hidden');
+        }
+
+        function normalizeGuildCandidate(optionKey, optionValue) {
+          var raw = optionValue && typeof optionValue === 'object' ? optionValue : {};
+          var name = raw.name || raw.guild || optionKey || '';
+          var prefix = raw.prefix || '';
+          var uuid = raw.uuid || raw.id || '';
+          var routeValue = uuid || prefix || name;
+          if (!routeValue) return null;
+          return {
+            type: 'guild',
+            value: routeValue,
+            routeValue: routeValue,
+            label: prefix && name ? name + ' [' + prefix + ']' : (name || prefix || routeValue),
+            detail: uuid ? 'UUID' : (prefix ? 'Prefix' : 'Name')
+          };
+        }
+
+        function normalizePlayerCandidate(optionKey, optionValue) {
+          var raw = optionValue && typeof optionValue === 'object' ? optionValue : {};
+          var name = raw.storedName || raw.username || raw.name || optionKey || '';
+          var uuid = raw.uuid || raw.id || optionKey || '';
+          var routeValue = uuid || name;
+          if (!routeValue) return null;
+          return {
+            type: 'player',
+            value: routeValue,
+            routeValue: routeValue,
+            label: name || routeValue,
+            detail: raw.rank || raw.supportRank || (uuid && name ? 'UUID' : 'Player')
+          };
+        }
+
+        function dedupeByTypeAndValue(entries) {
+          var seen = {};
+          return entries.filter(function(entry) {
+            var key = entry.type + '::' + String(entry.value).toLowerCase();
+            if (seen[key]) return false;
+            seen[key] = true;
+            return true;
+          });
+        }
+
+        function setActiveIndex(nextIndex) {
+          if (!suggestions.length) {
+            activeIndex = -1;
+            return;
+          }
+          if (nextIndex < 0) nextIndex = suggestions.length - 1;
+          if (nextIndex >= suggestions.length) nextIndex = 0;
+          activeIndex = nextIndex;
+          Array.prototype.forEach.call(dropdown.querySelectorAll('.quick-search-item'), function(node, idx) {
+            node.classList.toggle('is-active', idx === activeIndex);
+            if (idx === activeIndex) node.scrollIntoView({ block: 'nearest' });
+          });
+        }
+
+        function renderGroups(grouped) {
+          var parts = [];
+          suggestions = [];
+          activeIndex = -1;
+          var groupOrder = ['recent', 'guild', 'player'];
+          var groupLabel = { recent: 'Recent', guild: 'Guilds', player: 'Players' };
+          groupOrder.forEach(function(groupKey) {
+            var entries = grouped[groupKey] || [];
+            if (!entries.length) return;
+            parts.push('<div class="quick-search-group-label">' + groupLabel[groupKey] + '</div>');
+            entries.forEach(function(entry) {
+              var suggestionIndex = suggestions.length;
+              suggestions.push(entry);
+              parts.push(
+                '<button type="button" class="quick-search-item" data-suggestion-index="' + suggestionIndex + '">' +
+                  '<span class="truncate">' + escapeHtml(entry.label) + '</span>' +
+                  '<span class="quick-search-pill">' + escapeHtml(entry.type) + '</span>' +
+                '</button>'
+              );
+            });
+          });
+          if (!parts.length) {
+            closeDropdown();
+            return;
+          }
+          dropdown.innerHTML = parts.join('');
+          dropdown.classList.remove('hidden');
+        }
+
+        function toGuildCandidates(payload, responseStatus) {
+          if (!payload || typeof payload !== 'object') return [];
+          if (responseStatus === 300 && payload.ambiguous && payload.options && typeof payload.options === 'object') {
+            return dedupeByTypeAndValue(Object.keys(payload.options).map(function(key) {
+              return normalizeGuildCandidate(key, payload.options[key]);
+            }).filter(Boolean));
+          }
+          if (responseStatus === 200) {
+            var direct = normalizeGuildCandidate('', payload);
+            return direct ? [direct] : [];
+          }
+          return [];
+        }
+
+        function toPlayerCandidates(payload, responseStatus) {
+          if (!payload || typeof payload !== 'object') return [];
+          if ((responseStatus === 300 || responseStatus === 404) && payload.ambiguous) {
+            var source = payload.options && payload.options.objects && typeof payload.options.objects === 'object'
+              ? payload.options.objects
+              : payload.options;
+            if (!source || typeof source !== 'object') return [];
+            return dedupeByTypeAndValue(Object.keys(source).map(function(key) {
+              return normalizePlayerCandidate(key, source[key]);
+            }).filter(Boolean));
+          }
+          if (responseStatus === 200) {
+            var direct = normalizePlayerCandidate(payload.uuid || payload.username || payload.name || '', payload);
+            return direct ? [direct] : [];
+          }
+          return [];
+        }
+
+        async function fetchGuildCandidates(query) {
+          var url = '/api/guild?query=' + encodeURIComponent(query) + '&mode=auto';
+          var response = await fetch(url, { cache: 'no-store' });
+          var payload = null;
+          try {
+            payload = await response.json();
+          } catch (e) {
+            payload = null;
+          }
+          return toGuildCandidates(payload, response.status);
+        }
+
+        async function fetchPlayerCandidates(query) {
+          var url = '/api/profile?player=' + encodeURIComponent(query);
+          var response = await fetch(url, { cache: 'no-store' });
+          var payload = null;
+          try {
+            payload = await response.json();
+          } catch (e) {
+            payload = null;
+          }
+          return toPlayerCandidates(payload, response.status);
+        }
+
+        function routeToSuggestion(suggestion) {
+          if (!suggestion || !suggestion.routeValue) return;
+          var routeValue = encodeURIComponent(String(suggestion.routeValue));
+          pushRecent(suggestion);
+          document.body.classList.add('page-leaving');
+          var destination = suggestion.type === 'guild'
+            ? '/guild/search?q=' + routeValue
+            : '/player-stats?q=' + routeValue;
+          window.location.href = destination;
+        }
+
+        async function fallbackRoute(query) {
+          var guildCandidates = [];
+          try {
+            guildCandidates = await fetchGuildCandidates(query);
+          } catch (e) {
+            guildCandidates = [];
+          }
+          if (guildCandidates.length) {
+            routeToSuggestion(guildCandidates[0]);
+            return;
+          }
+          routeToSuggestion({
+            type: 'player',
+            value: query,
+            routeValue: query,
+            label: query
+          });
+        }
+
+        async function refreshSuggestions() {
+          var query = String(input.value || '').trim();
+          if (!query) {
+            var initialRecent = readRecent();
+            renderGroups({ recent: initialRecent, guild: [], player: [] });
+            return;
+          }
+          var seq = ++requestSeq;
+          var recent = dedupeByTypeAndValue(readRecent().filter(function(entry) {
+            return entry.label.toLowerCase().indexOf(query.toLowerCase()) !== -1
+              || String(entry.value).toLowerCase().indexOf(query.toLowerCase()) !== -1;
+          }));
+
+          if (query.length < MIN_LIVE_QUERY) {
+            renderGroups({ recent: recent, guild: [], player: [] });
+            return;
+          }
+
+          var guild = [];
+          var player = [];
+          try {
+            var settled = await Promise.allSettled([
+              fetchGuildCandidates(query),
+              fetchPlayerCandidates(query)
+            ]);
+            guild = settled[0].status === 'fulfilled' ? settled[0].value : [];
+            player = settled[1].status === 'fulfilled' ? settled[1].value : [];
+          } catch (e) {
+            guild = [];
+            player = [];
+          }
+
+          if (seq !== requestSeq) return;
+          renderGroups({
+            recent: recent,
+            guild: dedupeByTypeAndValue(guild).slice(0, 5),
+            player: dedupeByTypeAndValue(player).slice(0, 5)
+          });
+        }
+
+        function scheduleRefresh() {
+          if (debounceTimer) clearTimeout(debounceTimer);
+          debounceTimer = setTimeout(refreshSuggestions, DEBOUNCE_MS);
+        }
+
+        form.addEventListener('submit', function(event) {
+          event.preventDefault();
+          if (activeIndex >= 0 && suggestions[activeIndex]) {
+            routeToSuggestion(suggestions[activeIndex]);
+            return;
+          }
+          var query = String(input.value || '').trim();
+          if (!query) return;
+          fallbackRoute(query);
+        });
+
+        input.addEventListener('focus', function() {
+          scheduleRefresh();
+        });
+
+        input.addEventListener('input', function() {
+          setActiveIndex(-1);
+          scheduleRefresh();
+        });
+
+        input.addEventListener('keydown', function(event) {
+          if (event.key === 'Escape') {
+            closeDropdown();
+            return;
+          }
+          if (event.key === 'ArrowDown') {
+            if (dropdown.classList.contains('hidden')) scheduleRefresh();
+            event.preventDefault();
+            setActiveIndex(activeIndex + 1);
+            return;
+          }
+          if (event.key === 'ArrowUp') {
+            if (dropdown.classList.contains('hidden')) scheduleRefresh();
+            event.preventDefault();
+            setActiveIndex(activeIndex - 1);
+            return;
+          }
+          if (event.key === 'Enter' && activeIndex >= 0 && suggestions[activeIndex]) {
+            event.preventDefault();
+            routeToSuggestion(suggestions[activeIndex]);
+          }
+        });
+
+        dropdown.addEventListener('mousedown', function(event) {
+          var button = event.target.closest('.quick-search-item[data-suggestion-index]');
+          if (!button) return;
+          event.preventDefault();
+          var index = Number(button.getAttribute('data-suggestion-index'));
+          if (!Number.isFinite(index) || !suggestions[index]) return;
+          routeToSuggestion(suggestions[index]);
+        });
+
+        document.addEventListener('click', function(event) {
+          if (!form.contains(event.target)) {
+            closeDropdown();
+          }
+        });
+
+        return {
+          refresh: refreshSuggestions
+        };
+      })();
       document.querySelectorAll('.menu-card[href]').forEach(function(link) {
         link.addEventListener('click', function(e) {
           if (e.defaultPrevented) return;
