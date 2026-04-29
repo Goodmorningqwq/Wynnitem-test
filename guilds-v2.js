@@ -236,7 +236,7 @@ function formatRelativeTime(dateStr) {
 
 function getRankConfig(rank) {
   const configs = {
-    owner: { color: '#ff5a68', stars: 5, label: 'Owner' },
+    owner: { color: '#fbbf24', stars: 5, label: 'Owner' },
     chief: { color: '#ff5a68', stars: 4, label: 'Chief' },
     strategist: { color: '#a855f7', stars: 3, label: 'Strategist' },
     captain: { color: '#3b82f6', stars: 2, label: 'Captain' },
@@ -244,6 +244,12 @@ function getRankConfig(rank) {
     recruit: { color: '#9ca3af', stars: 0, label: 'Recruit' }
   };
   return configs[rank.toLowerCase()] || configs.recruit;
+}
+
+function getMinecraftHeadUrl(player) {
+  const id = String(player?.uuid || player?.username || '').trim();
+  if (!id) return 'https://mc-heads.net/avatar/Steve/32';
+  return `https://mc-heads.net/avatar/${encodeURIComponent(id)}/32`;
 }
 
 function buildPlayerMap(players) {
@@ -455,6 +461,7 @@ function renderMembersList(players) {
     const rc = getRankConfig(player.rank);
     const stars = '★'.repeat(rc.stars).padEnd(5, ' ');
     const onlineIndicator = player.online ? '<span class="w-1.5 h-1.5 rounded-full bg-green-500 inline-block ml-1"></span>' : '';
+    const headUrl = getMinecraftHeadUrl(player);
     
     return `
       <div
@@ -466,7 +473,8 @@ function renderMembersList(players) {
           <span style="color: ${rc.color}" class="font-bold uppercase text-[9px] leading-tight">${rc.label}</span>
           <span class="text-[8px] mt-[-2px] opacity-60" style="color: ${rc.color}">${stars}</span>
         </div>
-        <div class="flex items-center">
+        <div class="flex items-center gap-2 min-w-0">
+          <img src="${escapeHtml(headUrl)}" alt="${escapeHtml(player.username)} head" class="w-5 h-5 rounded border border-[rgba(192,132,252,0.35)] bg-black/40 shrink-0">
           <span class="text-white truncate font-medium group-hover:text-pink-200 transition-colors">${escapeHtml(player.username)}</span>
           ${onlineIndicator}
         </div>
@@ -496,6 +504,7 @@ function renderPlayerSelection(players) {
   container.innerHTML = players.map((player) => {
     const rc = getRankConfig(player.rank);
     const stars = '★'.repeat(rc.stars).padEnd(5, ' ');
+    const headUrl = getMinecraftHeadUrl(player);
     return `
       <label class="flex items-center gap-3 px-3 py-2 hover:bg-[rgba(236,72,153,0.08)] rounded cursor-pointer transition-all border border-transparent has-[:checked]:bg-[rgba(168,85,247,0.16)] has-[:checked]:border-[rgba(232,121,249,0.5)] group select-none">
         <input type="checkbox" value="${escapeHtml(player.username)}" class="hidden peer">
@@ -504,10 +513,11 @@ function renderPlayerSelection(players) {
            <span class="text-[8px] opacity-40" style="color: ${rc.color}">${stars}</span>
         </div>
         <div
-          class="flex items-center gap-2 flex-1"
+          class="flex items-center gap-2 flex-1 min-w-0"
           onclick="window.viewPlayerProfileFromElement(this)"
           data-profile-username="${escapeHtml(player.username || '')}"
           data-profile-uuid="${escapeHtml(player.uuid || '')}">
+           <img src="${escapeHtml(headUrl)}" alt="${escapeHtml(player.username)} head" class="w-5 h-5 rounded border border-[rgba(192,132,252,0.35)] bg-black/40 shrink-0">
            <span class="text-white text-sm font-medium group-hover:text-pink-200 transition-colors">${escapeHtml(player.username)}</span>
            <svg class="w-3.5 h-3.5 text-green-400 opacity-0 peer-checked:opacity-100 transition-opacity shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"></path></svg>
         </div>
