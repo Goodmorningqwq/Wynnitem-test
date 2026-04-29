@@ -229,7 +229,8 @@ function renderProfile(profile) {
 
 async function searchPlayer(overrideQuery = '') {
   if (inFlight) return;
-  const query = String(overrideQuery || elements.input.value || '').trim();
+  const safeOverride = typeof overrideQuery === 'string' ? overrideQuery : '';
+  const query = String(safeOverride || elements.input.value || '').trim();
   if (!query) {
     setStatus('Enter a player name or UUID first.', 'error');
     return;
@@ -278,7 +279,7 @@ async function searchPlayer(overrideQuery = '') {
   }
 }
 
-elements.button?.addEventListener('click', searchPlayer);
+elements.button?.addEventListener('click', () => searchPlayer());
 elements.input?.addEventListener('keydown', (event) => {
   if (event.key === 'Enter') {
     event.preventDefault();
