@@ -58,10 +58,13 @@ function hideAmbiguousPlayers() {
 
 function normalizeAmbiguousOptions(options) {
   if (!options || typeof options !== 'object') return [];
-  return Object.entries(options).map(([key, value]) => {
+  const source = options?.objects && typeof options.objects === 'object'
+    ? options.objects
+    : options;
+  return Object.entries(source).map(([key, value]) => {
     if (value && typeof value === 'object') {
       return {
-        identifier: key,
+        identifier: value.uuid || key,
         name: value.storedName || value.username || value.name || key,
         rank: value.rank || value.supportRank || 'Player'
       };
@@ -256,7 +259,7 @@ async function searchPlayer(overrideQuery = '') {
       payload = null;
     }
 
-    if (response.status === 300 && payload?.ambiguous) {
+    if ((response.status === 300 || response.status === 404) && payload?.ambiguous) {
       elements.content.classList.add('hidden');
       renderAmbiguousPlayers(query, payload.options || {});
       setStatus('Multiple players matched query. Pick one below.', 'neutral');
