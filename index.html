@@ -775,9 +775,26 @@
           try {
             var parsed = JSON.parse(localStorage.getItem(RECENT_KEY) || '[]');
             if (!Array.isArray(parsed)) return [];
-            return parsed.filter(function(entry) {
-              return entry && (entry.type === 'guild' || entry.type === 'player') && entry.value;
-            }).slice(0, RECENT_LIMIT);
+            return parsed
+              .filter(function(entry) {
+                return entry && (entry.type === 'guild' || entry.type === 'player');
+              })
+              .map(function(entry) {
+                var value = String(entry.value || '').trim();
+                var routeValue = String(entry.routeValue || value).trim();
+                var label = String(entry.label || value).trim();
+                return {
+                  type: entry.type,
+                  value: value || routeValue,
+                  routeValue: routeValue,
+                  label: label || routeValue,
+                  ts: Number(entry.ts) || 0
+                };
+              })
+              .filter(function(entry) {
+                return Boolean(entry.routeValue);
+              })
+              .slice(0, RECENT_LIMIT);
           } catch (e) {
             return [];
           }
@@ -793,15 +810,17 @@
 
         function pushRecent(entry) {
           if (!entry || !entry.value) return;
+          var routeValue = String(entry.routeValue || entry.value || '').trim();
           var nowEntry = {
             type: entry.type,
             value: String(entry.value).trim(),
+            routeValue: routeValue,
             label: String(entry.label || entry.value).trim(),
             ts: Date.now()
           };
-          if (!nowEntry.value) return;
+          if (!nowEntry.value || !nowEntry.routeValue) return;
           var merged = [nowEntry].concat(readRecent().filter(function(item) {
-            return !(item.type === nowEntry.type && String(item.value).toLowerCase() === nowEntry.value.toLowerCase());
+            return !(item.type === nowEntry.type && String(item.routeValue).toLowerCase() === nowEntry.routeValue.toLowerCase());
           }));
           writeRecent(merged);
         }
@@ -954,8 +973,10 @@
         }
 
         function routeToSuggestion(suggestion) {
-          if (!suggestion || !suggestion.routeValue) return;
-          var routeValue = encodeURIComponent(String(suggestion.routeValue));
+          if (!suggestion) return;
+          var rawRouteValue = String(suggestion.routeValue || suggestion.value || '').trim();
+          if (!rawRouteValue) return;
+          var routeValue = encodeURIComponent(rawRouteValue);
           pushRecent(suggestion);
           document.body.classList.add('page-leaving');
           var destination = suggestion.type === 'guild'
