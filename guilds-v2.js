@@ -2078,6 +2078,7 @@ function configurePageMode() {
   const guildResult = document.getElementById('guildResult');
   const noResult = document.getElementById('noResult');
   const userDashboard = document.getElementById('userDashboard');
+  const dashboardQuickNavSection = document.getElementById('dashboardQuickNavSection');
   const guildHowToSection = document.getElementById('guildHowToSection');
   const trackedGuildsSection = document.getElementById('trackedGuildsSection');
   const eventHistorySection = document.getElementById('eventHistorySection');
@@ -2089,6 +2090,7 @@ function configurePageMode() {
   if (isSearchPage) {
     searchSection?.classList.remove('hidden');
     userDashboard?.classList.add('hidden');
+    dashboardQuickNavSection?.classList.add('hidden');
     trackedGuildsSection?.classList.add('hidden');
     eventHistorySection?.classList.add('hidden');
     backToDashboardBtn?.classList.remove('hidden');
@@ -2099,6 +2101,7 @@ function configurePageMode() {
   guildResult?.classList.add('hidden');
   noResult?.classList.add('hidden');
   userDashboard?.classList.remove('hidden');
+  dashboardQuickNavSection?.classList.remove('hidden');
   trackedGuildsSection?.classList.add('hidden');
   eventHistorySection?.classList.add('hidden');
   backToDashboardBtn?.classList.add('hidden');

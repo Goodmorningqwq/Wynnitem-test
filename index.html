@@ -392,6 +392,10 @@
       animation-delay: 1.6s;
     }
 
+    .menu-card--player::before {
+      background: linear-gradient(90deg, #ff4fd8, #c084fc);
+    }
+
     .menu-card:hover {
       transform: translateY(-6px);
       border-color: var(--pink);
@@ -878,14 +882,14 @@
               <div class="text-2xl font-bold text-white mb-2 home-card-title--flash">Territories</div>
               <div class="text-[var(--text-muted)] text-sm md:text-base leading-relaxed">Live Interactive Territory War Map & Economy Simulator</div>
             </div>
-            <span class="flex items-center justify-center xl:justify-start gap-1 text-[var(--pink)] text-sm font-semibold opacity-90 group-hover:opacity-100 whitespace-nowrap">
+            <span class="flex items-center justify-center xl:justify-start gap-1 text-emerald-400 text-sm font-semibold opacity-90 group-hover:opacity-100 whitespace-nowrap">
               Launch
               <svg class="w-4 h-4 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
             </span>
           </a>
         </div>
         <div class="max-w-6xl mx-auto mt-6">
-          <a href="/player-stats" class="menu-card group rounded-xl flex items-center justify-between gap-4 p-5 md:p-6 overflow-hidden">
+          <a href="/player-stats" class="menu-card menu-card--player group rounded-xl flex items-center justify-between gap-4 p-5 md:p-6 overflow-hidden">
             <div class="flex items-center gap-4">
               <div class="menu-card-icon !w-14 !h-14 !text-2xl">👤</div>
               <div>
