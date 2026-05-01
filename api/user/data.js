@@ -22,7 +22,7 @@ function sanitizeActiveEvent(value) {
     ? value.trackedPlayers.filter((p) => typeof p === 'string').slice(0, 100)
     : [];
   const parsedCooldown = Number(value.refreshCooldownMs);
-  const refreshCooldownMs = Number.isFinite(parsedCooldown) ? parsedCooldown : 0;
+  const refreshCooldownMs = Number.isFinite(parsedCooldown) ? parsedCooldown : 5 * 60 * 1000;
   const startedAt = Number(value.startedAt || Date.now());
   const lastRefreshAt = Number(value.lastRefreshAt || startedAt);
   const firstRefreshDone = Boolean(value.firstRefreshDone);

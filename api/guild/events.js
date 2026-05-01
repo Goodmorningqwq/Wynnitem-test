@@ -283,7 +283,7 @@ module.exports = async (req, res) => {
           startedAt: Number(event.startedAt || Date.now()),
           refreshCooldownMs: (() => {
             const v = Number(event.refreshCooldownMs);
-            return Number.isFinite(v) ? v : 0;
+            return Number.isFinite(v) ? v : 5 * 60 * 1000;
           })(),
           baseline,
           current: event.current || event.baseline || existing?.current || baseline || { metricValue: 0, playerValues: {} },

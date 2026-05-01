@@ -1,14 +1,13 @@
 const GUILD_API = '/api/guild';
 const GUILD_EVENTS_API = '/api/guild/events';
 const USER_API = '/api/user';
-const REFRESH_COOLDOWN_MS = 0;
+const REFRESH_COOLDOWN_MS = 5 * 60 * 1000;
 
-/** Use for refresh button UI/guard. When REFRESH_COOLDOWN_MS is 0, ignore legacy stored values (e.g. 15m still in Redis). */
 function effectiveEventRefreshCooldownMs(event) {
-  if (REFRESH_COOLDOWN_MS === 0) return 0;
   const raw = event?.refreshCooldownMs;
   const n = Number(raw !== undefined && raw !== null ? raw : REFRESH_COOLDOWN_MS);
-  return Number.isFinite(n) ? n : REFRESH_COOLDOWN_MS;
+  const stored = Number.isFinite(n) ? n : REFRESH_COOLDOWN_MS;
+  return Math.max(REFRESH_COOLDOWN_MS, stored);
 }
 const WYNN_PLAYER_WARS_SPACING_MS = 500;
 const WYNN_PLAYER_WARS_REFRESH_SPACING_MS = 280;
@@ -504,13 +503,10 @@ function normalizeActiveEvent(rawEvent, fallbackTrackedPlayers = []) {
   if (!rawEvent || typeof rawEvent !== 'object') return null;
 
   if (rawEvent.metric && rawEvent.startedAt && rawEvent.baseline) {
-    const storedCooldown =
-      rawEvent.refreshCooldownMs !== undefined && rawEvent.refreshCooldownMs !== null
-        ? Number(rawEvent.refreshCooldownMs)
-        : REFRESH_COOLDOWN_MS;
+    const rc = Number(rawEvent.refreshCooldownMs);
     return {
       ...rawEvent,
-      refreshCooldownMs: REFRESH_COOLDOWN_MS === 0 ? 0 : storedCooldown
+      refreshCooldownMs: Number.isFinite(rc) ? rc : REFRESH_COOLDOWN_MS
     };
   }
 
@@ -535,12 +531,9 @@ function normalizeActiveEvent(rawEvent, fallbackTrackedPlayers = []) {
     metric,
     scope: rawEvent.scope || 'selected',
     trackedPlayers,
-    refreshCooldownMs:
-      REFRESH_COOLDOWN_MS === 0
-        ? 0
-        : Number.isFinite(Number(rawEvent.refreshCooldownMs))
-          ? Number(rawEvent.refreshCooldownMs)
-          : REFRESH_COOLDOWN_MS,
+    refreshCooldownMs: Number.isFinite(Number(rawEvent.refreshCooldownMs))
+      ? Number(rawEvent.refreshCooldownMs)
+      : REFRESH_COOLDOWN_MS,
     startedAt,
     lastRefreshAt,
     firstRefreshDone,
