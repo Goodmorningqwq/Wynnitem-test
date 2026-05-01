@@ -408,15 +408,30 @@
     }
 
     .quick-guild-search::before {
+      content: none;
+    }
+
+    .quick-search-chrome {
+      position: relative;
+      border-radius: 0.72rem;
+      overflow: hidden;
+    }
+
+    .quick-search-chrome::before {
       content: '';
       position: absolute;
       inset: 0;
-      border-radius: inherit;
-      clip-path: inset(0 round 0.75rem);
       pointer-events: none;
+      border-radius: inherit;
       background: linear-gradient(120deg, transparent 15%, rgba(255, 255, 255, 0.08) 40%, transparent 65%);
       transform: translateX(-130%);
       animation: shimmerSweep 4.8s ease-in-out infinite;
+      z-index: 0;
+    }
+
+    .quick-search-chrome > * {
+      position: relative;
+      z-index: 1;
     }
 
     .quick-search-meta {
@@ -448,9 +463,13 @@
       flex: 1;
     }
 
+    .quick-input-wrap .quick-guild-search-input {
+      padding-left: 2.85rem;
+    }
+
     .quick-search-icon {
       position: absolute;
-      left: 0.78rem;
+      left: 1rem;
       top: 50%;
       transform: translateY(-50%);
       width: 0.95rem;
@@ -512,6 +531,38 @@
       overflow-y: auto;
       transform-origin: top center;
       animation: quickSearchDropdownIn 160ms ease;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+      position: relative;
+    }
+
+    .quick-search-dropdown::-webkit-scrollbar {
+      width: 0;
+      height: 0;
+    }
+
+    .quick-search-dropdown::before,
+    .quick-search-dropdown::after {
+      content: '';
+      display: block;
+      position: sticky;
+      left: 0;
+      right: 0;
+      height: 14px;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    .quick-search-dropdown::before {
+      top: 0;
+      margin-bottom: -14px;
+      background: linear-gradient(180deg, rgba(13, 8, 23, 0.96), rgba(13, 8, 23, 0));
+    }
+
+    .quick-search-dropdown::after {
+      bottom: 0;
+      margin-top: -14px;
+      background: linear-gradient(0deg, rgba(13, 8, 23, 0.96), rgba(13, 8, 23, 0));
     }
 
     @keyframes quickSearchDropdownIn {
@@ -740,32 +791,34 @@
             One place for the item database and guild tracking—wars, XP, raids, and event leaderboards built for active guilds.
           </p>
           <form id="homeUnifiedSearchForm" action="/guild/search" method="get" class="quick-guild-search rounded-xl p-3 md:p-4 max-w-2xl mx-auto mb-8">
-            <div class="quick-search-meta">
-              <p class="quick-search-title">
-                <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <path stroke-linecap="round" stroke-linejoin="round" d="M10 6h10M6 12h14M10 18h10M4 6h.01M4 12h.01M4 18h.01"/>
-                </svg>
-                Quick Search
-              </p>
-              <p class="quick-search-hint">Guilds + Players</p>
-            </div>
             <div class="quick-search-shell">
-              <div class="flex flex-col md:flex-row gap-2">
-                <div class="quick-input-wrap">
-                  <input
-                    id="homeUnifiedSearchInput"
-                    type="text"
-                    name="q"
-                    autocomplete="off"
-                    placeholder="Search guild name, player name, prefix, or UUID..."
-                    class="quick-guild-search-input w-full rounded-lg pl-10 pr-4 py-3 text-sm text-white placeholder-[var(--text-muted)] focus:outline-none"
-                  >
-                  <svg class="quick-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="11" cy="11" r="7"></circle>
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M20 20L16.65 16.65"></path>
-                  </svg>
+              <div class="quick-search-chrome">
+                <div class="quick-search-meta">
+                  <p class="quick-search-title">
+                    <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M10 6h10M6 12h14M10 18h10M4 6h.01M4 12h.01M4 18h.01"/>
+                    </svg>
+                    Quick Search
+                  </p>
+                  <p class="quick-search-hint">Guilds + Players</p>
                 </div>
-                <button id="homeUnifiedSearchBtn" type="submit" class="theme-btn-primary home-search-submit px-5 py-3 rounded-lg text-sm font-semibold whitespace-nowrap">Search</button>
+                <div class="flex flex-col md:flex-row gap-2">
+                  <div class="quick-input-wrap">
+                    <input
+                      id="homeUnifiedSearchInput"
+                      type="text"
+                      name="q"
+                      autocomplete="off"
+                      placeholder="Search guild name, player name, prefix, or UUID..."
+                      class="quick-guild-search-input w-full rounded-lg pr-4 py-3 text-sm text-white placeholder-[var(--text-muted)] focus:outline-none"
+                    >
+                    <svg class="quick-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="11" cy="11" r="7"></circle>
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M20 20L16.65 16.65"></path>
+                    </svg>
+                  </div>
+                  <button id="homeUnifiedSearchBtn" type="submit" class="theme-btn-primary home-search-submit px-5 py-3 rounded-lg text-sm font-semibold whitespace-nowrap">Search</button>
+                </div>
               </div>
               <div id="homeUnifiedSearchDropdown" class="quick-search-dropdown hidden"></div>
             </div>
