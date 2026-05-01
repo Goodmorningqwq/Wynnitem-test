@@ -1688,11 +1688,13 @@ function renderActiveEvent() {
 async function searchGuild(name, mode = 'auto', options = {}) {
   const shouldRender = options.render !== false;
   const hydrateWars = options.hydrateWars !== undefined ? options.hydrateWars : false;
+  const forceFresh = options.forceFresh !== false;
   warLog('searchGuild', {
     query: (name || '').slice(0, 40),
     mode,
     shouldRender,
     hydrateWars,
+    forceFresh,
     isSearchPage,
     path: window.location.pathname
   });
@@ -1707,7 +1709,16 @@ async function searchGuild(name, mode = 'auto', options = {}) {
   }
 
   try {
-    const response = await fetch(`${GUILD_API}?query=${encodeURIComponent(name)}&mode=${encodeURIComponent(mode)}`);
+    const url = new URL(GUILD_API, window.location.origin);
+    url.searchParams.set('query', name);
+    url.searchParams.set('mode', mode);
+    if (forceFresh) {
+      url.searchParams.set('fresh', '1');
+      url.searchParams.set('_ts', String(Date.now()));
+    }
+    const response = await fetch(url.toString(), {
+      cache: forceFresh ? 'no-store' : 'default'
+    });
     let data = null;
     try {
       data = await response.json();
