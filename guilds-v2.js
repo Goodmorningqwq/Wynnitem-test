@@ -1384,9 +1384,9 @@ function openLeaderboardByCode(rawCode) {
 function toggleDashboardCodePanel(forceOpen = null) {
   const panel = document.getElementById('dashboardJoinCodeSection');
   if (!panel) return;
-  const nextOpen = forceOpen === null ? panel.classList.contains('hidden') : Boolean(forceOpen);
-  panel.classList.toggle('hidden', !nextOpen);
-  if (nextOpen) {
+  const shouldFocus = forceOpen === null ? true : Boolean(forceOpen);
+  panel.classList.remove('hidden');
+  if (shouldFocus) {
     document.getElementById('dashboardEventCodeInput')?.focus();
   }
 }
@@ -2155,10 +2155,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.location.href = '/guild/event_history';
   });
   document.getElementById('dashboardOpenCodePanelBtn')?.addEventListener('click', () => {
-    toggleDashboardCodePanel();
+    toggleDashboardCodePanel(true);
   });
   document.getElementById('dashboardCloseCodePanelBtn')?.addEventListener('click', () => {
-    toggleDashboardCodePanel(false);
+    const input = document.getElementById('dashboardEventCodeInput');
+    if (input) {
+      input.value = '';
+      input.focus();
+    }
   });
   document.getElementById('dashboardViewEventCodeBtn')?.addEventListener('click', () => {
     const input = document.getElementById('dashboardEventCodeInput');
