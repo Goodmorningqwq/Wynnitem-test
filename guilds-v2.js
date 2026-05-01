@@ -823,7 +823,7 @@ function getLiveRosterUsernames(event, guild) {
   return Array.isArray(event.trackedPlayers) ? event.trackedPlayers.slice() : [];
 }
 
-function getSnapshot(metric, guild, trackedPlayers, scope = 'selected') {
+function getSnapshot(metric, guild, trackedPlayers, scope = 'selected', previousPlayerValues = null) {
   // Event snapshots use raw guild API fields only (no hydrated raid cache).
   const players = collectGuildMembers(guild, { includeHydratedRaidCache: false });
   const playerMap = buildPlayerMap(players);
@@ -832,7 +832,24 @@ function getSnapshot(metric, guild, trackedPlayers, scope = 'selected') {
   for (const username of selected) {
     const entry = findPlayerEntry(playerMap, username);
     const liveValue = snapshotPlayerValueForMetric(entry || { xp: 0, wars: 0, guildRaids: 0 }, metric);
-    snapshotPlayers[username] = liveValue;
+    const hasPrev =
+      previousPlayerValues &&
+      Object.prototype.hasOwnProperty.call(previousPlayerValues, username);
+    const prevValue = hasPrev ? Number(previousPlayerValues[username] || 0) : null;
+
+    if (metric === 'guildRaids' && hasPrev) {
+      const unknownOrMissing = !entry || entry.guildRaidsKnown === false;
+      // Wynncraft guild payloads sometimes omit raid stats or send stale zeros for one member.
+      if (unknownOrMissing) {
+        snapshotPlayers[username] = prevValue;
+      } else if (liveValue === 0 && prevValue > 0) {
+        snapshotPlayers[username] = prevValue;
+      } else {
+        snapshotPlayers[username] = liveValue;
+      }
+    } else {
+      snapshotPlayers[username] = liveValue;
+    }
   }
   const selectedTotal = Object.values(snapshotPlayers).reduce((sum, value) => sum + Number(value || 0), 0);
   let metricValue;
@@ -2063,7 +2080,8 @@ async function refreshEvent() {
       activeEvent.metric,
       currentGuild,
       liveRoster,
-      eventScope
+      eventScope,
+      activeEvent.current?.playerValues || null
     );
     if (eventScope === 'guild') {
       activeEvent.trackedPlayers = liveRoster.slice();
