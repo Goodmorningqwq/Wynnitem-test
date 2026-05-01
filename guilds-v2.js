@@ -912,68 +912,6 @@ function getSnapshot(metric, guild, trackedPlayers, scope = 'selected', previous
   };
 }
 
-function recomputeSnapshotMetricValue(metric, guild, scope, playerValues) {
-  const selectedTotal = Object.values(playerValues).reduce((sum, value) => sum + Number(value || 0), 0);
-  if (scope === 'selected') return selectedTotal;
-  if (metric === 'wars') return Number(guild.wars || 0);
-  if (metric === 'guildRaids') return selectedTotal;
-  return Number(guild.xpPercent || 0);
-}
-
-function findMemberUuidByUsername(guild, username) {
-  if (!guild || username == null || username === '') return null;
-  const players = collectGuildMembers(guild);
-  const target = String(username).toLowerCase();
-  for (let i = 0; i < players.length; i += 1) {
-    if (String(players[i].username || '').toLowerCase() === target) {
-      return players[i].uuid || null;
-    }
-  }
-  return null;
-}
-
-/** Player profile (`/api/profile`) guildRaids-only total — source of truth when guild roster JSON drifts. */
-async function fetchProfileGuildRaidsStrict(uuid) {
-  if (!uuid) return null;
-  try {
-    const response = await fetch(`/api/profile?uuid=${encodeURIComponent(uuid)}&_ts=${Date.now()}`, {
-      cache: 'no-store'
-    });
-    if (!response.ok) return null;
-    const payload = await response.json().catch(() => null);
-    const state = resolveMemberGuildRaidsStrict(payload);
-    if (!state.known) return null;
-    return Number(state.value);
-  } catch {
-    return null;
-  }
-}
-
-const PROFILE_RAID_RECONCILE_CONCURRENCY = 8;
-const PROFILE_RAID_BATCH_GAP_MS = 40;
-
-async function reconcileGuildRaidSnapshotWithProfiles(metric, guild, snapshot, trackedPlayers, scope) {
-  if (metric !== 'guildRaids' || !snapshot?.playerValues || !trackedPlayers?.length) return;
-  for (let i = 0; i < trackedPlayers.length; i += PROFILE_RAID_RECONCILE_CONCURRENCY) {
-    const batch = trackedPlayers.slice(i, i + PROFILE_RAID_RECONCILE_CONCURRENCY);
-    await Promise.all(
-      batch.map(async (username) => {
-        const uuid = findMemberUuidByUsername(guild, username);
-        if (!uuid) return;
-        const v = await fetchProfileGuildRaidsStrict(uuid);
-        if (v !== null && Number.isFinite(v)) {
-          snapshot.playerValues[username] = v;
-        }
-      })
-    );
-    if (i + PROFILE_RAID_RECONCILE_CONCURRENCY < trackedPlayers.length) {
-      await delay(PROFILE_RAID_BATCH_GAP_MS);
-    }
-  }
-  snapshot.metricValue = recomputeSnapshotMetricValue(metric, guild, scope, snapshot.playerValues);
-  snapshot.capturedAt = Date.now();
-}
-
 async function fetchMemberWars(uuid, forceRefresh = false, requestSpacingMs = null) {
   const spacingMs = requestSpacingMs ?? WYNN_PLAYER_WARS_SPACING_MS;
   const uuidShort = typeof uuid === 'string' && uuid.length > 12 ? `${uuid.slice(0, 8)}…` : uuid;
@@ -2070,9 +2008,6 @@ async function startEvent() {
   }
 
   const baseline = getSnapshot(metric, currentGuild, trackedPlayers, scope);
-  if (metric === 'guildRaids') {
-    await reconcileGuildRaidSnapshotWithProfiles(metric, currentGuild, baseline, trackedPlayers, scope);
-  }
   let eventCode = null;
   for (let attempts = 0; attempts < 8; attempts += 1) {
     const candidate = generateEventCode();
@@ -2168,23 +2103,13 @@ async function refreshEvent() {
       }
 
     liveRoster = getLiveRosterUsernames(activeEvent, currentGuild);
-    let snapshot = getSnapshot(
+    const snapshot = getSnapshot(
       activeEvent.metric,
       currentGuild,
       liveRoster,
       eventScope,
       activeEvent.current?.playerValues || null
     );
-    if (activeEvent.metric === 'guildRaids') {
-      setDashboardEventLoading(true, 'Verifying guild raid totals from player profiles...');
-      await reconcileGuildRaidSnapshotWithProfiles(
-        activeEvent.metric,
-        currentGuild,
-        snapshot,
-        liveRoster,
-        eventScope
-      );
-    }
     if (eventScope === 'guild') {
       activeEvent.trackedPlayers = liveRoster.slice();
     }
