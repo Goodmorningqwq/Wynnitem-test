@@ -856,6 +856,10 @@ function mergeGuildScopeBaselineForNewMembers(event, guild, snapshot) {
     }
     const v = Number(snapshot.playerValues[username] ?? 0);
     event.baseline.playerValues[username] = v;
+    if (event.metric === 'guildRaids') {
+      const baseMetric = Number(event.baseline.metricValue || 0);
+      event.baseline.metricValue = baseMetric + v;
+    }
     mutated = true;
   }
   return mutated;
@@ -1645,7 +1649,9 @@ function updateStopTrackingState() {
 
 function getGuildDelta(event) {
   if (event?.metric === 'guildRaids') {
-    return computeEventTotalsFromPlayers(event).delta;
+    const start = Number(event.baseline?.metricValue || 0);
+    const current = Number(event.current?.metricValue || start);
+    return current - start;
   }
   const start = Number(event.baseline?.metricValue || 0);
   const current = Number(event.current?.metricValue || start);
@@ -1801,11 +1807,10 @@ function renderActiveEvent() {
   let currentValue = Number(activeEvent.current?.metricValue || startValue);
   if (activeEvent.metric === 'guildRaids') {
     const totals = computeEventTotalsFromPlayers(activeEvent);
-    startValue = totals.startValue;
-    currentValue = totals.currentValue;
-    if (activeEvent.baseline) {
-      activeEvent.baseline.metricValue = startValue;
+    if (!Number.isFinite(startValue)) {
+      startValue = totals.startValue;
     }
+    currentValue = totals.currentValue;
     if (activeEvent.current) {
       activeEvent.current.metricValue = currentValue;
     }
@@ -2138,9 +2143,6 @@ async function refreshEvent() {
     activeEvent.current = snapshot;
     if (activeEvent.metric === 'guildRaids') {
       const totals = computeEventTotalsFromPlayers(activeEvent);
-      if (activeEvent.baseline) {
-        activeEvent.baseline.metricValue = totals.startValue;
-      }
       activeEvent.current.metricValue = totals.currentValue;
     }
     const nextMetricValue = Number(activeEvent.current?.metricValue || 0);
