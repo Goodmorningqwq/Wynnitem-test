@@ -1,7 +1,7 @@
 const GUILD_API = '/api/guild';
 const GUILD_EVENTS_API = '/api/guild/events';
 const USER_API = '/api/user';
-const REFRESH_COOLDOWN_MS = 15 * 60 * 1000;
+const REFRESH_COOLDOWN_MS = 5 * 60 * 1000;
 const WYNN_PLAYER_WARS_SPACING_MS = 500;
 const WYNN_PLAYER_WARS_REFRESH_SPACING_MS = 280;
 const WYNN_PLAYER_WARS_429_BACKOFF_MS = 3200;
@@ -50,8 +50,8 @@ let webhookStatusLastEventCode = '';
 let webhookStatusRequestInFlight = false;
 const isSearchPage = window.location.pathname.startsWith('/guild/search');
 let guildSearchMode = 'auto';
-const TRACKED_PLAYERS_VIEW_MODE_KEY = 'guild_tracked_players_view_mode_v1';
-let trackedPlayersViewMode = 'minimize';
+const MINI_LB_VIEW_MODE_KEY = 'guild_dashboard_mini_lb_view_mode_v1';
+let miniLbViewMode = 'scroll';
 
 function getCurrentUser() {
   try {
@@ -65,36 +65,50 @@ function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function getTrackedPlayersViewMode() {
+function getMiniLbViewMode() {
   try {
-    const raw = localStorage.getItem(TRACKED_PLAYERS_VIEW_MODE_KEY);
+    const raw = localStorage.getItem(MINI_LB_VIEW_MODE_KEY);
     if (raw === 'minimize' || raw === 'scroll' || raw === 'long') return raw;
   } catch {
     // Ignore localStorage issues.
   }
-  return 'minimize';
+  return 'scroll';
 }
 
-function setTrackedPlayersViewMode(mode) {
+function setMiniLbViewMode(mode) {
   if (!['minimize', 'scroll', 'long'].includes(mode)) return;
-  trackedPlayersViewMode = mode;
+  miniLbViewMode = mode;
   try {
-    localStorage.setItem(TRACKED_PLAYERS_VIEW_MODE_KEY, mode);
+    localStorage.setItem(MINI_LB_VIEW_MODE_KEY, mode);
   } catch {
     // Ignore localStorage issues.
   }
 }
 
-function updateTrackedPlayersViewButtons() {
+function updateMiniLbViewButtons() {
   const map = {
-    minimize: document.getElementById('trackedPlayersViewMinBtn'),
-    scroll: document.getElementById('trackedPlayersViewScrollBtn'),
-    long: document.getElementById('trackedPlayersViewLongBtn')
+    minimize: document.getElementById('dashboardMiniLbViewMinBtn'),
+    scroll: document.getElementById('dashboardMiniLbViewScrollBtn'),
+    long: document.getElementById('dashboardMiniLbViewLongBtn')
   };
   Object.entries(map).forEach(([mode, button]) => {
     if (!button) return;
-    button.classList.toggle('guild-mode-btn--active', trackedPlayersViewMode === mode);
+    button.classList.toggle('guild-mode-btn--active', miniLbViewMode === mode);
   });
+}
+
+function applyMiniLbViewMode() {
+  const list = document.getElementById('dashboardEventPlayerBreakdownList');
+  if (!list) return;
+  list.classList.remove('max-h-40', 'max-h-80', 'max-h-[28rem]', 'overflow-y-auto', 'overflow-y-scroll');
+  if (miniLbViewMode === 'minimize') {
+    list.classList.add('max-h-40', 'overflow-y-auto');
+  } else if (miniLbViewMode === 'long') {
+    list.classList.add('max-h-[28rem]', 'overflow-y-auto');
+  } else {
+    list.classList.add('max-h-80', 'overflow-y-scroll');
+  }
+  updateMiniLbViewButtons();
 }
 
 async function throttlePlayerWarsRequest(spacingMs = WYNN_PLAYER_WARS_SPACING_MS) {
@@ -452,7 +466,10 @@ function normalizeActiveEvent(rawEvent, fallbackTrackedPlayers = []) {
   if (!rawEvent || typeof rawEvent !== 'object') return null;
 
   if (rawEvent.metric && rawEvent.startedAt && rawEvent.baseline) {
-    return rawEvent;
+    return {
+      ...rawEvent,
+      refreshCooldownMs: REFRESH_COOLDOWN_MS
+    };
   }
 
   let metric = 'xp';
@@ -1457,7 +1474,9 @@ async function loadEventWebhookLinkStatus(options = {}) {
     statusEl.textContent = 'Checking webhook link...';
   }
   try {
-    const response = await fetch(`/api/discord/webhook-link?eventCode=${encodeURIComponent(eventCode)}&username=${encodeURIComponent(currentUser)}`);
+    const response = await fetch(`/api/discord/webhook-link?eventCode=${encodeURIComponent(eventCode)}&username=${encodeURIComponent(currentUser)}&_ts=${Date.now()}`, {
+      cache: 'no-store'
+    });
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
       if (statusEl) statusEl.textContent = `Webhook status unavailable: ${data?.error || response.status}`;
@@ -1501,6 +1520,7 @@ async function saveEventWebhookLink() {
     const response = await fetch('/api/discord/webhook-link', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      cache: 'no-store',
       body: JSON.stringify({
         eventCode: activeEvent.eventCode,
         webhookUrl,
@@ -1645,25 +1665,6 @@ function renderTrackedPlayersInfo(players) {
   const container = document.getElementById('trackedPlayersInfo');
   if (!players || !players.length) {
     container.innerHTML = '<p class="text-gray-500 text-sm">No selected players saved.</p>';
-    updateTrackedPlayersViewButtons();
-    return;
-  }
-  if (trackedPlayersViewMode === 'long') {
-    container.innerHTML = players.map((username) => `
-      <div class="bg-gray-800/50 rounded px-2 py-1 text-sm inline-block mr-2 mb-2">
-        <span class="text-white font-medium">${escapeHtml(username)}</span>
-      </div>
-    `).join('');
-    updateTrackedPlayersViewButtons();
-    return;
-  }
-  if (trackedPlayersViewMode === 'scroll') {
-    container.innerHTML = `<div class="max-h-44 overflow-y-auto pr-1 hide-scrollbar">${players.map((username) => `
-      <div class="bg-gray-800/50 rounded px-2 py-1 text-sm inline-block mr-2 mb-2">
-        <span class="text-white font-medium">${escapeHtml(username)}</span>
-      </div>
-    `).join('')}</div>`;
-    updateTrackedPlayersViewButtons();
     return;
   }
   const maxPreview = 12;
@@ -1676,7 +1677,6 @@ function renderTrackedPlayersInfo(players) {
   `).join('') + (remaining > 0
     ? `<div class="mt-1 text-xs text-violet-300/90 font-medium">+${remaining} more tracked players</div>`
     : '');
-  updateTrackedPlayersViewButtons();
 }
 
 function renderEventPlayerBreakdown(event, idPrefix = '') {
@@ -1717,22 +1717,34 @@ function renderEventPlayerBreakdown(event, idPrefix = '') {
     </div>
   `).join('');
   section.classList.remove('hidden');
+  if (idPrefix === 'dashboard') {
+    applyMiniLbViewMode();
+  }
 }
 
 function renderActiveEvent() {
   const hasEvent = Boolean(activeEvent);
   const quickCodeRow = document.getElementById('dashboardQuickEventCodeRow');
   const quickCodeValue = document.getElementById('dashboardQuickEventCodeValue');
-  document.getElementById('activeEventSection').classList.toggle('hidden', !hasEvent);
+  const searchActiveEventBanner = document.getElementById('searchActiveEventBanner');
+  const searchActiveEventBannerText = document.getElementById('searchActiveEventBannerText');
+  const hideSearchActiveCard = isSearchPage && hasEvent;
+  document.getElementById('activeEventSection').classList.toggle('hidden', !hasEvent || hideSearchActiveCard);
   document.getElementById('dashboardEventSection').classList.toggle('hidden', !hasEvent);
   document.getElementById('eventSetupSection').classList.toggle('hidden', hasEvent);
   document.getElementById('startEventBtn').classList.toggle('hidden', hasEvent);
   document.getElementById('noActiveEventSection').classList.toggle('hidden', hasEvent);
+  if (searchActiveEventBanner) {
+    searchActiveEventBanner.classList.toggle('hidden', !(isSearchPage && hasEvent));
+  }
   if (quickCodeRow) {
     quickCodeRow.classList.toggle('hidden', !hasEvent);
   }
 
   if (!hasEvent) {
+    if (searchActiveEventBannerText) {
+      searchActiveEventBannerText.textContent = 'No active event. Start one from this page.';
+    }
     if (quickCodeValue) {
       quickCodeValue.textContent = '-';
     }
@@ -1831,6 +1843,9 @@ function renderActiveEvent() {
   }
   if (quickCodeValue) {
     quickCodeValue.textContent = activeEvent.eventCode || '-';
+  }
+  if (searchActiveEventBannerText) {
+    searchActiveEventBannerText.textContent = `${activeEvent.guildName} is currently tracking. Use dashboard to refresh, webhook, and end event.`;
   }
   if (activeEventPublicToggle) {
     activeEventPublicToggle.checked = Boolean(activeEvent.isPublic);
@@ -2332,8 +2347,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const userDisplayName = document.getElementById('userDisplayName');
 
   configurePageMode();
-  trackedPlayersViewMode = getTrackedPlayersViewMode();
-  updateTrackedPlayersViewButtons();
+  miniLbViewMode = getMiniLbViewMode();
+  applyMiniLbViewMode();
   currentUser = getCurrentUser();
   document.getElementById('guildHowToLoginStep')?.classList.toggle('hidden', Boolean(currentUser));
   if (currentUser) {
@@ -2374,17 +2389,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('dashboardOpenHistoryBtn')?.addEventListener('click', openEventHistoryPage);
   document.getElementById('dashboardViewPastEventsBtn')?.addEventListener('click', openEventHistoryPage);
   document.getElementById('viewPastEventsBtn')?.addEventListener('click', openEventHistoryPage);
-  document.getElementById('trackedPlayersViewMinBtn')?.addEventListener('click', () => {
-    setTrackedPlayersViewMode('minimize');
-    renderTrackedPlayersInfo(activeEvent?.trackedPlayers || []);
+  document.getElementById('searchGoDashboardBtn')?.addEventListener('click', () => {
+    window.location.href = '/guild';
   });
-  document.getElementById('trackedPlayersViewScrollBtn')?.addEventListener('click', () => {
-    setTrackedPlayersViewMode('scroll');
-    renderTrackedPlayersInfo(activeEvent?.trackedPlayers || []);
+  document.getElementById('dashboardMiniLbViewMinBtn')?.addEventListener('click', () => {
+    setMiniLbViewMode('minimize');
+    applyMiniLbViewMode();
   });
-  document.getElementById('trackedPlayersViewLongBtn')?.addEventListener('click', () => {
-    setTrackedPlayersViewMode('long');
-    renderTrackedPlayersInfo(activeEvent?.trackedPlayers || []);
+  document.getElementById('dashboardMiniLbViewScrollBtn')?.addEventListener('click', () => {
+    setMiniLbViewMode('scroll');
+    applyMiniLbViewMode();
+  });
+  document.getElementById('dashboardMiniLbViewLongBtn')?.addEventListener('click', () => {
+    setMiniLbViewMode('long');
+    applyMiniLbViewMode();
   });
   document.getElementById('dashboardOpenCodePanelBtn')?.addEventListener('click', () => {
     toggleDashboardCodePanel(true);

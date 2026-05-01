@@ -409,11 +409,6 @@
             <div class="flex justify-between items-center mb-2">
               <span class="text-gray-400 text-xs uppercase tracking-widest">Tracked Players</span>
               <div class="flex items-center gap-3">
-              <div class="flex items-center gap-1 bg-gray-900/40 border border-gray-700/70 rounded-lg px-1 py-1">
-                <button type="button" id="trackedPlayersViewMinBtn" class="theme-btn px-2 py-1 rounded text-[10px] leading-none">Min</button>
-                <button type="button" id="trackedPlayersViewScrollBtn" class="theme-btn px-2 py-1 rounded text-[10px] leading-none">Scroll</button>
-                <button type="button" id="trackedPlayersViewLongBtn" class="theme-btn px-2 py-1 rounded text-[10px] leading-none">Long</button>
-              </div>
                 <button type="button" id="stopTrackingBtn" class="text-red-400 text-xs hover:underline disabled:text-gray-500 disabled:no-underline disabled:cursor-not-allowed">Stop Tracking</button>
                 <button type="button" id="changeGuildBtn" class="text-violet-400 text-xs hover:underline">Change Players</button>
               </div>
@@ -478,7 +473,14 @@
               <div id="dashboardEventPlayerBreakdownSection" class="hidden mt-3 bg-gray-900/40 border border-gray-700 rounded-lg p-3">
                 <div class="flex items-center justify-between mb-2">
                   <span class="text-gray-300 text-xs uppercase tracking-widest font-semibold">Player Breakdown</span>
-                  <span id="dashboardEventPlayerBreakdownMeta" class="text-xs text-gray-500">-</span>
+                  <div class="flex items-center gap-2">
+                    <span id="dashboardEventPlayerBreakdownMeta" class="text-xs text-gray-500">-</span>
+                    <div class="flex items-center gap-1 bg-gray-900/40 border border-gray-700/70 rounded-lg px-1 py-1">
+                      <button type="button" id="dashboardMiniLbViewMinBtn" class="theme-btn px-2 py-1 rounded text-[10px] leading-none">Min</button>
+                      <button type="button" id="dashboardMiniLbViewScrollBtn" class="theme-btn px-2 py-1 rounded text-[10px] leading-none">Scroll</button>
+                      <button type="button" id="dashboardMiniLbViewLongBtn" class="theme-btn px-2 py-1 rounded text-[10px] leading-none">Long</button>
+                    </div>
+                  </div>
                 </div>
                 <div id="dashboardEventPlayerBreakdownList" class="space-y-1 max-h-80 overflow-y-auto">
                   <p class="text-sm text-gray-500">No player data yet.</p>
@@ -526,6 +528,17 @@
           </div>
           <div id="guildAmbiguousList" class="space-y-2 max-h-56 overflow-y-auto">
             <p class="text-sm text-gray-500">No options.</p>
+          </div>
+        </div>
+        <div id="searchActiveEventBanner" class="hidden mt-4 bg-rose-900/20 border border-rose-500/35 rounded-lg p-4">
+          <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <p class="text-rose-300 text-xs uppercase tracking-widest font-semibold">Event In Progress</p>
+              <p id="searchActiveEventBannerText" class="text-sm text-white font-medium">A live event is active. Manage it from dashboard.</p>
+            </div>
+            <button type="button" id="searchGoDashboardBtn" class="theme-btn-primary px-4 py-2 rounded-lg text-sm whitespace-nowrap">
+              Go to Dashboard
+            </button>
           </div>
         </div>
       </div>
@@ -607,7 +620,7 @@
             </div>
             <div>
               <label class="text-gray-400 text-xs mb-1 block">Manual Refresh Cooldown</label>
-              <p class="text-sm text-gray-400">15 minutes between refreshes to reduce Redis usage.</p>
+              <p class="text-sm text-gray-400">5 minutes between refreshes to reduce Redis usage.</p>
             </div>
             <div>
               <label class="text-gray-400 text-xs mb-1 block">Event Visibility</label>
@@ -774,6 +787,6 @@
     </div>
   </div>
 
-  <script type="module" src="/guilds-v2.js?v=20260501h"></script>
+  <script type="module" src="/guilds-v2.js?v=20260501i"></script>
 </body>
 </html>
