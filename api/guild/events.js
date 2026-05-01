@@ -275,6 +275,13 @@ module.exports = async (req, res) => {
       if (action === 'upsert') {
         if (!event || typeof event !== 'object') return res.status(400).json({ error: 'event payload required' });
         if (existing && existing.owner !== normalizedUser) return res.status(409).json({ error: 'Event code already in use' });
+        const hasIncomingBaseline = event.baseline != null && typeof event.baseline === 'object';
+        const baseline =
+          hasIncomingBaseline && event.baseline
+            ? event.baseline
+            : existing && existing.baseline && typeof existing.baseline === 'object'
+              ? existing.baseline
+              : { metricValue: 0, playerValues: {} };
         const record = {
           eventCode: normalizedCode,
           owner: normalizedUser,
@@ -285,8 +292,8 @@ module.exports = async (req, res) => {
           trackedPlayers: Array.isArray(event.trackedPlayers) ? event.trackedPlayers : [],
           startedAt: Number(event.startedAt || Date.now()),
           refreshCooldownMs: Number(event.refreshCooldownMs || 15 * 60 * 1000),
-          baseline: event.baseline || { metricValue: 0, playerValues: {} },
-          current: event.current || event.baseline || { metricValue: 0, playerValues: {} },
+          baseline,
+          current: event.current || event.baseline || existing?.current || baseline || { metricValue: 0, playerValues: {} },
           lastRefreshAt: Number(event.lastRefreshAt || Date.now()),
           firstRefreshDone: Boolean(event.firstRefreshDone),
           updatedAt: Date.now()

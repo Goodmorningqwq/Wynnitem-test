@@ -142,7 +142,21 @@ module.exports = async (req, res) => {
       }
 
       if (activeEvent !== undefined) {
-        const sanitizedEvent = sanitizeActiveEvent(activeEvent);
+        let sanitizedEvent = sanitizeActiveEvent(activeEvent);
+        const prevEvent = userData.activeEvent && typeof userData.activeEvent === 'object' ? userData.activeEvent : null;
+        if (
+          sanitizedEvent &&
+          prevEvent &&
+          prevEvent.baseline &&
+          typeof prevEvent.baseline === 'object' &&
+          Number(prevEvent.startedAt) === Number(sanitizedEvent.startedAt) &&
+          String(prevEvent.eventCode || '') === String(sanitizedEvent.eventCode || '')
+        ) {
+          const incomingHasBaseline = activeEvent.baseline != null && typeof activeEvent.baseline === 'object';
+          if (!incomingHasBaseline || !sanitizedEvent.baseline) {
+            sanitizedEvent = { ...sanitizedEvent, baseline: prevEvent.baseline };
+          }
+        }
         if (sanitizedEvent && userData.guildName && sanitizedEvent.guildName && sanitizedEvent.guildName !== userData.guildName) {
           return res.status(400).json({ error: 'Active event guild must match tracked guild' });
         }

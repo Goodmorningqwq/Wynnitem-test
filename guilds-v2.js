@@ -267,39 +267,15 @@ function resolveMemberGuildRaids(member) {
   return { value: 0, known: false };
 }
 
-/** Guild raid totals only — excludes globalData.raids (different metric). Used for event snapshots. */
-function resolveMemberGuildRaidsStrict(member) {
-  const candidates = [member?.globalData?.guildRaids?.total, member?.guildRaids?.total];
-  let firstFinite = null;
-  for (let i = 0; i < candidates.length; i += 1) {
-    const raw = candidates[i];
-    if (raw === null || raw === undefined || raw === '') continue;
-    const parsed = Number(raw);
-    if (Number.isFinite(parsed)) {
-      if (firstFinite === null) firstFinite = parsed;
-      if (parsed > 0) {
-        return { value: parsed, known: true };
-      }
-    }
-  }
-  if (firstFinite !== null) {
-    return { value: firstFinite, known: true };
-  }
-  return { value: 0, known: false };
-}
-
 function collectGuildMembers(guild, options = {}) {
   if (!guild?.members) return [];
   const includeHydratedRaidCache = options.includeHydratedRaidCache !== false;
-  const strictGuildRaidMetric = options.strictGuildRaidMetric === true;
   const ranks = ['owner', 'chief', 'strategist', 'captain', 'recruiter', 'recruit'];
   const players = [];
   for (const rank of ranks) {
     if (!guild.members[rank]) continue;
     for (const [memberKey, member] of Object.entries(guild.members[rank])) {
-      const raidState = strictGuildRaidMetric
-        ? resolveMemberGuildRaidsStrict(member)
-        : resolveMemberGuildRaids(member);
+      const raidState = resolveMemberGuildRaids(member);
       const id = member.uuid || memberKey || null;
       const cachedRaids = includeHydratedRaidCache && id ? memberRaidsCache.get(id) : undefined;
       const hasCachedRaids = Number.isFinite(Number(cachedRaids));
@@ -825,10 +801,6 @@ function snapshotPlayerValueForMetric(entry, metric) {
   return Number(entry.xp || 0);
 }
 
-function sumGuildRaidsAcrossMembers(guild) {
-  return collectGuildMembers(guild).reduce((sum, p) => sum + Number(p.guildRaids || 0), 0);
-}
-
 function getLiveRosterUsernames(event, guild) {
   if (!guild || !event) return [];
   if (event.scope === 'guild') {
@@ -837,102 +809,16 @@ function getLiveRosterUsernames(event, guild) {
   return Array.isArray(event.trackedPlayers) ? event.trackedPlayers.slice() : [];
 }
 
-function mergeGuildScopeBaselineForNewMembers(event, guild, snapshot) {
-  if (!event || event.scope !== 'guild' || !snapshot || typeof snapshot.playerValues !== 'object') {
-    return false;
-  }
-  if (!event.baseline) {
-    event.baseline = { metricValue: 0, playerValues: {} };
-  }
-  if (!event.baseline.playerValues || typeof event.baseline.playerValues !== 'object') {
-    event.baseline.playerValues = {};
-  }
-  const roster = collectGuildMembers(guild).map((m) => m.username);
-  let mutated = false;
-  for (let i = 0; i < roster.length; i += 1) {
-    const username = roster[i];
-    if (Object.prototype.hasOwnProperty.call(event.baseline.playerValues, username)) {
-      continue;
-    }
-    const v = Number(snapshot.playerValues[username] ?? 0);
-    event.baseline.playerValues[username] = v;
-    if (event.metric === 'guildRaids') {
-      const baseMetric = Number(event.baseline.metricValue || 0);
-      event.baseline.metricValue = baseMetric + v;
-    }
-    mutated = true;
-  }
-  return mutated;
-}
-
-function sumPlayerValues(map) {
-  if (!map || typeof map !== 'object') return 0;
-  return Object.values(map).reduce((sum, value) => sum + Number(value || 0), 0);
-}
-
-function computeEventTotalsFromPlayers(event) {
-  const baselinePlayers = event?.baseline?.playerValues || {};
-  const currentPlayers = event?.current?.playerValues || baselinePlayers;
-  const allNames = Array.from(new Set([
-    ...Object.keys(baselinePlayers),
-    ...Object.keys(currentPlayers)
-  ]));
-
-  let startValue = 0;
-  let currentValue = 0;
-  allNames.forEach((username) => {
-    const start = Number(baselinePlayers[username] || 0);
-    const hasCurrent = Object.prototype.hasOwnProperty.call(currentPlayers, username);
-    const current = hasCurrent ? Number(currentPlayers[username] || 0) : start;
-    startValue += start;
-    currentValue += current;
-  });
-
-  // Fallback keeps legacy shape resilient when player maps are absent.
-  if (!allNames.length) {
-    startValue = sumPlayerValues(baselinePlayers);
-    currentValue = sumPlayerValues(currentPlayers);
-    if (!startValue && !currentValue) {
-      startValue = Number(event?.baseline?.metricValue || 0);
-      currentValue = Number(event?.current?.metricValue || startValue);
-    }
-  }
-
-  return {
-    startValue,
-    currentValue,
-    delta: currentValue - startValue
-  };
-}
-
-function getSnapshot(metric, guild, trackedPlayers, scope = 'selected', previousPlayerValues = null) {
-  // Event snapshots must use raw guild payload values only.
-  // Hydrated profile raid cache is display-only and can drift from event baseline semantics.
-  const players = collectGuildMembers(guild, {
-    includeHydratedRaidCache: false,
-    strictGuildRaidMetric: metric === 'guildRaids'
-  });
+function getSnapshot(metric, guild, trackedPlayers, scope = 'selected') {
+  // Event snapshots use raw guild API fields only (no hydrated raid cache).
+  const players = collectGuildMembers(guild, { includeHydratedRaidCache: false });
   const playerMap = buildPlayerMap(players);
   const selected = trackedPlayers.length ? trackedPlayers : players.map((p) => p.username);
   const snapshotPlayers = {};
   for (const username of selected) {
     const entry = findPlayerEntry(playerMap, username);
     const liveValue = snapshotPlayerValueForMetric(entry || { xp: 0, wars: 0, guildRaids: 0 }, metric);
-    if (metric === 'guildRaids') {
-      const prevValue = Number(previousPlayerValues?.[username] || 0);
-      const hasPrev =
-        previousPlayerValues &&
-        Object.prototype.hasOwnProperty.call(previousPlayerValues, username);
-      if (!entry || entry.guildRaidsKnown === false) {
-        // Keep previous snapshot value only when this member value is missing/unknown.
-        snapshotPlayers[username] = prevValue;
-      } else {
-        // Cumulative guild raids should not decrease; partial API payloads sometimes report 0 or stale lows.
-        snapshotPlayers[username] = hasPrev ? Math.max(liveValue, prevValue) : liveValue;
-      }
-    } else {
-      snapshotPlayers[username] = liveValue;
-    }
+    snapshotPlayers[username] = liveValue;
   }
   const selectedTotal = Object.values(snapshotPlayers).reduce((sum, value) => sum + Number(value || 0), 0);
   let metricValue;
@@ -1651,6 +1537,16 @@ function updateStopTrackingState() {
   stopBtn.title = hasActiveEvent ? 'End the active event first' : 'Stop tracking this guild';
 }
 
+/** Deep clone so refresh never shares references with current snapshot or mutates start-of-period totals. */
+function cloneBaselineForRefresh(baseline) {
+  if (!baseline || typeof baseline !== 'object') return baseline;
+  try {
+    return JSON.parse(JSON.stringify(baseline));
+  } catch {
+    return baseline;
+  }
+}
+
 function getGuildDelta(event) {
   if (event?.metric === 'guildRaids') {
     const start = Number(event.baseline?.metricValue || 0);
@@ -1807,18 +1703,8 @@ function renderActiveEvent() {
   const minutes = Math.floor((elapsed % 3600000) / 60000);
   const seconds = Math.floor((elapsed % 60000) / 1000);
   const durationText = `${hours}h ${minutes}m ${seconds}s`;
-  let startValue = Number(activeEvent.baseline?.metricValue || 0);
-  let currentValue = Number(activeEvent.current?.metricValue || startValue);
-  if (activeEvent.metric === 'guildRaids') {
-    const totals = computeEventTotalsFromPlayers(activeEvent);
-    if (!Number.isFinite(startValue)) {
-      startValue = totals.startValue;
-    }
-    currentValue = totals.currentValue;
-    if (activeEvent.current) {
-      activeEvent.current.metricValue = currentValue;
-    }
-  }
+  const startValue = Number(activeEvent.baseline?.metricValue || 0);
+  const currentValue = Number(activeEvent.current?.metricValue || startValue);
   const delta = currentValue - startValue;
   if (activeEvent.metric === 'wars') {
     // #region agent log
@@ -2127,10 +2013,8 @@ async function refreshEvent() {
       activeEvent.metric,
       currentGuild,
       liveRoster,
-      eventScope,
-      activeEvent.current?.playerValues || null
+      eventScope
     );
-    const baselineMutated = mergeGuildScopeBaselineForNewMembers(activeEvent, currentGuild, snapshot);
     if (eventScope === 'guild') {
       activeEvent.trackedPlayers = liveRoster.slice();
     }
@@ -2144,11 +2028,10 @@ async function refreshEvent() {
     const sameKeyCount = previousKeys.length === nextKeys.length;
     const sameKeys = sameKeyCount && previousKeys.every((key, idx) => key === nextKeys[idx]);
     const samePlayerValues = sameKeys && previousKeys.every((key) => Number(previousPlayers[key] || 0) === Number(nextPlayers[key] || 0));
+    // Period totals: baseline = raids at event start (immutable). Only current is updated from API.
+    const lockedBaseline = cloneBaselineForRefresh(activeEvent.baseline);
     activeEvent.current = snapshot;
-    if (activeEvent.metric === 'guildRaids') {
-      const totals = computeEventTotalsFromPlayers(activeEvent);
-      activeEvent.current.metricValue = totals.currentValue;
-    }
+    activeEvent.baseline = lockedBaseline;
     const nextMetricValue = Number(activeEvent.current?.metricValue || 0);
     const snapshotChanged = previousMetricValue !== nextMetricValue || !samePlayerValues;
     activeEvent.lastRefreshAt = Date.now();
@@ -2163,7 +2046,7 @@ async function refreshEvent() {
         console.error('Failed to sync event code on refresh:', syncResult.error);
       }
     }
-    if (snapshotChanged || baselineMutated) {
+    if (snapshotChanged) {
       await notifyDiscordLeaderboardUpdate('refresh', activeEvent, snapshot);
     }
   } catch (err) {
