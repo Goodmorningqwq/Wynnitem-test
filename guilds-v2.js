@@ -187,6 +187,16 @@ function preSeedMemberWars(guild) {
   warLog(`pre-seeded ${count} members`);
 }
 
+function resolveMemberGuildRaids(member) {
+  return Number(
+    member?.globalData?.guildRaids?.total
+    ?? member?.globalData?.raids?.total
+    ?? member?.guildRaids?.total
+    ?? member?.raids?.total
+    ?? 0
+  );
+}
+
 function collectGuildMembers(guild) {
   if (!guild?.members) return [];
   const ranks = ['owner', 'chief', 'strategist', 'captain', 'recruiter', 'recruit'];
@@ -198,7 +208,7 @@ function collectGuildMembers(guild) {
         uuid: member.uuid || memberKey || null,
         username: member.username || member.legacyName || memberKey,
         contributed: Number(member.contributed || 0),
-        guildRaids: Number(member.globalData?.guildRaids?.total ?? member.guildRaids?.total ?? 0),
+        guildRaids: resolveMemberGuildRaids(member),
         wars: member.globalData?.wars ?? memberWarsCache.get(member.uuid || memberKey || '') ?? null,
         rank: rank,
         joined: member.joined || '',
@@ -262,6 +272,22 @@ function buildPlayerMap(players) {
     };
   }
   return map;
+}
+
+function findPlayerEntry(playerMap, username) {
+  if (!playerMap || !username) return null;
+  if (Object.prototype.hasOwnProperty.call(playerMap, username)) {
+    return playerMap[username];
+  }
+  const target = String(username).toLowerCase();
+  const keys = Object.keys(playerMap);
+  for (let i = 0; i < keys.length; i += 1) {
+    const key = keys[i];
+    if (String(key).toLowerCase() === target) {
+      return playerMap[key];
+    }
+  }
+  return null;
 }
 
 function formatDelta(value) {
@@ -687,14 +713,21 @@ function computeEventTotalsFromPlayers(event) {
   };
 }
 
-function getSnapshot(metric, guild, trackedPlayers, scope = 'selected') {
+function getSnapshot(metric, guild, trackedPlayers, scope = 'selected', previousPlayerValues = null) {
   const players = collectGuildMembers(guild);
   const playerMap = buildPlayerMap(players);
   const selected = trackedPlayers.length ? trackedPlayers : players.map((p) => p.username);
   const snapshotPlayers = {};
   for (const username of selected) {
-    const entry = playerMap[username] || { xp: 0, wars: 0, guildRaids: 0 };
-    snapshotPlayers[username] = snapshotPlayerValueForMetric(entry, metric);
+    const entry = findPlayerEntry(playerMap, username);
+    const liveValue = snapshotPlayerValueForMetric(entry || { xp: 0, wars: 0, guildRaids: 0 }, metric);
+    if (metric === 'guildRaids') {
+      // Guild raid totals are monotonic. Keep last known value if live roster is missing/stale.
+      const prevValue = Number(previousPlayerValues?.[username] || 0);
+      snapshotPlayers[username] = Math.max(liveValue, prevValue);
+    } else {
+      snapshotPlayers[username] = liveValue;
+    }
   }
   const selectedTotal = Object.values(snapshotPlayers).reduce((sum, value) => sum + Number(value || 0), 0);
   let metricValue;
@@ -1850,7 +1883,13 @@ async function refreshEvent() {
       }
 
     liveRoster = getLiveRosterUsernames(activeEvent, currentGuild);
-    const snapshot = getSnapshot(activeEvent.metric, currentGuild, liveRoster, eventScope);
+    const snapshot = getSnapshot(
+      activeEvent.metric,
+      currentGuild,
+      liveRoster,
+      eventScope,
+      activeEvent.current?.playerValues || null
+    );
     const baselineMutated = mergeGuildScopeBaselineForNewMembers(activeEvent, currentGuild, snapshot);
     if (eventScope === 'guild') {
       activeEvent.trackedPlayers = liveRoster.slice();
