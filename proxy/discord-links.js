@@ -4,7 +4,6 @@ const { Redis } = require('@upstash/redis');
 const WEBHOOK_KEY_PREFIX = 'guild:event:discord:webhook:';
 const EVENT_KEY_PREFIX = 'guild:event:code:';
 const NOTIFY_STATE_KEY_PREFIX = 'guild:event:discord:notify:';
-const REFRESH_NOTIFY_COOLDOWN_MS = 45 * 1000;
 
 let redis = null;
 if (process.env.UPSTASH_REDIS_REST_URL_GUILD && process.env.UPSTASH_REDIS_REST_TOKEN_GUILD) {
@@ -129,7 +128,7 @@ function buildEmbed({ event, kind, snapshot }) {
       { name: 'Delta', value: `${delta >= 0 ? '+' : ''}${delta.toLocaleString()}`, inline: true },
       { name: 'Top Players', value: topText, inline: false }
     ],
-    footer: { text: kind === 'end' ? 'Final summary' : 'Auto refresh update' },
+    footer: { text: kind === 'end' ? 'Final summary' : 'Dashboard refresh' },
     timestamp: new Date().toISOString()
   };
 }
@@ -166,23 +165,12 @@ async function notifyLinkedChannels({ eventCode, kind, event, snapshot }) {
     return { ok: true, sent: 0, skipped: 0, reason: 'No linked webhook' };
   }
 
-  const stateKey = getNotifyStateKey(code);
-  const lastStateStr = await redis.get(stateKey);
-  const lastState = parseJsonSafe(lastStateStr, {});
   const digest = buildDigest({
     kind,
     metricValue: snapshot?.metricValue ?? event?.current?.metricValue ?? 0,
     playerValues: snapshot?.playerValues ?? event?.current?.playerValues ?? {}
   });
   const now = Date.now();
-
-  if (kind === 'refresh') {
-    const sameDigest = String(lastState.digest || '') === digest;
-    const cooldownHit = now - Number(lastState.lastSentAt || 0) < REFRESH_NOTIFY_COOLDOWN_MS;
-    if (sameDigest || cooldownHit) {
-      return { ok: true, sent: 0, skipped: 1, reason: sameDigest ? 'Unchanged snapshot' : 'Cooldown active' };
-    }
-  }
 
   const embed = buildEmbed({ event, kind, snapshot });
   const result = await sendDiscordWebhook(link.webhookUrl, {
@@ -193,6 +181,7 @@ async function notifyLinkedChannels({ eventCode, kind, event, snapshot }) {
     return { ok: false, sent: 0, failed: 1, skipped: 0, error: result.error };
   }
 
+  const stateKey = getNotifyStateKey(code);
   await redis.set(stateKey, JSON.stringify({
     digest,
     lastKind: kind,

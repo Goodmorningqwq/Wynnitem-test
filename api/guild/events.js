@@ -8,7 +8,6 @@ const redis = new Redis({
 
 const WEBHOOK_KEY_PREFIX = 'guild:event:discord:webhook:';
 const NOTIFY_STATE_KEY_PREFIX = 'guild:event:discord:notify:';
-const REFRESH_NOTIFY_COOLDOWN_MS = 45 * 1000;
 
 function getEventKey(code) {
   return `guild:event:code:${String(code || '').toUpperCase()}`;
@@ -73,7 +72,7 @@ function buildEmbed({ event, kind, snapshot }) {
       { name: 'Delta', value: `${delta >= 0 ? '+' : ''}${delta.toLocaleString()}`, inline: true },
       { name: 'Top Players', value: topText, inline: false }
     ],
-    footer: { text: kind === 'end' ? 'Final summary' : 'Auto refresh update' },
+    footer: { text: kind === 'end' ? 'Final summary' : 'Dashboard refresh' },
     timestamp: new Date().toISOString()
   };
 }
@@ -194,8 +193,6 @@ module.exports = async (req, res) => {
         return res.json({ ok: true, sent: 0, skipped: 0, reason: 'No linked webhook' });
       }
 
-      const stateKey = getNotifyStateKey(eventCode);
-      const lastState = parseJsonSafe(await redis.get(stateKey), {});
       const digest = buildDigest({
         kind,
         metricValue: snapshot?.metricValue ?? event?.current?.metricValue ?? 0,
@@ -203,20 +200,13 @@ module.exports = async (req, res) => {
       });
       const now = Date.now();
 
-      if (kind === 'refresh') {
-        const sameDigest = String(lastState.digest || '') === digest;
-        const cooldownHit = now - Number(lastState.lastSentAt || 0) < REFRESH_NOTIFY_COOLDOWN_MS;
-        if (sameDigest || cooldownHit) {
-          return res.json({ ok: true, sent: 0, skipped: 1, reason: sameDigest ? 'Unchanged snapshot' : 'Cooldown active' });
-        }
-      }
-
       const embed = buildEmbed({ event, kind, snapshot });
       const sendResult = await sendDiscordWebhook(link.webhookUrl, { embeds: [embed] });
       if (!sendResult.ok) {
         return res.status(500).json({ ok: false, sent: 0, failed: 1, skipped: 0, error: sendResult.error });
       }
 
+      const stateKey = getNotifyStateKey(eventCode);
       await redis.set(stateKey, JSON.stringify({ digest, lastKind: kind, lastSentAt: now }));
       return res.json({ ok: true, sent: 1, failed: 0, skipped: 0 });
     } catch (e) {

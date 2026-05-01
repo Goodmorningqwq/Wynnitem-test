@@ -2019,21 +2019,10 @@ async function refreshEvent() {
       activeEvent.trackedPlayers = liveRoster.slice();
     }
 
-    const previousSnapshot = activeEvent.current || null;
-    const previousMetricValue = Number(previousSnapshot?.metricValue || 0);
-    const previousPlayers = previousSnapshot?.playerValues || {};
-    const nextPlayers = snapshot?.playerValues || {};
-    const previousKeys = Object.keys(previousPlayers).sort();
-    const nextKeys = Object.keys(nextPlayers).sort();
-    const sameKeyCount = previousKeys.length === nextKeys.length;
-    const sameKeys = sameKeyCount && previousKeys.every((key, idx) => key === nextKeys[idx]);
-    const samePlayerValues = sameKeys && previousKeys.every((key) => Number(previousPlayers[key] || 0) === Number(nextPlayers[key] || 0));
     // Period totals: baseline = raids at event start (immutable). Only current is updated from API.
     const lockedBaseline = cloneBaselineForRefresh(activeEvent.baseline);
     activeEvent.current = snapshot;
     activeEvent.baseline = lockedBaseline;
-    const nextMetricValue = Number(activeEvent.current?.metricValue || 0);
-    const snapshotChanged = previousMetricValue !== nextMetricValue || !samePlayerValues;
     activeEvent.lastRefreshAt = Date.now();
     activeEvent.firstRefreshDone = true;
     const saveResult = await updateUserData({ activeEvent });
@@ -2046,9 +2035,7 @@ async function refreshEvent() {
         console.error('Failed to sync event code on refresh:', syncResult.error);
       }
     }
-    if (snapshotChanged) {
-      await notifyDiscordLeaderboardUpdate('refresh', activeEvent, snapshot);
-    }
+    await notifyDiscordLeaderboardUpdate('refresh', activeEvent, snapshot);
   } catch (err) {
     console.error('Refresh event error:', err);
   } finally {
