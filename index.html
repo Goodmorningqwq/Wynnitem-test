@@ -408,13 +408,28 @@
     }
 
     .quick-guild-search::before {
-      content: none;
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      border-radius: 0.75rem 0.75rem 0 0;
+      opacity: 0.95;
+      background: linear-gradient(90deg, #ff4fd8, #c084fc);
     }
 
     .quick-search-chrome {
       position: relative;
       border-radius: 0.72rem;
       overflow: hidden;
+      padding: 0.75rem;
+    }
+
+    @media (min-width: 768px) {
+      .quick-search-chrome {
+        padding: 1rem;
+      }
     }
 
     .quick-search-chrome::before {
@@ -439,7 +454,7 @@
       align-items: center;
       justify-content: space-between;
       gap: 0.75rem;
-      margin-bottom: 0.55rem;
+      margin-bottom: 0.62rem;
       text-transform: uppercase;
       letter-spacing: 0.12em;
       font-size: 0.66rem;
@@ -790,13 +805,13 @@
           <p class="hero-subtitle text-lg md:text-xl max-w-2xl mx-auto leading-relaxed mb-8">
             One place for the item database and guild tracking—wars, XP, raids, and event leaderboards built for active guilds.
           </p>
-          <form id="homeUnifiedSearchForm" action="/guild/search" method="get" class="quick-guild-search rounded-xl p-3 md:p-4 max-w-2xl mx-auto mb-8">
+          <form id="homeUnifiedSearchForm" action="/guild/search" method="get" class="quick-guild-search rounded-xl max-w-2xl mx-auto mb-8">
             <div class="quick-search-shell">
               <div class="quick-search-chrome">
                 <div class="quick-search-meta">
                   <p class="quick-search-title">
-                    <svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M10 6h10M6 12h14M10 18h10M4 6h.01M4 12h.01M4 18h.01"/>
+                    <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M4 12h16M4 17h10"/>
                     </svg>
                     Quick Search
                   </p>
@@ -870,7 +885,7 @@
           </a>
         </div>
         <div class="max-w-6xl mx-auto mt-6">
-          <a href="/player-stats" class="menu-card group rounded-xl flex items-center justify-between gap-4 p-5 md:p-6">
+          <a href="/player-stats" class="menu-card group rounded-xl flex items-center justify-between gap-4 p-5 md:p-6 overflow-hidden">
             <div class="flex items-center gap-4">
               <div class="menu-card-icon !w-14 !h-14 !text-2xl">👤</div>
               <div>
