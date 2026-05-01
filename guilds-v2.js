@@ -1517,6 +1517,10 @@ function openLeaderboardByCode(rawCode) {
   window.location.href = `/guild/leaderboard?code=${encodeURIComponent(code)}`;
 }
 
+function openEventHistoryPage() {
+  window.location.href = '/guild/event_history';
+}
+
 function toggleDashboardCodePanel(forceOpen = null) {
   const panel = document.getElementById('dashboardJoinCodeSection');
   if (!panel) return;
@@ -1606,15 +1610,15 @@ function renderTrackedPlayersInfo(players) {
     container.innerHTML = '<p class="text-gray-500 text-sm">No selected players saved.</p>';
     return;
   }
-  const maxPreview = 5;
+  const maxPreview = 12;
   const visiblePlayers = players.slice(0, maxPreview);
   const remaining = Math.max(0, players.length - visiblePlayers.length);
-  container.innerHTML = visiblePlayers.map((username) => `
-    <div class="bg-gray-800/50 rounded p-2 text-sm inline-block mr-2 mb-2">
+  container.innerHTML = `<div class="max-h-44 overflow-y-auto pr-1 hide-scrollbar">${visiblePlayers.map((username) => `
+    <div class="bg-gray-800/50 rounded px-2 py-1 text-sm inline-block mr-2 mb-2">
       <span class="text-white font-medium">${escapeHtml(username)}</span>
     </div>
-  `).join('') + (remaining > 0
-    ? `<div class="bg-gray-800/40 rounded p-2 text-sm inline-block mr-2 mb-2"><span class="text-gray-300 font-medium">... +${remaining} more</span></div>`
+  `).join('')}</div>` + (remaining > 0
+    ? `<div class="mt-1 text-xs text-violet-300/90 font-medium">+${remaining} more tracked players</div>`
     : '');
 }
 
@@ -1662,16 +1666,24 @@ function renderActiveEvent() {
   const hasEvent = Boolean(activeEvent);
   const quickCodeRow = document.getElementById('dashboardQuickEventCodeRow');
   const quickCodeValue = document.getElementById('dashboardQuickEventCodeValue');
+  const searchActiveEventBanner = document.getElementById('searchActiveEventBanner');
+  const searchActiveEventBannerText = document.getElementById('searchActiveEventBannerText');
   document.getElementById('activeEventSection').classList.toggle('hidden', !hasEvent);
   document.getElementById('dashboardEventSection').classList.toggle('hidden', !hasEvent);
   document.getElementById('eventSetupSection').classList.toggle('hidden', hasEvent);
   document.getElementById('startEventBtn').classList.toggle('hidden', hasEvent);
   document.getElementById('noActiveEventSection').classList.toggle('hidden', hasEvent);
+  if (searchActiveEventBanner) {
+    searchActiveEventBanner.classList.toggle('hidden', !(isSearchPage && hasEvent));
+  }
   if (quickCodeRow) {
     quickCodeRow.classList.toggle('hidden', !hasEvent);
   }
 
   if (!hasEvent) {
+    if (searchActiveEventBannerText) {
+      searchActiveEventBannerText.textContent = 'No active event. Start one from this page.';
+    }
     if (quickCodeValue) {
       quickCodeValue.textContent = '-';
     }
@@ -1770,6 +1782,10 @@ function renderActiveEvent() {
   }
   if (quickCodeValue) {
     quickCodeValue.textContent = activeEvent.eventCode || '-';
+  }
+  if (searchActiveEventBannerText) {
+    const metricText = formatMetric(activeEvent.metric);
+    searchActiveEventBannerText.textContent = `${activeEvent.guildName} · ${metricText} is running. Click to open dashboard.`;
   }
   if (activeEventPublicToggle) {
     activeEventPublicToggle.checked = Boolean(activeEvent.isPublic);
@@ -2085,6 +2101,9 @@ async function endEvent() {
   renderActiveEvent();
   stopCooldownTicker();
   await loadUserDashboard();
+  if (confirm('Event saved to history. Open past events now?')) {
+    openEventHistoryPage();
+  }
 }
 
 async function toggleActiveEventVisibility(isPublic) {
@@ -2305,8 +2324,11 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('dashboardOpenSearchBtn')?.addEventListener('click', () => {
     window.location.href = '/guild/search';
   });
-  document.getElementById('dashboardOpenHistoryBtn')?.addEventListener('click', () => {
-    window.location.href = '/guild/event_history';
+  document.getElementById('dashboardOpenHistoryBtn')?.addEventListener('click', openEventHistoryPage);
+  document.getElementById('dashboardViewPastEventsBtn')?.addEventListener('click', openEventHistoryPage);
+  document.getElementById('viewPastEventsBtn')?.addEventListener('click', openEventHistoryPage);
+  document.getElementById('searchGoDashboardBtn')?.addEventListener('click', () => {
+    window.location.href = '/guild';
   });
   document.getElementById('dashboardOpenCodePanelBtn')?.addEventListener('click', () => {
     toggleDashboardCodePanel(true);
