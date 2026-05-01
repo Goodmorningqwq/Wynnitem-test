@@ -275,15 +275,39 @@ function resolveMemberGuildRaids(member) {
   return { value: 0, known: false };
 }
 
+/** Guild raid event totals only — never use globalData.raids (different stat). */
+function resolveMemberGuildRaidsStrict(member) {
+  const candidates = [member?.globalData?.guildRaids?.total, member?.guildRaids?.total];
+  let firstFinite = null;
+  for (let i = 0; i < candidates.length; i += 1) {
+    const raw = candidates[i];
+    if (raw === null || raw === undefined || raw === '') continue;
+    const parsed = Number(raw);
+    if (Number.isFinite(parsed)) {
+      if (firstFinite === null) firstFinite = parsed;
+      if (parsed > 0) {
+        return { value: parsed, known: true };
+      }
+    }
+  }
+  if (firstFinite !== null) {
+    return { value: firstFinite, known: true };
+  }
+  return { value: 0, known: false };
+}
+
 function collectGuildMembers(guild, options = {}) {
   if (!guild?.members) return [];
   const includeHydratedRaidCache = options.includeHydratedRaidCache !== false;
+  const strictGuildRaidMetric = options.strictGuildRaidMetric === true;
   const ranks = ['owner', 'chief', 'strategist', 'captain', 'recruiter', 'recruit'];
   const players = [];
   for (const rank of ranks) {
     if (!guild.members[rank]) continue;
     for (const [memberKey, member] of Object.entries(guild.members[rank])) {
-      const raidState = resolveMemberGuildRaids(member);
+      const raidState = strictGuildRaidMetric
+        ? resolveMemberGuildRaidsStrict(member)
+        : resolveMemberGuildRaids(member);
       const id = member.uuid || memberKey || null;
       const cachedRaids = includeHydratedRaidCache && id ? memberRaidsCache.get(id) : undefined;
       const hasCachedRaids = Number.isFinite(Number(cachedRaids));
@@ -825,7 +849,10 @@ function getLiveRosterUsernames(event, guild) {
 
 function getSnapshot(metric, guild, trackedPlayers, scope = 'selected', previousPlayerValues = null) {
   // Event snapshots use raw guild API fields only (no hydrated raid cache).
-  const players = collectGuildMembers(guild, { includeHydratedRaidCache: false });
+  const players = collectGuildMembers(guild, {
+    includeHydratedRaidCache: false,
+    strictGuildRaidMetric: metric === 'guildRaids'
+  });
   const playerMap = buildPlayerMap(players);
   const selected = trackedPlayers.length ? trackedPlayers : players.map((p) => p.username);
   const snapshotPlayers = {};
