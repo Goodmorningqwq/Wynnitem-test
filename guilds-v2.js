@@ -197,13 +197,19 @@ function resolveMemberGuildRaids(member) {
     member?.guildRaids?.total,
     member?.raids?.total
   ];
+  const parsedValues = [];
   for (let i = 0; i < candidates.length; i += 1) {
     const raw = candidates[i];
     if (raw === null || raw === undefined || raw === '') continue;
     const parsed = Number(raw);
     if (Number.isFinite(parsed)) {
-      return { value: parsed, known: true };
+      parsedValues.push(parsed);
     }
+  }
+  if (parsedValues.length) {
+    // Some upstream payloads carry both `guildRaids` and `raids` with mismatched values.
+    // Use the largest observed value to avoid pinning a member at a stale zero.
+    return { value: Math.max(...parsedValues), known: true };
   }
   return { value: 0, known: false };
 }
@@ -219,7 +225,9 @@ function collectGuildMembers(guild) {
       const id = member.uuid || memberKey || null;
       const cachedRaids = id ? memberRaidsCache.get(id) : undefined;
       const hasCachedRaids = Number.isFinite(Number(cachedRaids));
-      const guildRaids = raidState.known ? raidState.value : (hasCachedRaids ? Number(cachedRaids) : 0);
+      const guildRaids = raidState.known
+        ? (hasCachedRaids ? Math.max(raidState.value, Number(cachedRaids)) : raidState.value)
+        : (hasCachedRaids ? Number(cachedRaids) : 0);
       const guildRaidsKnown = raidState.known || hasCachedRaids;
       players.push({
         uuid: id,
