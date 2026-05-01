@@ -267,22 +267,19 @@ function resolveMemberGuildRaids(member) {
   return { value: 0, known: false };
 }
 
+/** Guild raid totals only — excludes globalData.raids (different metric). Used for event snapshots. */
 function resolveMemberGuildRaidsStrict(member) {
-  const candidates = [
-    member?.globalData?.guildRaids?.total,
-    member?.guildRaids?.total
-  ];
+  const candidates = [member?.globalData?.guildRaids?.total, member?.guildRaids?.total];
   let firstFinite = null;
   for (let i = 0; i < candidates.length; i += 1) {
     const raw = candidates[i];
     if (raw === null || raw === undefined || raw === '') continue;
     const parsed = Number(raw);
-    if (!Number.isFinite(parsed)) continue;
-    if (firstFinite === null) {
-      firstFinite = parsed;
-    }
-    if (parsed > 0) {
-      return { value: parsed, known: true };
+    if (Number.isFinite(parsed)) {
+      if (firstFinite === null) firstFinite = parsed;
+      if (parsed > 0) {
+        return { value: parsed, known: true };
+      }
     }
   }
   if (firstFinite !== null) {
@@ -501,7 +498,10 @@ function normalizeActiveEvent(rawEvent, fallbackTrackedPlayers = []) {
   if (rawEvent.metric && rawEvent.startedAt && rawEvent.baseline) {
     return {
       ...rawEvent,
-      refreshCooldownMs: REFRESH_COOLDOWN_MS
+      refreshCooldownMs:
+        rawEvent.refreshCooldownMs !== undefined && rawEvent.refreshCooldownMs !== null
+          ? Number(rawEvent.refreshCooldownMs)
+          : REFRESH_COOLDOWN_MS
     };
   }
 
@@ -920,11 +920,15 @@ function getSnapshot(metric, guild, trackedPlayers, scope = 'selected', previous
     const liveValue = snapshotPlayerValueForMetric(entry || { xp: 0, wars: 0, guildRaids: 0 }, metric);
     if (metric === 'guildRaids') {
       const prevValue = Number(previousPlayerValues?.[username] || 0);
+      const hasPrev =
+        previousPlayerValues &&
+        Object.prototype.hasOwnProperty.call(previousPlayerValues, username);
       if (!entry || entry.guildRaidsKnown === false) {
         // Keep previous snapshot value only when this member value is missing/unknown.
         snapshotPlayers[username] = prevValue;
       } else {
-        snapshotPlayers[username] = liveValue;
+        // Cumulative guild raids should not decrease; partial API payloads sometimes report 0 or stale lows.
+        snapshotPlayers[username] = hasPrev ? Math.max(liveValue, prevValue) : liveValue;
       }
     } else {
       snapshotPlayers[username] = liveValue;
