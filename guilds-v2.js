@@ -638,7 +638,6 @@ function mergeGuildScopeBaselineForNewMembers(event, guild, snapshot) {
   }
   const roster = collectGuildMembers(guild).map((m) => m.username);
   let mutated = false;
-  const metric = event.metric;
   for (let i = 0; i < roster.length; i += 1) {
     const username = roster[i];
     if (Object.prototype.hasOwnProperty.call(event.baseline.playerValues, username)) {
@@ -646,12 +645,49 @@ function mergeGuildScopeBaselineForNewMembers(event, guild, snapshot) {
     }
     const v = Number(snapshot.playerValues[username] ?? 0);
     event.baseline.playerValues[username] = v;
-    if (metric === 'guildRaids') {
-      event.baseline.metricValue = Number(event.baseline.metricValue || 0) + v;
-    }
     mutated = true;
   }
   return mutated;
+}
+
+function sumPlayerValues(map) {
+  if (!map || typeof map !== 'object') return 0;
+  return Object.values(map).reduce((sum, value) => sum + Number(value || 0), 0);
+}
+
+function computeEventTotalsFromPlayers(event) {
+  const baselinePlayers = event?.baseline?.playerValues || {};
+  const currentPlayers = event?.current?.playerValues || baselinePlayers;
+  const allNames = Array.from(new Set([
+    ...Object.keys(baselinePlayers),
+    ...Object.keys(currentPlayers)
+  ]));
+
+  let startValue = 0;
+  let currentValue = 0;
+  allNames.forEach((username) => {
+    const start = Number(baselinePlayers[username] || 0);
+    const hasCurrent = Object.prototype.hasOwnProperty.call(currentPlayers, username);
+    const current = hasCurrent ? Number(currentPlayers[username] || 0) : start;
+    startValue += start;
+    currentValue += current;
+  });
+
+  // Fallback keeps legacy shape resilient when player maps are absent.
+  if (!allNames.length) {
+    startValue = sumPlayerValues(baselinePlayers);
+    currentValue = sumPlayerValues(currentPlayers);
+    if (!startValue && !currentValue) {
+      startValue = Number(event?.baseline?.metricValue || 0);
+      currentValue = Number(event?.current?.metricValue || startValue);
+    }
+  }
+
+  return {
+    startValue,
+    currentValue,
+    delta: currentValue - startValue
+  };
 }
 
 function getSnapshot(metric, guild, trackedPlayers, scope = 'selected') {
@@ -670,7 +706,7 @@ function getSnapshot(metric, guild, trackedPlayers, scope = 'selected') {
   } else if (metric === 'wars') {
     metricValue = Number(guild.wars || 0);
   } else if (metric === 'guildRaids') {
-    metricValue = Number(guild.raids || 0);
+    metricValue = selectedTotal;
   } else {
     metricValue = Number(guild.xpPercent || 0);
   }
@@ -1374,6 +1410,9 @@ function updateStopTrackingState() {
 }
 
 function getGuildDelta(event) {
+  if (event?.metric === 'guildRaids') {
+    return computeEventTotalsFromPlayers(event).delta;
+  }
   const start = Number(event.baseline?.metricValue || 0);
   const current = Number(event.current?.metricValue || start);
   return current - start;
@@ -1455,9 +1494,14 @@ function renderEventPlayerBreakdown(event, idPrefix = '') {
 
   const baselinePlayers = event?.baseline?.playerValues || {};
   const currentPlayers = event?.current?.playerValues || baselinePlayers;
-  const rows = Object.keys(currentPlayers).map((username) => {
+  const usernames = Array.from(new Set([
+    ...Object.keys(baselinePlayers),
+    ...Object.keys(currentPlayers)
+  ]));
+  const rows = usernames.map((username) => {
     const startValue = Number(baselinePlayers[username] || 0);
-    const currentValue = Number(currentPlayers[username] || startValue);
+    const hasCurrent = Object.prototype.hasOwnProperty.call(currentPlayers, username);
+    const currentValue = hasCurrent ? Number(currentPlayers[username] || 0) : startValue;
     const deltaValue = currentValue - startValue;
     return { username, startValue, currentValue, deltaValue };
   }).sort((a, b) => b.deltaValue - a.deltaValue);
@@ -1507,9 +1551,20 @@ function renderActiveEvent() {
   const minutes = Math.floor((elapsed % 3600000) / 60000);
   const seconds = Math.floor((elapsed % 60000) / 1000);
   const durationText = `${hours}h ${minutes}m ${seconds}s`;
-  const delta = getGuildDelta(activeEvent);
-  const startValue = Number(activeEvent.baseline?.metricValue || 0);
-  const currentValue = Number(activeEvent.current?.metricValue || startValue);
+  let startValue = Number(activeEvent.baseline?.metricValue || 0);
+  let currentValue = Number(activeEvent.current?.metricValue || startValue);
+  if (activeEvent.metric === 'guildRaids') {
+    const totals = computeEventTotalsFromPlayers(activeEvent);
+    startValue = totals.startValue;
+    currentValue = totals.currentValue;
+    if (activeEvent.baseline) {
+      activeEvent.baseline.metricValue = startValue;
+    }
+    if (activeEvent.current) {
+      activeEvent.current.metricValue = currentValue;
+    }
+  }
+  const delta = currentValue - startValue;
   if (activeEvent.metric === 'wars') {
     // #region agent log
     console.log('[wars-render]', {
@@ -1806,7 +1861,6 @@ async function refreshEvent() {
 
     const previousSnapshot = activeEvent.current || null;
     const previousMetricValue = Number(previousSnapshot?.metricValue || 0);
-    const nextMetricValue = Number(snapshot?.metricValue || 0);
     const previousPlayers = previousSnapshot?.playerValues || {};
     const nextPlayers = snapshot?.playerValues || {};
     const previousKeys = Object.keys(previousPlayers).sort();
@@ -1814,24 +1868,30 @@ async function refreshEvent() {
     const sameKeyCount = previousKeys.length === nextKeys.length;
     const sameKeys = sameKeyCount && previousKeys.every((key, idx) => key === nextKeys[idx]);
     const samePlayerValues = sameKeys && previousKeys.every((key) => Number(previousPlayers[key] || 0) === Number(nextPlayers[key] || 0));
-    const snapshotChanged = previousMetricValue !== nextMetricValue || !samePlayerValues;
     activeEvent.current = snapshot;
+    if (activeEvent.metric === 'guildRaids') {
+      const totals = computeEventTotalsFromPlayers(activeEvent);
+      if (activeEvent.baseline) {
+        activeEvent.baseline.metricValue = totals.startValue;
+      }
+      activeEvent.current.metricValue = totals.currentValue;
+    }
+    const nextMetricValue = Number(activeEvent.current?.metricValue || 0);
+    const snapshotChanged = previousMetricValue !== nextMetricValue || !samePlayerValues;
     activeEvent.lastRefreshAt = Date.now();
     activeEvent.firstRefreshDone = true;
+    const saveResult = await updateUserData({ activeEvent });
+    if (!saveResult.ok) {
+      console.error('Failed to persist refreshed active event:', saveResult.error);
+    }
+    if (activeEvent.eventCode) {
+      const syncResult = await upsertEventCodeIndex(activeEvent);
+      if (!syncResult.ok) {
+        console.error('Failed to sync event code on refresh:', syncResult.error);
+      }
+    }
     if (snapshotChanged || baselineMutated) {
-      const saveResult = await updateUserData({ activeEvent });
-      if (!saveResult.ok) {
-        console.error('Failed to persist refreshed active event:', saveResult.error);
-      }
-      if (activeEvent.eventCode) {
-        const syncResult = await upsertEventCodeIndex(activeEvent);
-        if (!syncResult.ok) {
-          console.error('Failed to sync event code on refresh:', syncResult.error);
-        }
-      }
-      if (snapshotChanged) {
-        await notifyDiscordLeaderboardUpdate('refresh', activeEvent, snapshot);
-      }
+      await notifyDiscordLeaderboardUpdate('refresh', activeEvent, snapshot);
     }
   } catch (err) {
     console.error('Refresh event error:', err);
