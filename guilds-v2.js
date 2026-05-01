@@ -40,6 +40,9 @@ let activeEvent = null;
 let cooldownTimerId = null;
 const memberWarsCache = new Map();
 let memberWarsHydrateSession = 0;
+const memberRaidsCache = new Map();
+const memberRaidsInFlight = new Map();
+let memberRaidsHydrateSession = 0;
 let guildResultCollapsed = false;
 let eventRefreshInFlight = false;
 let guildWarsHydrating = false;
@@ -188,13 +191,21 @@ function preSeedMemberWars(guild) {
 }
 
 function resolveMemberGuildRaids(member) {
-  return Number(
-    member?.globalData?.guildRaids?.total
-    ?? member?.globalData?.raids?.total
-    ?? member?.guildRaids?.total
-    ?? member?.raids?.total
-    ?? 0
-  );
+  const candidates = [
+    member?.globalData?.guildRaids?.total,
+    member?.globalData?.raids?.total,
+    member?.guildRaids?.total,
+    member?.raids?.total
+  ];
+  for (let i = 0; i < candidates.length; i += 1) {
+    const raw = candidates[i];
+    if (raw === null || raw === undefined || raw === '') continue;
+    const parsed = Number(raw);
+    if (Number.isFinite(parsed)) {
+      return { value: parsed, known: true };
+    }
+  }
+  return { value: 0, known: false };
 }
 
 function collectGuildMembers(guild) {
@@ -204,11 +215,18 @@ function collectGuildMembers(guild) {
   for (const rank of ranks) {
     if (!guild.members[rank]) continue;
     for (const [memberKey, member] of Object.entries(guild.members[rank])) {
+      const raidState = resolveMemberGuildRaids(member);
+      const id = member.uuid || memberKey || null;
+      const cachedRaids = id ? memberRaidsCache.get(id) : undefined;
+      const hasCachedRaids = Number.isFinite(Number(cachedRaids));
+      const guildRaids = raidState.known ? raidState.value : (hasCachedRaids ? Number(cachedRaids) : 0);
+      const guildRaidsKnown = raidState.known || hasCachedRaids;
       players.push({
-        uuid: member.uuid || memberKey || null,
+        uuid: id,
         username: member.username || member.legacyName || memberKey,
         contributed: Number(member.contributed || 0),
-        guildRaids: resolveMemberGuildRaids(member),
+        guildRaids,
+        guildRaidsKnown,
         wars: member.globalData?.wars ?? memberWarsCache.get(member.uuid || memberKey || '') ?? null,
         rank: rank,
         joined: member.joined || '',
@@ -446,6 +464,7 @@ function displayGuild(guild) {
   const members = collectGuildMembers(guild);
   renderMembersList(members);
   renderPlayerSelection(members);
+  hydrateMissingMemberRaids(guild);
 
   guildResult.classList.remove('hidden');
   noResult.classList.add('hidden');
@@ -511,7 +530,7 @@ function renderMembersList(players) {
           ${player.wars ?? 0}
         </div>
         <div class="text-right font-mono text-purple-200/80 group-hover:text-purple-100">
-          ${player.guildRaids ?? 0}
+          ${player.guildRaidsKnown ? (player.guildRaids ?? 0) : '...'}
         </div>
       </div>
     `;
@@ -547,11 +566,87 @@ function renderPlayerSelection(players) {
         <div class="ml-auto text-right flex items-center gap-3 opacity-60 group-hover:opacity-100 transition-opacity">
           <span class="text-[10px] font-mono text-violet-200/80">${formatCompactNumber(player.contributed)} XP</span>
           <span class="text-[10px] font-mono text-pink-200/80">${player.wars ?? 0}W</span>
-          <span class="text-[10px] font-mono text-purple-200/80">${player.guildRaids ?? 0}R</span>
+          <span class="text-[10px] font-mono text-purple-200/80">${player.guildRaidsKnown ? (player.guildRaids ?? 0) : '...'}R</span>
         </div>
       </label>
     `;
   }).join('');
+}
+
+function getGuildMembersMissingRaids(guild) {
+  if (!guild?.members) return [];
+  const ranks = ['owner', 'chief', 'strategist', 'captain', 'recruiter', 'recruit'];
+  const missing = [];
+  for (let i = 0; i < ranks.length; i += 1) {
+    const rank = ranks[i];
+    if (!guild.members[rank]) continue;
+    for (const [memberKey, member] of Object.entries(guild.members[rank])) {
+      const id = member.uuid || memberKey || '';
+      if (!id) continue;
+      const raidState = resolveMemberGuildRaids(member);
+      const shouldHydrate = !raidState.known || Number(raidState.value || 0) === 0;
+      if (!shouldHydrate || memberRaidsCache.has(id) || memberRaidsInFlight.has(id)) continue;
+      missing.push({ uuid: id });
+    }
+  }
+  return missing;
+}
+
+async function fetchMemberRaids(uuid) {
+  if (!uuid) return null;
+  if (memberRaidsCache.has(uuid)) {
+    return memberRaidsCache.get(uuid);
+  }
+  if (memberRaidsInFlight.has(uuid)) {
+    return memberRaidsInFlight.get(uuid);
+  }
+  const task = (async () => {
+    try {
+      const response = await fetch(`/api/profile?uuid=${encodeURIComponent(uuid)}&_ts=${Date.now()}`, {
+        cache: 'no-store'
+      });
+      if (!response.ok) return null;
+      const payload = await response.json().catch(() => null);
+      const raids = Number(
+        payload?.globalData?.raids?.total
+        ?? payload?.globalData?.guildRaids?.total
+        ?? payload?.raids?.total
+        ?? payload?.guildRaids?.total
+      );
+      if (!Number.isFinite(raids)) return null;
+      memberRaidsCache.set(uuid, raids);
+      return raids;
+    } catch {
+      return null;
+    } finally {
+      memberRaidsInFlight.delete(uuid);
+    }
+  })();
+  memberRaidsInFlight.set(uuid, task);
+  return task;
+}
+
+async function hydrateMissingMemberRaids(guild) {
+  const pending = getGuildMembersMissingRaids(guild);
+  if (!pending.length) return;
+  const session = ++memberRaidsHydrateSession;
+  let updated = false;
+  const maxToHydrate = Math.min(24, pending.length);
+  for (let i = 0; i < maxToHydrate; i += 1) {
+    if (session !== memberRaidsHydrateSession) return;
+    const raids = await fetchMemberRaids(pending[i].uuid);
+    if (raids !== null) {
+      updated = true;
+    }
+    if (i < maxToHydrate - 1) {
+      await delay(90);
+    }
+  }
+  if (updated && currentGuild && guild && currentGuild.name === guild.name) {
+    const members = collectGuildMembers(currentGuild);
+    renderMembersList(members);
+    renderPlayerSelection(members);
+  }
 }
 
 function hideAmbiguousGuildResults() {
@@ -1891,6 +1986,7 @@ async function refreshEvent() {
         const refreshedMembers = collectGuildMembers(currentGuild);
         renderMembersList(refreshedMembers);
         renderPlayerSelection(refreshedMembers);
+        hydrateMissingMemberRaids(currentGuild);
       }
 
     liveRoster = getLiveRosterUsernames(activeEvent, currentGuild);
