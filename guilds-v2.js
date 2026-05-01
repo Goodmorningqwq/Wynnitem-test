@@ -1,7 +1,7 @@
 const GUILD_API = '/api/guild';
 const GUILD_EVENTS_API = '/api/guild/events';
 const USER_API = '/api/user';
-const REFRESH_COOLDOWN_MS = 5 * 60 * 1000;
+const REFRESH_COOLDOWN_MS = 0;
 const WYNN_PLAYER_WARS_SPACING_MS = 500;
 const WYNN_PLAYER_WARS_REFRESH_SPACING_MS = 280;
 const WYNN_PLAYER_WARS_429_BACKOFF_MS = 3200;
@@ -375,7 +375,8 @@ function buildPlayerMap(players) {
     map[player.username] = {
       xp: Number(player.contributed || 0),
       wars: Number(player.wars || 0),
-      guildRaids: Number(player.guildRaids || 0)
+      guildRaids: Number(player.guildRaids || 0),
+      guildRaidsKnown: player.guildRaidsKnown !== false
     };
   }
   return map;
@@ -914,9 +915,13 @@ function getSnapshot(metric, guild, trackedPlayers, scope = 'selected', previous
     const entry = findPlayerEntry(playerMap, username);
     const liveValue = snapshotPlayerValueForMetric(entry || { xp: 0, wars: 0, guildRaids: 0 }, metric);
     if (metric === 'guildRaids') {
-      // Guild raid totals are monotonic. Keep last known value if live roster is missing/stale.
       const prevValue = Number(previousPlayerValues?.[username] || 0);
-      snapshotPlayers[username] = Math.max(liveValue, prevValue);
+      if (!entry || entry.guildRaidsKnown === false) {
+        // Keep previous snapshot value only when this member value is missing/unknown.
+        snapshotPlayers[username] = prevValue;
+      } else {
+        snapshotPlayers[username] = liveValue;
+      }
     } else {
       snapshotPlayers[username] = liveValue;
     }
