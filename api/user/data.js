@@ -21,7 +21,8 @@ function sanitizeActiveEvent(value) {
   const trackedPlayers = Array.isArray(value.trackedPlayers)
     ? value.trackedPlayers.filter((p) => typeof p === 'string').slice(0, 100)
     : [];
-  const refreshCooldownMs = Number(value.refreshCooldownMs || 15 * 60 * 1000);
+  const parsedCooldown = Number(value.refreshCooldownMs);
+  const refreshCooldownMs = Number.isFinite(parsedCooldown) ? parsedCooldown : 0;
   const startedAt = Number(value.startedAt || Date.now());
   const lastRefreshAt = Number(value.lastRefreshAt || startedAt);
   const firstRefreshDone = Boolean(value.firstRefreshDone);

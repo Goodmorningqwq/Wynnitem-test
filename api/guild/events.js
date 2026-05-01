@@ -281,7 +281,10 @@ module.exports = async (req, res) => {
           scope: event.scope || 'selected',
           trackedPlayers: Array.isArray(event.trackedPlayers) ? event.trackedPlayers : [],
           startedAt: Number(event.startedAt || Date.now()),
-          refreshCooldownMs: Number(event.refreshCooldownMs || 15 * 60 * 1000),
+          refreshCooldownMs: (() => {
+            const v = Number(event.refreshCooldownMs);
+            return Number.isFinite(v) ? v : 0;
+          })(),
           baseline,
           current: event.current || event.baseline || existing?.current || baseline || { metricValue: 0, playerValues: {} },
           lastRefreshAt: Number(event.lastRefreshAt || Date.now()),
