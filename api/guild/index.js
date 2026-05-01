@@ -89,6 +89,52 @@ async function fetchGuildPrefix(prefix) {
   return { response: { ok: false, status: 300 }, data: options };
 }
 
+async function fetchGuildSuggestions(query, limit = 8) {
+  const listData = await getGuildList();
+  if (!listData || typeof listData !== 'object') {
+    return [];
+  }
+
+  const target = String(query || '').trim().toLowerCase();
+  if (!target) return [];
+
+  const suggestions = [];
+  for (const [name, info] of Object.entries(listData)) {
+    const guildName = String(name || '').trim();
+    const prefix = String(info?.prefix || '').trim();
+    const uuid = String(info?.uuid || info?.id || '').trim();
+    if (!guildName && !prefix) continue;
+
+    const nameLower = guildName.toLowerCase();
+    const prefixLower = prefix.toLowerCase();
+
+    let score = 0;
+    if (prefixLower === target) score = 140;
+    else if (nameLower === target) score = 135;
+    else if (prefixLower.startsWith(target)) score = 125;
+    else if (nameLower.startsWith(target)) score = 115;
+    else if (prefixLower.includes(target)) score = 95;
+    else if (nameLower.includes(target)) score = 85;
+
+    if (!score) continue;
+
+    suggestions.push({
+      name: guildName || prefix,
+      prefix,
+      uuid,
+      score
+    });
+  }
+
+  suggestions.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    if ((a.name || '').length !== (b.name || '').length) return (a.name || '').length - (b.name || '').length;
+    return (a.name || '').localeCompare(b.name || '');
+  });
+
+  return suggestions.slice(0, Math.max(1, Number(limit) || 8)).map(({ score, ...entry }) => entry);
+}
+
 function looksLikeUuid(str) {
   // Standard UUID: 8-4-4-4-12 hex digits, optionally without dashes (32 chars)
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str.trim())
@@ -115,7 +161,7 @@ module.exports = async (req, res) => {
     return res.status(400).json({ error: 'Guild query required' });
   }
 
-  if (!['auto', 'name', 'prefix', 'uuid'].includes(mode)) {
+  if (!['auto', 'name', 'prefix', 'uuid', 'suggest'].includes(mode)) {
     return res.status(400).json({ error: 'Invalid search mode' });
   }
 
@@ -172,6 +218,15 @@ module.exports = async (req, res) => {
       }
       applyCacheHeaders(res);
       return res.json({ ...data, searchType: 'prefix' });
+    }
+
+    if (mode === 'suggest') {
+      const suggestions = await fetchGuildSuggestions(query, 8);
+      applyCacheHeaders(res);
+      return res.json({
+        searchType: 'suggest',
+        suggestions
+      });
     }
 
     // Auto mode: detect UUID format first

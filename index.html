@@ -956,7 +956,9 @@
 
         var RECENT_KEY = 'home_unified_search_recent_v1';
         var RECENT_LIMIT = 10;
-        var MIN_LIVE_QUERY = 2;
+        var RECENT_DISPLAY_LIMIT = 5;
+        var MIN_GUILD_LIVE_QUERY = 1;
+        var MIN_PLAYER_LIVE_QUERY = 2;
         var DEBOUNCE_MS = 340;
         var suggestions = [];
         var activeIndex = -1;
@@ -1120,6 +1122,11 @@
 
         function toGuildCandidates(payload, responseStatus) {
           if (!payload || typeof payload !== 'object') return [];
+          if (responseStatus === 200 && Array.isArray(payload.suggestions)) {
+            return dedupeByTypeAndValue(payload.suggestions.map(function(entry) {
+              return normalizeGuildCandidate(entry.name || entry.prefix || '', entry);
+            }).filter(Boolean));
+          }
           if (responseStatus === 300 && payload.ambiguous && payload.options && typeof payload.options === 'object') {
             return dedupeByTypeAndValue(Object.keys(payload.options).map(function(key) {
               return normalizeGuildCandidate(key, payload.options[key]);
@@ -1151,7 +1158,7 @@
         }
 
         async function fetchGuildCandidates(query) {
-          var url = '/api/guild?query=' + encodeURIComponent(query) + '&mode=auto';
+          var url = '/api/guild?query=' + encodeURIComponent(query) + '&mode=suggest';
           var response = await fetch(url, { cache: 'no-store' });
           var payload = null;
           try {
@@ -1210,16 +1217,16 @@
           var query = String(input.value || '').trim();
           if (!query) {
             var initialRecent = readRecent();
-            renderGroups({ recent: initialRecent, guild: [], player: [] });
+            renderGroups({ recent: initialRecent.slice(0, RECENT_DISPLAY_LIMIT), guild: [], player: [] });
             return;
           }
           var seq = ++requestSeq;
           var recent = dedupeByTypeAndValue(readRecent().filter(function(entry) {
             return entry.label.toLowerCase().indexOf(query.toLowerCase()) !== -1
               || String(entry.value).toLowerCase().indexOf(query.toLowerCase()) !== -1;
-          }));
+          })).slice(0, RECENT_DISPLAY_LIMIT);
 
-          if (query.length < MIN_LIVE_QUERY) {
+          if (query.length < MIN_GUILD_LIVE_QUERY) {
             renderGroups({ recent: recent, guild: [], player: [] });
             return;
           }
@@ -1227,12 +1234,14 @@
           var guild = [];
           var player = [];
           try {
-            var settled = await Promise.allSettled([
-              fetchGuildCandidates(query),
-              fetchPlayerCandidates(query)
-            ]);
+            var tasks = [fetchGuildCandidates(query)];
+            var includePlayers = query.length >= MIN_PLAYER_LIVE_QUERY;
+            if (includePlayers) {
+              tasks.push(fetchPlayerCandidates(query));
+            }
+            var settled = await Promise.allSettled(tasks);
             guild = settled[0].status === 'fulfilled' ? settled[0].value : [];
-            player = settled[1].status === 'fulfilled' ? settled[1].value : [];
+            player = includePlayers && settled[1] && settled[1].status === 'fulfilled' ? settled[1].value : [];
           } catch (e) {
             guild = [];
             player = [];
