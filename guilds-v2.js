@@ -245,19 +245,48 @@ function resolveMemberGuildRaids(member) {
     member?.guildRaids?.total,
     member?.raids?.total
   ];
-  const parsedValues = [];
+  let firstFinite = null;
   for (let i = 0; i < candidates.length; i += 1) {
     const raw = candidates[i];
     if (raw === null || raw === undefined || raw === '') continue;
     const parsed = Number(raw);
     if (Number.isFinite(parsed)) {
-      parsedValues.push(parsed);
+      if (firstFinite === null) {
+        firstFinite = parsed;
+      }
+      // Prefer first positive value in priority order to avoid stale zero fields,
+      // while also avoiding cross-field "max" jumps that can spike event totals.
+      if (parsed > 0) {
+        return { value: parsed, known: true };
+      }
     }
   }
-  if (parsedValues.length) {
-    // Some upstream payloads carry both `guildRaids` and `raids` with mismatched values.
-    // Use the largest observed value to avoid pinning a member at a stale zero.
-    return { value: Math.max(...parsedValues), known: true };
+  if (firstFinite !== null) {
+    return { value: firstFinite, known: true };
+  }
+  return { value: 0, known: false };
+}
+
+function resolveMemberGuildRaidsStrict(member) {
+  const candidates = [
+    member?.globalData?.guildRaids?.total,
+    member?.guildRaids?.total
+  ];
+  let firstFinite = null;
+  for (let i = 0; i < candidates.length; i += 1) {
+    const raw = candidates[i];
+    if (raw === null || raw === undefined || raw === '') continue;
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed)) continue;
+    if (firstFinite === null) {
+      firstFinite = parsed;
+    }
+    if (parsed > 0) {
+      return { value: parsed, known: true };
+    }
+  }
+  if (firstFinite !== null) {
+    return { value: firstFinite, known: true };
   }
   return { value: 0, known: false };
 }
@@ -265,12 +294,15 @@ function resolveMemberGuildRaids(member) {
 function collectGuildMembers(guild, options = {}) {
   if (!guild?.members) return [];
   const includeHydratedRaidCache = options.includeHydratedRaidCache !== false;
+  const strictGuildRaidMetric = options.strictGuildRaidMetric === true;
   const ranks = ['owner', 'chief', 'strategist', 'captain', 'recruiter', 'recruit'];
   const players = [];
   for (const rank of ranks) {
     if (!guild.members[rank]) continue;
     for (const [memberKey, member] of Object.entries(guild.members[rank])) {
-      const raidState = resolveMemberGuildRaids(member);
+      const raidState = strictGuildRaidMetric
+        ? resolveMemberGuildRaidsStrict(member)
+        : resolveMemberGuildRaids(member);
       const id = member.uuid || memberKey || null;
       const cachedRaids = includeHydratedRaidCache && id ? memberRaidsCache.get(id) : undefined;
       const hasCachedRaids = Number.isFinite(Number(cachedRaids));
@@ -871,7 +903,10 @@ function computeEventTotalsFromPlayers(event) {
 function getSnapshot(metric, guild, trackedPlayers, scope = 'selected', previousPlayerValues = null) {
   // Event snapshots must use raw guild payload values only.
   // Hydrated profile raid cache is display-only and can drift from event baseline semantics.
-  const players = collectGuildMembers(guild, { includeHydratedRaidCache: false });
+  const players = collectGuildMembers(guild, {
+    includeHydratedRaidCache: false,
+    strictGuildRaidMetric: metric === 'guildRaids'
+  });
   const playerMap = buildPlayerMap(players);
   const selected = trackedPlayers.length ? trackedPlayers : players.map((p) => p.username);
   const snapshotPlayers = {};
