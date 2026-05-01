@@ -50,6 +50,8 @@ let webhookStatusLastEventCode = '';
 let webhookStatusRequestInFlight = false;
 const isSearchPage = window.location.pathname.startsWith('/guild/search');
 let guildSearchMode = 'auto';
+const TRACKED_PLAYERS_VIEW_MODE_KEY = 'guild_tracked_players_view_mode_v1';
+let trackedPlayersViewMode = 'minimize';
 
 function getCurrentUser() {
   try {
@@ -61,6 +63,38 @@ function getCurrentUser() {
 
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getTrackedPlayersViewMode() {
+  try {
+    const raw = localStorage.getItem(TRACKED_PLAYERS_VIEW_MODE_KEY);
+    if (raw === 'minimize' || raw === 'scroll' || raw === 'long') return raw;
+  } catch {
+    // Ignore localStorage issues.
+  }
+  return 'minimize';
+}
+
+function setTrackedPlayersViewMode(mode) {
+  if (!['minimize', 'scroll', 'long'].includes(mode)) return;
+  trackedPlayersViewMode = mode;
+  try {
+    localStorage.setItem(TRACKED_PLAYERS_VIEW_MODE_KEY, mode);
+  } catch {
+    // Ignore localStorage issues.
+  }
+}
+
+function updateTrackedPlayersViewButtons() {
+  const map = {
+    minimize: document.getElementById('trackedPlayersViewMinBtn'),
+    scroll: document.getElementById('trackedPlayersViewScrollBtn'),
+    long: document.getElementById('trackedPlayersViewLongBtn')
+  };
+  Object.entries(map).forEach(([mode, button]) => {
+    if (!button) return;
+    button.classList.toggle('guild-mode-btn--active', trackedPlayersViewMode === mode);
+  });
 }
 
 async function throttlePlayerWarsRequest(spacingMs = WYNN_PLAYER_WARS_SPACING_MS) {
@@ -214,8 +248,9 @@ function resolveMemberGuildRaids(member) {
   return { value: 0, known: false };
 }
 
-function collectGuildMembers(guild) {
+function collectGuildMembers(guild, options = {}) {
   if (!guild?.members) return [];
+  const includeHydratedRaidCache = options.includeHydratedRaidCache !== false;
   const ranks = ['owner', 'chief', 'strategist', 'captain', 'recruiter', 'recruit'];
   const players = [];
   for (const rank of ranks) {
@@ -223,7 +258,7 @@ function collectGuildMembers(guild) {
     for (const [memberKey, member] of Object.entries(guild.members[rank])) {
       const raidState = resolveMemberGuildRaids(member);
       const id = member.uuid || memberKey || null;
-      const cachedRaids = id ? memberRaidsCache.get(id) : undefined;
+      const cachedRaids = includeHydratedRaidCache && id ? memberRaidsCache.get(id) : undefined;
       const hasCachedRaids = Number.isFinite(Number(cachedRaids));
       const guildRaids = raidState.known
         ? (hasCachedRaids ? Math.max(raidState.value, Number(cachedRaids)) : raidState.value)
@@ -817,7 +852,9 @@ function computeEventTotalsFromPlayers(event) {
 }
 
 function getSnapshot(metric, guild, trackedPlayers, scope = 'selected', previousPlayerValues = null) {
-  const players = collectGuildMembers(guild);
+  // Event snapshots must use raw guild payload values only.
+  // Hydrated profile raid cache is display-only and can drift from event baseline semantics.
+  const players = collectGuildMembers(guild, { includeHydratedRaidCache: false });
   const playerMap = buildPlayerMap(players);
   const selected = trackedPlayers.length ? trackedPlayers : players.map((p) => p.username);
   const snapshotPlayers = {};
@@ -1608,18 +1645,38 @@ function renderTrackedPlayersInfo(players) {
   const container = document.getElementById('trackedPlayersInfo');
   if (!players || !players.length) {
     container.innerHTML = '<p class="text-gray-500 text-sm">No selected players saved.</p>';
+    updateTrackedPlayersViewButtons();
+    return;
+  }
+  if (trackedPlayersViewMode === 'long') {
+    container.innerHTML = players.map((username) => `
+      <div class="bg-gray-800/50 rounded px-2 py-1 text-sm inline-block mr-2 mb-2">
+        <span class="text-white font-medium">${escapeHtml(username)}</span>
+      </div>
+    `).join('');
+    updateTrackedPlayersViewButtons();
+    return;
+  }
+  if (trackedPlayersViewMode === 'scroll') {
+    container.innerHTML = `<div class="max-h-44 overflow-y-auto pr-1 hide-scrollbar">${players.map((username) => `
+      <div class="bg-gray-800/50 rounded px-2 py-1 text-sm inline-block mr-2 mb-2">
+        <span class="text-white font-medium">${escapeHtml(username)}</span>
+      </div>
+    `).join('')}</div>`;
+    updateTrackedPlayersViewButtons();
     return;
   }
   const maxPreview = 12;
   const visiblePlayers = players.slice(0, maxPreview);
   const remaining = Math.max(0, players.length - visiblePlayers.length);
-  container.innerHTML = `<div class="max-h-44 overflow-y-auto pr-1 hide-scrollbar">${visiblePlayers.map((username) => `
+  container.innerHTML = visiblePlayers.map((username) => `
     <div class="bg-gray-800/50 rounded px-2 py-1 text-sm inline-block mr-2 mb-2">
       <span class="text-white font-medium">${escapeHtml(username)}</span>
     </div>
-  `).join('')}</div>` + (remaining > 0
+  `).join('') + (remaining > 0
     ? `<div class="mt-1 text-xs text-violet-300/90 font-medium">+${remaining} more tracked players</div>`
     : '');
+  updateTrackedPlayersViewButtons();
 }
 
 function renderEventPlayerBreakdown(event, idPrefix = '') {
@@ -1666,24 +1723,16 @@ function renderActiveEvent() {
   const hasEvent = Boolean(activeEvent);
   const quickCodeRow = document.getElementById('dashboardQuickEventCodeRow');
   const quickCodeValue = document.getElementById('dashboardQuickEventCodeValue');
-  const searchActiveEventBanner = document.getElementById('searchActiveEventBanner');
-  const searchActiveEventBannerText = document.getElementById('searchActiveEventBannerText');
   document.getElementById('activeEventSection').classList.toggle('hidden', !hasEvent);
   document.getElementById('dashboardEventSection').classList.toggle('hidden', !hasEvent);
   document.getElementById('eventSetupSection').classList.toggle('hidden', hasEvent);
   document.getElementById('startEventBtn').classList.toggle('hidden', hasEvent);
   document.getElementById('noActiveEventSection').classList.toggle('hidden', hasEvent);
-  if (searchActiveEventBanner) {
-    searchActiveEventBanner.classList.toggle('hidden', !(isSearchPage && hasEvent));
-  }
   if (quickCodeRow) {
     quickCodeRow.classList.toggle('hidden', !hasEvent);
   }
 
   if (!hasEvent) {
-    if (searchActiveEventBannerText) {
-      searchActiveEventBannerText.textContent = 'No active event. Start one from this page.';
-    }
     if (quickCodeValue) {
       quickCodeValue.textContent = '-';
     }
@@ -1782,10 +1831,6 @@ function renderActiveEvent() {
   }
   if (quickCodeValue) {
     quickCodeValue.textContent = activeEvent.eventCode || '-';
-  }
-  if (searchActiveEventBannerText) {
-    const metricText = formatMetric(activeEvent.metric);
-    searchActiveEventBannerText.textContent = `${activeEvent.guildName} · ${metricText} is running. Click to open dashboard.`;
   }
   if (activeEventPublicToggle) {
     activeEventPublicToggle.checked = Boolean(activeEvent.isPublic);
@@ -2287,6 +2332,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   const userDisplayName = document.getElementById('userDisplayName');
 
   configurePageMode();
+  trackedPlayersViewMode = getTrackedPlayersViewMode();
+  updateTrackedPlayersViewButtons();
   currentUser = getCurrentUser();
   document.getElementById('guildHowToLoginStep')?.classList.toggle('hidden', Boolean(currentUser));
   if (currentUser) {
@@ -2327,8 +2374,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('dashboardOpenHistoryBtn')?.addEventListener('click', openEventHistoryPage);
   document.getElementById('dashboardViewPastEventsBtn')?.addEventListener('click', openEventHistoryPage);
   document.getElementById('viewPastEventsBtn')?.addEventListener('click', openEventHistoryPage);
-  document.getElementById('searchGoDashboardBtn')?.addEventListener('click', () => {
-    window.location.href = '/guild';
+  document.getElementById('trackedPlayersViewMinBtn')?.addEventListener('click', () => {
+    setTrackedPlayersViewMode('minimize');
+    renderTrackedPlayersInfo(activeEvent?.trackedPlayers || []);
+  });
+  document.getElementById('trackedPlayersViewScrollBtn')?.addEventListener('click', () => {
+    setTrackedPlayersViewMode('scroll');
+    renderTrackedPlayersInfo(activeEvent?.trackedPlayers || []);
+  });
+  document.getElementById('trackedPlayersViewLongBtn')?.addEventListener('click', () => {
+    setTrackedPlayersViewMode('long');
+    renderTrackedPlayersInfo(activeEvent?.trackedPlayers || []);
   });
   document.getElementById('dashboardOpenCodePanelBtn')?.addEventListener('click', () => {
     toggleDashboardCodePanel(true);
