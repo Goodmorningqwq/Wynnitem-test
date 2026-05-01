@@ -2,6 +2,14 @@ const GUILD_API = '/api/guild';
 const GUILD_EVENTS_API = '/api/guild/events';
 const USER_API = '/api/user';
 const REFRESH_COOLDOWN_MS = 0;
+
+/** Use for refresh button UI/guard. When REFRESH_COOLDOWN_MS is 0, ignore legacy stored values (e.g. 15m still in Redis). */
+function effectiveEventRefreshCooldownMs(event) {
+  if (REFRESH_COOLDOWN_MS === 0) return 0;
+  const raw = event?.refreshCooldownMs;
+  const n = Number(raw !== undefined && raw !== null ? raw : REFRESH_COOLDOWN_MS);
+  return Number.isFinite(n) ? n : REFRESH_COOLDOWN_MS;
+}
 const WYNN_PLAYER_WARS_SPACING_MS = 500;
 const WYNN_PLAYER_WARS_REFRESH_SPACING_MS = 280;
 const WYNN_PLAYER_WARS_429_BACKOFF_MS = 3200;
@@ -472,12 +480,13 @@ function normalizeActiveEvent(rawEvent, fallbackTrackedPlayers = []) {
   if (!rawEvent || typeof rawEvent !== 'object') return null;
 
   if (rawEvent.metric && rawEvent.startedAt && rawEvent.baseline) {
+    const storedCooldown =
+      rawEvent.refreshCooldownMs !== undefined && rawEvent.refreshCooldownMs !== null
+        ? Number(rawEvent.refreshCooldownMs)
+        : REFRESH_COOLDOWN_MS;
     return {
       ...rawEvent,
-      refreshCooldownMs:
-        rawEvent.refreshCooldownMs !== undefined && rawEvent.refreshCooldownMs !== null
-          ? Number(rawEvent.refreshCooldownMs)
-          : REFRESH_COOLDOWN_MS
+      refreshCooldownMs: REFRESH_COOLDOWN_MS === 0 ? 0 : storedCooldown
     };
   }
 
@@ -502,7 +511,12 @@ function normalizeActiveEvent(rawEvent, fallbackTrackedPlayers = []) {
     metric,
     scope: rawEvent.scope || 'selected',
     trackedPlayers,
-    refreshCooldownMs: Number(rawEvent.refreshCooldownMs || REFRESH_COOLDOWN_MS),
+    refreshCooldownMs:
+      REFRESH_COOLDOWN_MS === 0
+        ? 0
+        : Number.isFinite(Number(rawEvent.refreshCooldownMs))
+          ? Number(rawEvent.refreshCooldownMs)
+          : REFRESH_COOLDOWN_MS,
     startedAt,
     lastRefreshAt,
     firstRefreshDone,
@@ -1611,7 +1625,7 @@ function updateCooldownText() {
   const firstRefreshDone = Boolean(activeEvent.firstRefreshDone);
   const lastRefreshAt = Number(activeEvent.lastRefreshAt || activeEvent.startedAt || 0);
   const remaining = firstRefreshDone
-    ? Math.max(0, (lastRefreshAt + Number(activeEvent.refreshCooldownMs || REFRESH_COOLDOWN_MS)) - Date.now())
+    ? Math.max(0, (lastRefreshAt + effectiveEventRefreshCooldownMs(activeEvent)) - Date.now())
     : 0;
 
   if (remaining === 0) {
@@ -2019,7 +2033,7 @@ async function refreshEvent() {
   if (!activeEvent || !currentGuild?.name) return;
   if (eventRefreshInFlight) return;
   const now = Date.now();
-  const cooldownUntil = Number(activeEvent.lastRefreshAt || 0) + Number(activeEvent.refreshCooldownMs || REFRESH_COOLDOWN_MS);
+  const cooldownUntil = Number(activeEvent.lastRefreshAt || 0) + effectiveEventRefreshCooldownMs(activeEvent);
   if (activeEvent.firstRefreshDone && now < cooldownUntil) {
     updateCooldownText();
     return;
