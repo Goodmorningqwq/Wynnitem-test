@@ -826,7 +826,7 @@
                     </svg>
                     Quick Search
                   </p>
-                  <p class="quick-search-hint">Guilds + Players</p>
+                  <p class="quick-search-hint">Guilds + Players + Event codes</p>
                 </div>
                 <div class="flex flex-col md:flex-row gap-2">
                   <div class="quick-input-wrap">
@@ -835,7 +835,7 @@
                       type="text"
                       name="q"
                       autocomplete="off"
-                      placeholder="Search guild name, player name, prefix, or UUID..."
+                      placeholder="Search guild name, player name, prefix, UUID, or 6-character event code..."
                       class="quick-guild-search-input w-full rounded-lg pr-4 py-3 text-sm text-white placeholder-[var(--text-muted)] focus:outline-none"
                     >
                     <svg class="quick-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -975,6 +975,7 @@
         var activeIndex = -1;
         var debounceTimer = null;
         var requestSeq = 0;
+        var EVENT_CODE_REGEX = /^[A-HJ-NP-Z2-9]{6}$/;
 
         function escapeHtml(value) {
           return String(value == null ? '' : value).replace(/[&<>"']/g, function(ch) {
@@ -992,7 +993,7 @@
             if (!Array.isArray(parsed)) return [];
             return parsed
               .filter(function(entry) {
-                return entry && (entry.type === 'guild' || entry.type === 'player');
+                return entry && (entry.type === 'guild' || entry.type === 'player' || entry.type === 'event');
               })
               .map(function(entry) {
                 var value = String(entry.value || '').trim();
@@ -1088,6 +1089,26 @@
           });
         }
 
+        function normalizeEventCode(value) {
+          return String(value || '').trim().toUpperCase();
+        }
+
+        function isEventCodeQuery(value) {
+          return EVENT_CODE_REGEX.test(normalizeEventCode(value));
+        }
+
+        function toEventSuggestion(value) {
+          var code = normalizeEventCode(value);
+          if (!isEventCodeQuery(code)) return null;
+          return {
+            type: 'event',
+            value: code,
+            routeValue: code,
+            label: 'Event ' + code,
+            detail: 'Code'
+          };
+        }
+
         function setActiveIndex(nextIndex) {
           if (!suggestions.length) {
             activeIndex = -1;
@@ -1106,8 +1127,8 @@
           var parts = [];
           suggestions = [];
           activeIndex = -1;
-          var groupOrder = ['recent', 'guild', 'player'];
-          var groupLabel = { recent: 'Recent', guild: 'Guilds', player: 'Players' };
+          var groupOrder = ['recent', 'event', 'guild', 'player'];
+          var groupLabel = { recent: 'Recent', event: 'Events', guild: 'Guilds', player: 'Players' };
           groupOrder.forEach(function(groupKey) {
             var entries = grouped[groupKey] || [];
             if (!entries.length) return;
@@ -1196,6 +1217,10 @@
           if (!suggestion) return;
           var rawRouteValue = String(suggestion.routeValue || suggestion.value || '').trim();
           if (!rawRouteValue) return;
+          if (suggestion.type === 'event') {
+            routeToEventCode(rawRouteValue);
+            return;
+          }
           var routeValue = encodeURIComponent(rawRouteValue);
           pushRecent(suggestion);
           document.body.classList.add('page-leaving');
@@ -1205,7 +1230,25 @@
           window.location.href = destination;
         }
 
+        function routeToEventCode(code) {
+          var normalizedCode = normalizeEventCode(code);
+          if (!normalizedCode) return;
+          var routeValue = encodeURIComponent(normalizedCode);
+          pushRecent({
+            type: 'event',
+            value: normalizedCode,
+            routeValue: normalizedCode,
+            label: 'Event ' + normalizedCode
+          });
+          document.body.classList.add('page-leaving');
+          window.location.href = '/guild/leaderboard?code=' + routeValue;
+        }
+
         async function fallbackRoute(query) {
+          if (isEventCodeQuery(query)) {
+            routeToEventCode(query);
+            return;
+          }
           var guildCandidates = [];
           try {
             guildCandidates = await fetchGuildCandidates(query);
@@ -1236,9 +1279,14 @@
             return entry.label.toLowerCase().indexOf(query.toLowerCase()) !== -1
               || String(entry.value).toLowerCase().indexOf(query.toLowerCase()) !== -1;
           })).slice(0, RECENT_DISPLAY_LIMIT);
+          var event = [];
+          var eventSuggestion = toEventSuggestion(query);
+          if (eventSuggestion) {
+            event = [eventSuggestion];
+          }
 
           if (query.length < MIN_GUILD_LIVE_QUERY) {
-            renderGroups({ recent: recent, guild: [], player: [] });
+            renderGroups({ recent: recent, event: event, guild: [], player: [] });
             return;
           }
 
@@ -1261,6 +1309,7 @@
           if (seq !== requestSeq) return;
           renderGroups({
             recent: recent,
+            event: event,
             guild: dedupeByTypeAndValue(guild).slice(0, 5),
             player: dedupeByTypeAndValue(player).slice(0, 5)
           });
@@ -1279,6 +1328,10 @@
           }
           var query = String(input.value || '').trim();
           if (!query) return;
+          if (isEventCodeQuery(query)) {
+            routeToEventCode(query);
+            return;
+          }
           fallbackRoute(query);
         });
 
