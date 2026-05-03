@@ -2303,6 +2303,20 @@ async function loadUserDashboard(prefetchedUserData = null) {
   if (activeEvent) {
     renderActiveEvent();
     setDashboardEventLoading(true, 'Loading event data...');
+    
+    // Background sync to ensure local storage isn't holding stale data
+    if (activeEvent.eventCode) {
+      fetch(`${GUILD_EVENTS_API}?code=${encodeURIComponent(activeEvent.eventCode)}&username=${encodeURIComponent(currentUser || '')}`)
+        .then(res => res.json())
+        .then(async serverEvent => {
+          if (serverEvent && !serverEvent.error && serverEvent.baseline) {
+             activeEvent.baseline = cloneBaselineForRefresh(serverEvent.baseline);
+             await updateUserData({ activeEvent });
+             renderActiveEvent();
+          }
+        })
+        .catch(console.error);
+    }
   }
   await searchGuild(effectiveGuildName, 'auto', { render: isSearchPage });
   setDashboardEventLoading(false);
