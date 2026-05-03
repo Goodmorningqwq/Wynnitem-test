@@ -262,16 +262,62 @@ module.exports = async (req, res) => {
         return res.json({ success: true, event: existing });
       }
 
+      if (action === 'patchBaseline') {
+        if (!existing) return res.status(404).json({ error: 'Event not found' });
+        if (existing.owner !== normalizedUser) return res.status(403).json({ error: 'Only owner can patch baseline' });
+        const patches = req.body?.patches;
+        if (!patches || typeof patches !== 'object') return res.status(400).json({ error: 'patches object required' });
+        if (!existing.baseline) existing.baseline = { metricValue: 0, playerValues: {} };
+        if (!existing.baseline.playerValues) existing.baseline.playerValues = {};
+        if (patches.playerValues && typeof patches.playerValues === 'object') {
+          for (const [pUsername, pValue] of Object.entries(patches.playerValues)) {
+            const n = Number(pValue);
+            if (!Number.isFinite(n) || n < 0) continue;
+            existing.baseline.playerValues[pUsername] = n;
+          }
+        }
+        if (typeof patches.metricValue === 'number' && Number.isFinite(patches.metricValue)) {
+          existing.baseline.metricValue = patches.metricValue;
+        }
+        existing.updatedAt = Date.now();
+        await redis.set(key, JSON.stringify(existing));
+        return res.json({ success: true, event: existing });
+      }
+
       if (action === 'upsert') {
         if (!event || typeof event !== 'object') return res.status(400).json({ error: 'event payload required' });
         if (existing && existing.owner !== normalizedUser) return res.status(409).json({ error: 'Event code already in use' });
         const hasIncomingBaseline = event.baseline != null && typeof event.baseline === 'object';
-        const baseline =
+        let baseline =
           hasIncomingBaseline && event.baseline
             ? event.baseline
             : existing && existing.baseline && typeof existing.baseline === 'object'
               ? existing.baseline
               : { metricValue: 0, playerValues: {} };
+
+        // Max-floor guard: if an existing baseline is already in Redis, never let a
+        // client upsert reduce any player's value below it. This makes manual Redis
+        // patches durable — even if the event owner's browser still holds the old
+        // stale-zero baseline, the corrected values are preserved on every refresh.
+        if (existing && existing.baseline && typeof existing.baseline === 'object') {
+          const existingPv = existing.baseline.playerValues || {};
+          const incomingPv = (baseline.playerValues) || {};
+          const mergedPv = { ...incomingPv };
+          for (const [player, storedVal] of Object.entries(existingPv)) {
+            const stored = Number(storedVal);
+            const incoming = Number(incomingPv[player] ?? stored);
+            mergedPv[player] = Math.max(stored, Number.isFinite(incoming) ? incoming : stored);
+          }
+          const storedMetric = Number(existing.baseline.metricValue || 0);
+          const incomingMetric = Number(baseline.metricValue || 0);
+          baseline = {
+            ...baseline,
+            playerValues: mergedPv,
+            metricValue: Math.max(storedMetric, incomingMetric),
+            capturedAt: existing.baseline.capturedAt || baseline.capturedAt
+          };
+        }
+
         const record = {
           eventCode: normalizedCode,
           owner: normalizedUser,

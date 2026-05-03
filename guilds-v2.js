@@ -841,9 +841,12 @@ function getLiveRosterUsernames(event, guild) {
 }
 
 function getSnapshot(metric, guild, trackedPlayers, scope = 'selected', previousPlayerValues = null) {
-  // Event snapshots use raw guild API fields only (no hydrated raid cache).
+  // For guildRaids baseline capture (no previous values), allow the hydrated player-API
+  // cache to correct stale guild-API zeros. For refresh snapshots previousPlayerValues is
+  // non-null, so we keep the raw-API-only path to avoid artificial drift.
+  const isBaselineCapture = metric === 'guildRaids' && previousPlayerValues === null;
   const players = collectGuildMembers(guild, {
-    includeHydratedRaidCache: false,
+    includeHydratedRaidCache: isBaselineCapture,
     strictGuildRaidMetric: metric === 'guildRaids'
   });
   const playerMap = buildPlayerMap(players);
@@ -1561,6 +1564,46 @@ async function saveEventWebhookLink() {
     setAllWebhookStatusTexts('Save failed: network error');
   }
 }
+
+/**
+ * Owner-only: correct specific player baseline values in a live event.
+ * Can be called from the browser console by the event owner.
+ * @param {string} eventCode - The event code (e.g. '4GUMCX')
+ * @param {{ playerValues: Record<string,number>, metricValue?: number }} patches
+ */
+async function patchEventBaseline(eventCode, patches) {
+  if (!currentUser) {
+    console.error('patchEventBaseline: not logged in');
+    return { ok: false, error: 'Not logged in' };
+  }
+  try {
+    const response = await fetch(GUILD_EVENTS_API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        action: 'patchBaseline',
+        username: currentUser,
+        code: String(eventCode || '').toUpperCase(),
+        patches
+      })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      console.error('patchEventBaseline failed:', data?.error || response.status);
+      return { ok: false, error: data?.error || response.status };
+    }
+    console.log('patchEventBaseline success. Updated baseline:', data?.event?.baseline);
+    if (activeEvent && activeEvent.eventCode === String(eventCode || '').toUpperCase()) {
+      activeEvent.baseline = data.event.baseline;
+      renderActiveEvent();
+    }
+    return { ok: true, event: data.event };
+  } catch (e) {
+    console.error('patchEventBaseline error:', e.message);
+    return { ok: false, error: e.message };
+  }
+}
+window.patchEventBaseline = patchEventBaseline;
 
 async function removeEventCodeIndex(eventCode) {
   if (!currentUser || !eventCode) return { ok: true };
