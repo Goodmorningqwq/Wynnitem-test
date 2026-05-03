@@ -1389,11 +1389,11 @@ async function upsertEventCodeIndex(event) {
         event
       })
     });
+    const data = await response.json().catch(() => ({}));
     if (!response.ok) {
-      const data = await response.json().catch(() => ({}));
       return { ok: false, status: response.status, error: data?.error || 'Failed to upsert event code' };
     }
-    return { ok: true };
+    return { ok: true, event: data?.event };
   } catch (e) {
     return { ok: false, status: 0, error: e.message };
   }
@@ -1595,6 +1595,7 @@ async function patchEventBaseline(eventCode, patches) {
     console.log('patchEventBaseline success. Updated baseline:', data?.event?.baseline);
     if (activeEvent && activeEvent.eventCode === String(eventCode || '').toUpperCase()) {
       activeEvent.baseline = data.event.baseline;
+      await updateUserData({ activeEvent });
       renderActiveEvent();
     }
     return { ok: true, event: data.event };
@@ -2163,16 +2164,21 @@ async function refreshEvent() {
     activeEvent.baseline = lockedBaseline;
     activeEvent.lastRefreshAt = Date.now();
     activeEvent.firstRefreshDone = true;
+    
+    if (activeEvent.eventCode) {
+      const syncResult = await upsertEventCodeIndex(activeEvent);
+      if (syncResult.ok && syncResult.event?.baseline) {
+        activeEvent.baseline = cloneBaselineForRefresh(syncResult.event.baseline);
+      } else if (!syncResult.ok) {
+        console.error('Failed to sync event code on refresh:', syncResult.error);
+      }
+    }
+
     const saveResult = await updateUserData({ activeEvent });
     if (!saveResult.ok) {
       console.error('Failed to persist refreshed active event:', saveResult.error);
     }
-    if (activeEvent.eventCode) {
-      const syncResult = await upsertEventCodeIndex(activeEvent);
-      if (!syncResult.ok) {
-        console.error('Failed to sync event code on refresh:', syncResult.error);
-      }
-    }
+
     await notifyDiscordLeaderboardUpdate('refresh', activeEvent, snapshot);
   } catch (err) {
     console.error('Refresh event error:', err);
