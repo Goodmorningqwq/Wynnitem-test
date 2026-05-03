@@ -818,6 +818,13 @@ function renderItems() {
       });
     }
   });
+
+  if (window.animate && window.stagger) {
+    window.animate('.item-card', 
+      { opacity: [0, 1], y: [20, 0] }, 
+      { delay: window.stagger(0.05), duration: 0.4, easing: "ease-out" }
+    );
+  }
 }
 
 function updatePagination() {
@@ -898,6 +905,11 @@ async function showItemModal(name, item) {
     modalTitle.style.color = TIER_COLORS.gray;
     modalContent.innerHTML = `<div class="text-center py-8"><p class="text-gray-400">Loading item details...</p></div>`;
     itemModal.classList.remove('hidden');
+    if (window.animate) {
+      window.animate(itemModal, { opacity: [0, 1] }, { duration: 0.2 });
+      const modalShell = itemModal.querySelector('.game-modal-shell');
+      if (modalShell) window.animate(modalShell, { scale: [0.95, 1], opacity: [0, 1] }, { duration: 0.2 });
+    }
     
     try {
       const searchResult = await quickSearch(itemName);
@@ -1073,9 +1085,25 @@ async function showItemModal(name, item) {
   
   modalContent.innerHTML = html;
   itemModal.classList.remove('hidden');
+
+  if (window.animate && window.spring) {
+    window.animate(itemModal, { opacity: [0, 1] }, { duration: 0.3 });
+    const modalShell = itemModal.querySelector('.game-modal-shell');
+    if (modalShell) {
+      window.animate(modalShell, { scale: [0.95, 1], opacity: [0, 1] }, { type: window.spring, stiffness: 300, damping: 20 });
+    }
+  }
 }
 
-function closeModal() {
+async function closeModal() {
+  if (window.animate) {
+    const modalShell = itemModal.querySelector('.game-modal-shell');
+    const anims = [window.animate(itemModal, { opacity: 0 }, { duration: 0.2 }).finished];
+    if (modalShell) {
+      anims.push(window.animate(modalShell, { scale: 0.95, opacity: 0 }, { duration: 0.2 }).finished);
+    }
+    await Promise.all(anims).catch(() => {});
+  }
   itemModal.classList.add('hidden');
 }
 

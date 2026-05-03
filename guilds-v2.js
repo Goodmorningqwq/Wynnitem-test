@@ -1785,7 +1785,7 @@ function renderEventPlayerBreakdown(event, idPrefix = '') {
   const metricLabel = event.metric === 'wars' ? 'Wars' : event.metric === 'guildRaids' ? 'Raids' : 'XP';
   meta.textContent = `${rows.length} players · ${metricLabel}`;
   list.innerHTML = rows.map((row, index) => `
-    <div class="grid grid-cols-12 gap-2 items-center text-xs bg-gray-800/40 rounded px-2 py-1">
+    <div class="lb-row grid grid-cols-12 gap-2 items-center text-xs bg-gray-800/40 rounded px-2 py-1">
       <div class="col-span-4 text-white truncate" title="${escapeHtml(row.username)}">#${index + 1} ${escapeHtml(row.username)}</div>
       <div class="col-span-3 text-gray-400 text-right">${row.startValue.toLocaleString()}</div>
       <div class="col-span-3 text-gray-300 text-right">${row.currentValue.toLocaleString()}</div>
@@ -1795,6 +1795,13 @@ function renderEventPlayerBreakdown(event, idPrefix = '') {
   section.classList.remove('hidden');
   if (idPrefix === 'dashboard') {
     applyMiniLbViewMode();
+  }
+  
+  if (window.animate && window.stagger) {
+    window.animate('.lb-row', 
+      { opacity: [0, 1], x: [-20, 0] }, 
+      { delay: window.stagger(0.03), duration: 0.3, easing: "ease-out" }
+    );
   }
 }
 
