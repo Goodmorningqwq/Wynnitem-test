@@ -47,11 +47,13 @@
 
     body {
       background:
-        radial-gradient(circle at 15% 15%, rgba(118, 63, 186, 0.14), transparent 36%),
-        radial-gradient(circle at 85% 10%, rgba(44, 232, 255, 0.1), transparent 30%),
-        linear-gradient(180deg, #1a1a1a 0%, #111 100%);
+        radial-gradient(circle at 14% 18%, rgba(255, 79, 216, 0.14), transparent 32%),
+        radial-gradient(circle at 82% 8%, rgba(168, 85, 247, 0.2), transparent 35%),
+        radial-gradient(circle at 72% 75%, rgba(124, 58, 237, 0.13), transparent 38%),
+        #07050d;
       color: var(--game-text);
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+      transition: opacity 160ms ease, transform 180ms ease, filter 140ms ease;
     }
 
     ::selection {
@@ -132,6 +134,61 @@
       border-color: var(--game-accent-strong);
       box-shadow: 0 0 0 1px rgba(167, 116, 255, 0.3), inset 0 0 20px rgba(143, 95, 216, 0.15);
       color: #efe4ff;
+    }
+
+    .theme-input,
+    .btn-secondary {
+      background: rgba(30, 20, 40, 0.9);
+      border: 1px solid var(--game-border-soft);
+      color: var(--game-text);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .btn-secondary:hover {
+      background: rgba(45, 30, 60, 0.9);
+      border-color: var(--game-accent-soft);
+    }
+
+    .home-mesh {
+      pointer-events: none;
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      z-index: 0;
+    }
+    .home-blob {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.35;
+      animation: blobDrift 12s ease-in-out infinite alternate;
+    }
+    .home-blob--1 {
+      width: min(420px, 70vw);
+      height: min(420px, 70vw);
+      background: rgba(255, 79, 216, 0.35);
+      top: -10%;
+      left: -15%;
+    }
+    .home-blob--2 {
+      width: min(360px, 60vw);
+      height: min(360px, 60vw);
+      background: rgba(168, 85, 247, 0.28);
+      bottom: 5%;
+      right: -10%;
+      animation-delay: 1.4s;
+    }
+    .home-blob--3 {
+      width: min(280px, 50vw);
+      height: min(280px, 50vw);
+      background: rgba(124, 58, 237, 0.22);
+      top: 40%;
+      left: 40%;
+      animation-delay: 2.2s;
+    }
+    @keyframes blobDrift {
+      0% { transform: translate3d(0, 0, 0) scale(1); }
+      100% { transform: translate3d(10px, -12px, 0) scale(1.05); }
     }
 
     .theme-input,
@@ -408,6 +465,11 @@
   </style>
 </head>
 <body class="text-gray-100 min-h-screen flex flex-col">
+  <div class="home-mesh">
+    <div class="home-blob home-blob--1"></div>
+    <div class="home-blob home-blob--2"></div>
+    <div class="home-blob home-blob--3"></div>
+  </div>
   
   <!-- Header -->
   <header class="theme-header sticky top-0 z-50">
