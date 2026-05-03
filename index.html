@@ -753,6 +753,27 @@
         transition: none !important;
       }
     }
+    /* Mouse Sparkle Trail */
+    .mouse-sparkle {
+      pointer-events: none;
+      position: fixed;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      z-index: 9999;
+      animation: sparkle-fade 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+    }
+    
+    @keyframes sparkle-fade {
+      0% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 0.8;
+      }
+      100% {
+        transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(0);
+        opacity: 0;
+      }
+    }
   </style>
 </head>
 <body class="text-gray-100 min-h-screen flex flex-col">
@@ -1437,6 +1458,45 @@
           );
         });
       }
+    });
+
+    // Mouse Sparkle Trail
+    let lastSparkleTime = 0;
+    document.addEventListener('mousemove', (e) => {
+      const now = Date.now();
+      // Throttle to 1 sparkle every 30ms max to prevent lag
+      if (now - lastSparkleTime < 30) return;
+      lastSparkleTime = now;
+      
+      // Only spawn 60% of the time for a broken, magical trail look
+      if (Math.random() > 0.6) return;
+
+      const sparkle = document.createElement('div');
+      sparkle.className = 'mouse-sparkle';
+      // Center the sparkle exactly on the mouse point
+      sparkle.style.left = e.clientX + 'px';
+      sparkle.style.top = e.clientY + 'px';
+      
+      // Randomize color slightly (pink to purple to cyan)
+      const colors = ['#ff4fd8', '#c084fc', '#a855f7', '#2ce8ff'];
+      const color = colors[Math.floor(Math.random() * colors.length)];
+      sparkle.style.background = color;
+      sparkle.style.boxShadow = `0 0 10px ${color}, 0 0 20px ${color}`;
+
+      // Random drift direction
+      const tx = (Math.random() - 0.5) * 40 + 'px';
+      const ty = (Math.random() * 40 + 10) + 'px'; // Fall downwards
+      sparkle.style.setProperty('--tx', tx);
+      sparkle.style.setProperty('--ty', ty);
+
+      document.body.appendChild(sparkle);
+
+      // Clean up after animation finishes (800ms)
+      setTimeout(() => {
+        if (sparkle.parentNode) {
+          sparkle.parentNode.removeChild(sparkle);
+        }
+      }, 800);
     });
   </script>
 </body>
