@@ -171,7 +171,6 @@
       display: block;
       width: 100%;
       max-width: 100%;
-      overflow: hidden;
       text-align: center;
       box-sizing: border-box;
       padding: 0 0.25rem;
@@ -219,9 +218,7 @@
       font-weight: 800;
       line-height: 1.1;
       letter-spacing: -0.03em;
-      display: inline-block;
-      max-width: 100%;
-      white-space: nowrap;
+      display: inline;
       background: linear-gradient(130deg, #f5d0fe 0%, #f472b6 40%, #c084fc 74%, #a78bfa 100%);
       background-size: 200% auto;
       -webkit-background-clip: text;
@@ -235,11 +232,12 @@
 
     .hero-bracket {
       font-family: 'Russo One', sans-serif;
-      font-size: clamp(1.15rem, 3.6vw + 0.55rem, 3.75rem);
+      font-size: clamp(0.9rem, 2.8vw + 0.4rem, 2.8rem);
       color: var(--pink);
       text-shadow: 0 0 10px rgba(255,79,216,0.5), 0 0 30px rgba(255,79,216,0.2);
       opacity: 0.7;
-      vertical-align: baseline;
+      display: inline;
+      margin: 0 0.1em;
     }
 
     .nav-link svg {
