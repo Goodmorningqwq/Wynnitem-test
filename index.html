@@ -50,6 +50,27 @@
       filter: blur(1px);
     }
 
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 9998;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.03) 2px,
+        rgba(0,0,0,0.03) 4px
+      );
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      body::after {
+        display: none;
+      }
+    }
+
     .theme-btn {
       background: linear-gradient(180deg, rgba(38, 21, 62, 0.94), rgba(28, 14, 46, 0.94));
       border: 1px solid rgba(192, 132, 252, 0.35);
@@ -212,8 +233,86 @@
       font-family: 'Russo One', sans-serif;
     }
 
+    .hero-bracket {
+      font-family: 'Russo One', sans-serif;
+      font-size: clamp(1.15rem, 3.6vw + 0.55rem, 3.75rem);
+      color: var(--pink);
+      text-shadow: 0 0 10px rgba(255,79,216,0.5), 0 0 30px rgba(255,79,216,0.2);
+      opacity: 0.7;
+      vertical-align: baseline;
+    }
+
+    .nav-link svg {
+      opacity: 0.6;
+      transition: opacity 200ms ease;
+    }
+
+    .nav-link:hover svg {
+      opacity: 1;
+    }
+
+    #mobileMenu {
+      display: none;
+    }
+
+    @media (max-width: 767px) {
+      #mobileMenu.open {
+        display: flex;
+      }
+    }
+
+    #mobileMenu {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: linear-gradient(180deg, rgba(22, 10, 35, 0.98), rgba(13, 8, 23, 0.99));
+      border-bottom: 1px solid var(--panel-border);
+      flex-direction: column;
+      padding: 0.75rem 1rem;
+      gap: 0.25rem;
+      z-index: 60;
+    }
+
+    #mobileMenu a {
+      padding: 0.5rem 0.75rem;
+      border-radius: 0.5rem;
+      transition: background 150ms ease;
+    }
+
+    #mobileMenu a:hover {
+      background: rgba(236, 72, 153, 0.1);
+    }
+
+    @media (prefers-reduced-motion: no-preference) {
+      .hero-bracket {
+        animation: bracketGlitch 8s ease-in-out infinite;
+      }
+      @keyframes bracketGlitch {
+        0%, 95%, 100% { transform: skewX(0deg); opacity: 0.7; }
+        96% { transform: skewX(-3deg); opacity: 0.9; }
+        97% { transform: skewX(2deg); opacity: 0.6; }
+        98% { transform: skewX(0deg); opacity: 0.8; }
+      }
+    }
+
     .hero-subtitle {
       color: var(--text-muted);
+      font-weight: 500;
+      letter-spacing: 0.02em;
+    }
+
+    .feature-chip {
+      letter-spacing: 0.08em;
+      text-shadow: 0 0 6px rgba(255,79,216,0.3);
+    }
+
+    .quick-search-title {
+      text-shadow: 0 0 8px rgba(211,95,255,0.3);
+    }
+
+    .home-card-title--flash:hover {
+      text-shadow: 0 0 8px rgba(255,255,255,0.15);
     }
 
     @media (prefers-reduced-motion: no-preference) {
@@ -406,6 +505,26 @@
       transform: translateY(-6px);
       border-color: var(--pink);
       box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45), 0 0 36px rgba(255, 79, 216, 0.25);
+    }
+
+    .menu-card--items:hover {
+      border-color: #f472b6;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45), 0 0 30px rgba(244, 114, 182, 0.2);
+    }
+
+    .menu-card--guild:hover {
+      border-color: #c084fc;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45), 0 0 30px rgba(192, 132, 252, 0.2);
+    }
+
+    .menu-card--territory:hover {
+      border-color: #34d399;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45), 0 0 30px rgba(52, 211, 153, 0.2);
+    }
+
+    .menu-card--player:hover {
+      border-color: #fb7185;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45), 0 0 30px rgba(251, 113, 133, 0.2);
     }
 
     .quick-guild-search {
@@ -700,16 +819,36 @@
       height: 2rem;
     }
 
+    .menu-card--items .menu-card-icon svg {
+      color: #f472b6;
+      filter: drop-shadow(0 0 6px rgba(244, 114, 182, 0.5));
+    }
+
     .menu-card--items .menu-card-icon {
       box-shadow: 0 0 24px rgba(255, 79, 216, 0.2);
+    }
+
+    .menu-card--guild .menu-card-icon svg {
+      color: #c084fc;
+      filter: drop-shadow(0 0 6px rgba(192, 132, 252, 0.5));
     }
 
     .menu-card--guild .menu-card-icon {
       box-shadow: 0 0 24px rgba(168, 85, 247, 0.2);
     }
 
+    .menu-card--territory .menu-card-icon svg {
+      color: #34d399;
+      filter: drop-shadow(0 0 6px rgba(52, 211, 153, 0.5));
+    }
+
     .menu-card--territory .menu-card-icon {
       box-shadow: 0 0 24px rgba(124, 58, 237, 0.18);
+    }
+
+    .menu-card--player .menu-card-icon svg {
+      color: #fb7185;
+      filter: drop-shadow(0 0 6px rgba(251, 113, 133, 0.5));
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -789,17 +928,44 @@
           </div>
         </a>
       </div>
-      <nav class="flex items-center gap-4">
-        <a href="/item" class="text-[var(--text-muted)] hover:text-[var(--pink)] transition-colors text-sm font-medium">Items</a>
-        <a href="/guild" class="text-[var(--text-muted)] hover:text-[var(--pink)] transition-colors text-sm font-medium">Guilds</a>
-        <a href="/player-stats" class="text-[var(--text-muted)] hover:text-[var(--pink)] transition-colors text-sm font-medium">Player Stats</a>
+      <button type="button" id="mobileMenuBtn" class="md:hidden theme-btn p-2 rounded-lg" aria-label="Toggle menu">
+        <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <nav class="hidden md:flex items-center gap-4" id="mainNav">
+        <a href="/item" class="nav-link text-[var(--text-muted)] hover:text-[var(--pink)] transition-colors text-sm font-medium flex items-center gap-1.5">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 17.5L3 6V3h3l11.5 11.5"/><path d="M13 19l6-6"/><path d="M16 3l2 2-9.5 9.5-2-2L16 3z"/></svg>
+          Items</a>
+        <a href="/guild" class="nav-link text-[var(--text-muted)] hover:text-[var(--pink)] transition-colors text-sm font-medium flex items-center gap-1.5">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          Guilds</a>
+        <a href="/player-stats" class="nav-link text-[var(--text-muted)] hover:text-[var(--pink)] transition-colors text-sm font-medium flex items-center gap-1.5">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          Player Stats</a>
         <!-- After deploying territory-map-site, set href to that Vercel URL -->
-        <a href="https://wynnitem-territory.vercel.app/" target="_blank" rel="noopener noreferrer" class="text-[var(--text-muted)] hover:text-[var(--pink)] transition-colors text-sm font-medium">Map</a>
+        <a href="https://wynnitem-territory.vercel.app/" target="_blank" rel="noopener noreferrer" class="nav-link text-[var(--text-muted)] hover:text-[var(--pink)] transition-colors text-sm font-medium flex items-center gap-1.5">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 6v16l7-4"/><path d="M8 2v16"/><path d="M16 6l6 10"/><path d="M16 6l6 4"/><path d="M16 6v16"/></svg>
+          Map</a>
         <a href="/login" id="headerLoginBtn" class="theme-btn px-4 py-2 rounded-lg text-sm">Login</a>
         <button type="button" id="headerUserBtn" class="hidden theme-btn-primary px-4 py-2 rounded-lg text-sm"></button>
       </nav>
     </div>
   </header>
+
+  <div id="mobileMenu">
+    <a href="/item" class="text-[var(--text-main)] hover:text-[var(--pink)] text-sm font-medium flex items-center gap-2">
+      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 17.5L3 6V3h3l11.5 11.5"/><path d="M13 19l6-6"/><path d="M16 3l2 2-9.5 9.5-2-2L16 3z"/></svg>
+      Items</a>
+    <a href="/guild" class="text-[var(--text-main)] hover:text-[var(--pink)] text-sm font-medium flex items-center gap-2">
+      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+      Guilds</a>
+    <a href="/player-stats" class="text-[var(--text-main)] hover:text-[var(--pink)] text-sm font-medium flex items-center gap-2">
+      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      Player Stats</a>
+    <a href="https://wynnitem-territory.vercel.app/" target="_blank" rel="noopener noreferrer" class="text-[var(--text-main)] hover:text-[var(--pink)] text-sm font-medium flex items-center gap-2">
+      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 6v16l7-4"/><path d="M8 2v16"/><path d="M16 6l6 10"/><path d="M16 6l6 4"/><path d="M16 6v16"/></svg>
+      Map</a>
+    <a href="/login" class="theme-btn text-center px-4 py-2 rounded-lg text-sm mt-1">Login</a>
+  </div>
 
   <div id="userMenu" class="hidden top-glass border-b" style="backdrop-filter:blur(10px) saturate(130%);-webkit-backdrop-filter:blur(10px) saturate(130%)">
     <div class="container mx-auto px-4 py-2 flex items-center justify-between">
@@ -839,7 +1005,7 @@
             <span class="tier-dot text-pink-400"></span>
           </div>
           <h2 class="hero-title-shell mb-6">
-            <span class="hero-title hero-title--anim">Browse smarter. Track deeper.</span>
+            <span class="hero-bracket" aria-hidden="true">[</span><span class="hero-title hero-title--anim">Browse smarter. Track deeper.</span><span class="hero-bracket" aria-hidden="true">]</span>
           </h2>
           <p class="hero-subtitle text-lg md:text-xl max-w-2xl mx-auto leading-relaxed mb-8">
             One place for the item database and guild tracking—wars, XP, raids, and event leaderboards built for active guilds.
@@ -948,21 +1114,57 @@
   </main>
 
   <footer class="bg-[rgba(8,5,14,0.92)] border-t border-[rgba(130,86,188,0.35)] mt-auto" style="backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)">
-    <div class="container mx-auto px-4 py-8 text-center">
-      <div class="flex flex-wrap justify-center gap-x-6 gap-y-2 mb-3 text-sm">
-        <a href="/item" class="text-[var(--text-muted)] hover:text-[var(--pink)] transition-colors">Items</a>
-        <a href="/guild" class="text-[var(--text-muted)] hover:text-[var(--pink)] transition-colors">Guilds</a>
-        <a href="/player-stats" class="text-[var(--text-muted)] hover:text-[var(--pink)] transition-colors">Player Stats</a>
-        <a href="https://wynnitem-territory.vercel.app/" target="_blank" rel="noopener noreferrer" class="text-[var(--text-muted)] hover:text-[var(--pink)] transition-colors">Map</a>
-        <a href="/login" class="text-[var(--text-muted)] hover:text-[var(--pink)] transition-colors">Login</a>
+    <div class="container mx-auto px-4 py-10">
+      <div class="flex flex-col md:flex-row items-center md:items-start justify-between gap-8 mb-8">
+        <div class="text-center md:text-left">
+          <a href="/" class="flex items-center gap-2 justify-center md:justify-start">
+            <svg class="w-6 h-6 text-pink-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14.5 17.5L3 6V3h3l11.5 11.5M13 19l6-6M15 21l6-6M19 3l2 2-9.5 9.5-2-2L19 3z"/>
+            </svg>
+            <span class="text-white font-bold tracking-tight" style="font-family: 'Russo One', sans-serif;">Wynncraft Database</span>
+          </a>
+          <p class="text-[var(--text-muted)] text-xs mt-1.5 max-w-xs">Item database and guild tracking for active Wynncraft players.</p>
+        </div>
+        <div class="grid grid-cols-3 gap-x-10 gap-y-2 text-sm">
+          <div>
+            <p class="text-[var(--text-muted)] uppercase text-xs font-semibold tracking-widest mb-2">Database</p>
+            <a href="/item" class="block text-[var(--text-muted)] hover:text-[var(--pink)] transition-colors">Items</a>
+          </div>
+          <div>
+            <p class="text-[var(--text-muted)] uppercase text-xs font-semibold tracking-widest mb-2">Community</p>
+            <a href="/guild" class="block text-[var(--text-muted)] hover:text-[var(--pink)] transition-colors">Guilds</a>
+            <a href="/player-stats" class="block text-[var(--text-muted)] hover:text-[var(--pink)] transition-colors">Player Stats</a>
+          </div>
+          <div>
+            <p class="text-[var(--text-muted)] uppercase text-xs font-semibold tracking-widest mb-2">Resources</p>
+            <a href="https://wynnitem-territory.vercel.app/" target="_blank" rel="noopener noreferrer" class="block text-[var(--text-muted)] hover:text-[var(--pink)] transition-colors">Territory Map</a>
+            <a href="/login" class="block text-[var(--text-muted)] hover:text-[var(--pink)] transition-colors">Login</a>
+          </div>
+        </div>
       </div>
-      <p class="text-[var(--text-muted)] text-sm opacity-60">Not affiliated with Wynncraft Industries.</p>
+      <div class="border-t border-[rgba(130,86,188,0.2)] pt-4 text-center">
+        <p class="text-[var(--text-muted)] text-xs opacity-60">Not affiliated with Wynncraft Industries.</p>
+      </div>
     </div>
   </footer>
 
   <script>
     document.addEventListener('DOMContentLoaded', function() {
       document.body.classList.remove('page-leaving');
+
+      var mobileMenuBtn = document.getElementById('mobileMenuBtn');
+      var mobileMenu = document.getElementById('mobileMenu');
+      if (mobileMenuBtn && mobileMenu) {
+        mobileMenuBtn.addEventListener('click', function() {
+          mobileMenu.classList.toggle('open');
+        });
+        document.addEventListener('click', function(e) {
+          if (!mobileMenuBtn.contains(e.target) && !mobileMenu.contains(e.target)) {
+            mobileMenu.classList.remove('open');
+          }
+        });
+      }
+
       var headerLoginBtn = document.getElementById('headerLoginBtn');
       var headerUserBtn = document.getElementById('headerUserBtn');
       var userMenu = document.getElementById('userMenu');
