@@ -106,6 +106,18 @@
       overflow: hidden;
     }
 
+    .top-glass::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,79,216,0.6), rgba(168,85,247,0.6), transparent);
+      box-shadow: 0 0 8px rgba(255,79,216,0.3), 0 0 16px rgba(168,85,247,0.2);
+      pointer-events: none;
+    }
+
     .top-glass::before {
       content: '';
       position: absolute;
@@ -230,16 +242,6 @@
       font-family: 'Russo One', sans-serif;
     }
 
-    .hero-bracket {
-      font-family: 'Russo One', sans-serif;
-      font-size: clamp(0.9rem, 2.8vw + 0.4rem, 2.8rem);
-      color: var(--pink);
-      text-shadow: 0 0 10px rgba(255,79,216,0.5), 0 0 30px rgba(255,79,216,0.2);
-      opacity: 0.7;
-      display: inline;
-      margin: 0 0.1em;
-    }
-
     .nav-link svg {
       opacity: 0.6;
       transition: opacity 200ms ease;
@@ -283,15 +285,6 @@
     }
 
     @media (prefers-reduced-motion: no-preference) {
-      .hero-bracket {
-        animation: bracketGlitch 8s ease-in-out infinite;
-      }
-      @keyframes bracketGlitch {
-        0%, 95%, 100% { transform: skewX(0deg); opacity: 0.7; }
-        96% { transform: skewX(-3deg); opacity: 0.9; }
-        97% { transform: skewX(2deg); opacity: 0.6; }
-        98% { transform: skewX(0deg); opacity: 0.8; }
-      }
     }
 
     .hero-subtitle {
@@ -917,11 +910,11 @@
     <div class="container mx-auto px-4 py-3 flex items-center justify-between">
       <div class="flex items-center gap-3">
         <a href="/" class="flex items-center gap-3 cursor-pointer">
-          <svg class="w-8 h-8 text-pink-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg class="w-8 h-8 text-pink-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="filter: drop-shadow(0 0 6px rgba(255,79,216,0.4));">
             <path d="M14.5 17.5L3 6V3h3l11.5 11.5M13 19l6-6M15 21l6-6M19 3l2 2-9.5 9.5-2-2L19 3z"/>
           </svg>
           <div>
-            <h1 class="text-xl font-bold text-white tracking-tight">Wynncraft Database</h1>
+            <h1 class="text-xl font-bold text-white tracking-tight" style="text-shadow: 0 0 12px rgba(255,79,216,0.3), 0 0 24px rgba(168,85,247,0.15);">Wynncraft Database</h1>
             <p class="text-xs text-[var(--text-muted)] -mt-1">Home</p>
           </div>
         </a>
@@ -1003,7 +996,7 @@
             <span class="tier-dot text-pink-400"></span>
           </div>
           <h2 class="hero-title-shell mb-6">
-            <span class="hero-bracket" aria-hidden="true">[</span><span class="hero-title hero-title--anim">Browse smarter. Track deeper.</span><span class="hero-bracket" aria-hidden="true">]</span>
+            <span class="hero-title hero-title--anim">Browse smarter. Track deeper.</span>
           </h2>
           <p class="hero-subtitle text-lg md:text-xl max-w-2xl mx-auto leading-relaxed mb-8">
             One place for the item database and guild tracking—wars, XP, raids, and event leaderboards built for active guilds.
