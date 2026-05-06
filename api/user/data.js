@@ -61,12 +61,9 @@ function parseJsonSafe(value, fallback) {
 module.exports = async (req, res) => {
   const username = req.query.username;
   const usernameTrimmed = typeof username === 'string' ? username.trim() : '';
-  const usernameLower = usernameTrimmed.toLowerCase();
-  const candidateUsernames = Array.from(new Set(
-    [username, usernameTrimmed, usernameLower].filter((value) => typeof value === 'string' && value.length > 0)
-  ));
-  const dataKey = `user:${username}:data`;
-  const eventsKey = `user:${username}:events`;
+  const normalizedUsername = usernameTrimmed.toLowerCase();
+  const dataKey = `user:${normalizedUsername}:data`;
+  const eventsKey = `user:${normalizedUsername}:events`;
 
   if (!username) {
     return res.status(400).json({ error: 'Username required' });
@@ -189,10 +186,13 @@ module.exports = async (req, res) => {
 
   if (req.method === 'DELETE') {
     try {
-      const keysToDelete = [];
-      for (const candidate of candidateUsernames) {
-        keysToDelete.push(`user:${candidate}:data`);
-        keysToDelete.push(`user:${candidate}:events`);
+      const keysToDelete = [
+        `user:${normalizedUsername}:data`,
+        `user:${normalizedUsername}:events`
+      ];
+      if (typeof username === 'string' && username !== normalizedUsername) {
+        keysToDelete.push(`user:${username}:data`);
+        keysToDelete.push(`user:${username}:events`);
       }
       if (keysToDelete.length) {
         await redis.del(...keysToDelete);

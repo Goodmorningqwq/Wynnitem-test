@@ -545,14 +545,25 @@
 
       try {
         if (currentMode !== 'login') {
-          await registerUser(username, password);
+          try {
+            await registerUser(username, password);
+          } catch (regErr) {
+            if (!(regErr.message && regErr.message.includes('already exists'))) {
+              throw regErr;
+            }
+          }
         }
 
         const result = await loginUser(username, password);
         setCurrentUser(result.username || username);
 
         if (currentMode === 'register-guild') {
-          await setGuildAccount(username, selectedGuild.name);
+          try {
+            await setGuildAccount(username, selectedGuild.name);
+          } catch (guildErr) {
+            window.location.href = '/guild/dashboard';
+            return;
+          }
           window.location.href = '/guild/dashboard';
         } else {
           const isGuild = await checkIsGuildAccount(username);

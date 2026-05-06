@@ -39,12 +39,19 @@ module.exports = async (req, res) => {
     return res.status(400).json({ error: 'Username and password required' });
   }
 
+  const normalizedUsername = username.toLowerCase();
+
+  if (!process.env.UPSTASH_REDIS_REST_URL_GUILD || !process.env.UPSTASH_REDIS_REST_TOKEN_GUILD) {
+    console.error('Auth error: Redis env vars missing (UPSTASH_REDIS_REST_URL_GUILD or UPSTASH_REDIS_REST_TOKEN_GUILD)');
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+
   try {
     const usersKey = 'users';
 
     // LOGIN LOGIC
     if (action === 'login') {
-      const userDataStr = await redis.hget(usersKey, username);
+      const userDataStr = await redis.hget(usersKey, normalizedUsername);
 
       if (!userDataStr) {
         return res.status(401).json({ error: 'Invalid username or password' });
@@ -63,7 +70,7 @@ module.exports = async (req, res) => {
           const passwordSalt = crypto.randomBytes(16).toString('hex');
           userData.passwordSalt = passwordSalt;
           userData.passwordHash = hashPassword(password, passwordSalt);
-          await redis.hset(usersKey, { [username]: JSON.stringify(userData) });
+          await redis.hset(usersKey, { [normalizedUsername]: JSON.stringify(userData) });
         }
       }
 
@@ -71,7 +78,7 @@ module.exports = async (req, res) => {
         return res.status(401).json({ error: 'Invalid username or password' });
       }
 
-      return res.json({ success: true, username: username });
+      return res.json({ success: true, username: userData.username || username });
     }
 
     // REGISTER LOGIC
@@ -84,7 +91,7 @@ module.exports = async (req, res) => {
         return res.status(400).json({ error: 'Password must be at least 4 characters' });
       }
 
-      const existingUser = await redis.hget(usersKey, username);
+      const existingUser = await redis.hget(usersKey, normalizedUsername);
 
       if (existingUser) {
         return res.status(409).json({ error: 'Username already exists' });
@@ -98,7 +105,7 @@ module.exports = async (req, res) => {
         createdAt: Date.now()
       };
 
-      await redis.hset(usersKey, { [username]: JSON.stringify(userData) });
+      await redis.hset(usersKey, { [normalizedUsername]: JSON.stringify(userData) });
 
       return res.json({ success: true, username: username });
     }
