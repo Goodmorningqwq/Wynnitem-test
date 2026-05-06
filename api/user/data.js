@@ -14,6 +14,23 @@ function getDefaultUserData() {
   };
 }
 
+function getDefaultGuildData() {
+  return {
+    guildName: null,
+    trackedPlayers: [],
+    activeEvent: null,
+    isGuildAccount: true
+  };
+}
+
+function getDataKeys(normalizedUsername, isGuildAccount) {
+  const prefix = isGuildAccount ? 'guild' : 'user';
+  return {
+    dataKey: `${prefix}:${normalizedUsername}:data`,
+    eventsKey: `${prefix}:${normalizedUsername}:events`
+  };
+}
+
 function sanitizeActiveEvent(value) {
   if (!value || typeof value !== 'object') return null;
   const allowedMetrics = ['xp', 'wars', 'guildRaids'];
@@ -62,21 +79,41 @@ module.exports = async (req, res) => {
   const username = req.query.username;
   const usernameTrimmed = typeof username === 'string' ? username.trim() : '';
   const normalizedUsername = usernameTrimmed.toLowerCase();
-  const dataKey = `user:${normalizedUsername}:data`;
-  const eventsKey = `user:${normalizedUsername}:events`;
 
   if (!username) {
     return res.status(400).json({ error: 'Username required' });
   }
 
+  const userDataKey = `user:${normalizedUsername}:data`;
+  const userEventsKey = `user:${normalizedUsername}:events`;
+  const guildDataKey = `guild:${normalizedUsername}:data`;
+  const guildEventsKey = `guild:${normalizedUsername}:events`;
+
+  async function locateAccount() {
+    const guildStr = await redis.get(guildDataKey);
+    if (guildStr) {
+      const data = parseJsonSafe(guildStr, null);
+      if (data) return { source: 'guild', data };
+    }
+    const userStr = await redis.get(userDataKey);
+    if (userStr) {
+      const data = parseJsonSafe(userStr, null);
+      if (data) return { source: data.isGuildAccount ? 'guild' : 'user', data };
+    }
+    return { source: 'user', data: null };
+  }
+
   if (req.method === 'GET') {
     try {
       const includeEvents = req.query.includeEvents === 'true';
+      const { source, data: existingData } = await locateAccount();
 
-      const userDataStr = await redis.get(dataKey);
+      const defaultFn = source === 'guild' ? getDefaultGuildData : getDefaultUserData;
+      const userData = existingData || defaultFn();
+
+      const { dataKey, eventsKey } = getDataKeys(normalizedUsername, source === 'guild');
       const events = includeEvents ? await redis.lrange(eventsKey, 0, 49) : [];
 
-      const userData = parseJsonSafe(userDataStr, getDefaultUserData());
       const parsedEvents = events
         .map(e => parseJsonSafe(e, null))
         .filter(Boolean)
@@ -100,8 +137,13 @@ module.exports = async (req, res) => {
     try {
       const { guildName, trackedPlayers, activeEvent, isGuildAccount, addEvent, addPlayer, removePlayer, clearPlayers } = req.body;
 
-      const userDataStr = await redis.get(dataKey);
-      const userData = parseJsonSafe(userDataStr, getDefaultUserData());
+      const { source, data: existingData } = await locateAccount();
+      const isCurrentlyGuild = source === 'guild';
+      const willBeGuild = isGuildAccount === true || (isGuildAccount !== false && isCurrentlyGuild);
+
+      const defaultFn = willBeGuild ? getDefaultGuildData : getDefaultUserData;
+      const userData = existingData || defaultFn();
+
       const beforeJson = JSON.stringify(userData);
 
       if (isGuildAccount !== undefined) {
@@ -168,13 +210,32 @@ module.exports = async (req, res) => {
       }
 
       const afterJson = JSON.stringify(userData);
+      const targetKeys = getDataKeys(normalizedUsername, willBeGuild);
+      const sourceKeys = getDataKeys(normalizedUsername, isCurrentlyGuild);
+
       if (beforeJson !== afterJson) {
-        await redis.set(dataKey, afterJson);
+        await redis.set(targetKeys.dataKey, afterJson);
+      }
+
+      // Migrate data when transitioning from user to guild namespace
+      if (willBeGuild && !isCurrentlyGuild) {
+        const oldDataStr = await redis.get(sourceKeys.dataKey);
+        if (oldDataStr && targetKeys.dataKey !== sourceKeys.dataKey) {
+          if (beforeJson === afterJson) {
+            await redis.set(targetKeys.dataKey, afterJson || oldDataStr);
+          }
+          const oldEvents = await redis.lrange(sourceKeys.eventsKey, 0, -1);
+          if (oldEvents.length > 0) {
+            await redis.lpush(targetKeys.eventsKey, ...oldEvents);
+            await redis.ltrim(targetKeys.eventsKey, 0, 99);
+          }
+          await redis.del(sourceKeys.dataKey, sourceKeys.eventsKey);
+        }
       }
 
       if (addEvent) {
-        await redis.lpush(eventsKey, JSON.stringify(addEvent));
-        await redis.ltrim(eventsKey, 0, 99);
+        await redis.lpush(targetKeys.eventsKey, JSON.stringify(addEvent));
+        await redis.ltrim(targetKeys.eventsKey, 0, 99);
       }
 
       return res.json({ success: true, isGuildAccount: Boolean(userData.isGuildAccount), trackedPlayers: userData.trackedPlayers });
@@ -188,11 +249,15 @@ module.exports = async (req, res) => {
     try {
       const keysToDelete = [
         `user:${normalizedUsername}:data`,
-        `user:${normalizedUsername}:events`
+        `user:${normalizedUsername}:events`,
+        `guild:${normalizedUsername}:data`,
+        `guild:${normalizedUsername}:events`
       ];
       if (typeof username === 'string' && username !== normalizedUsername) {
         keysToDelete.push(`user:${username}:data`);
         keysToDelete.push(`user:${username}:events`);
+        keysToDelete.push(`guild:${username}:data`);
+        keysToDelete.push(`guild:${username}:events`);
       }
       if (keysToDelete.length) {
         await redis.del(...keysToDelete);
