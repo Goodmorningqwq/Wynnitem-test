@@ -9,7 +9,8 @@ function getDefaultUserData() {
   return {
     guildName: null,
     trackedPlayers: [],
-    activeEvent: null
+    activeEvent: null,
+    isGuildAccount: false
   };
 }
 
@@ -89,6 +90,7 @@ module.exports = async (req, res) => {
         guildName: userData.guildName,
         trackedPlayers: userData.trackedPlayers || [],
         activeEvent: userData.activeEvent,
+        isGuildAccount: Boolean(userData.isGuildAccount),
         events: parsedEvents || []
       });
     } catch (e) {
@@ -99,11 +101,15 @@ module.exports = async (req, res) => {
 
   if (req.method === 'POST') {
     try {
-      const { guildName, trackedPlayers, activeEvent, addEvent, addPlayer, removePlayer, clearPlayers } = req.body;
+      const { guildName, trackedPlayers, activeEvent, isGuildAccount, addEvent, addPlayer, removePlayer, clearPlayers } = req.body;
 
       const userDataStr = await redis.get(dataKey);
       const userData = parseJsonSafe(userDataStr, getDefaultUserData());
       const beforeJson = JSON.stringify(userData);
+
+      if (isGuildAccount !== undefined) {
+        userData.isGuildAccount = Boolean(isGuildAccount);
+      }
 
       if (guildName !== undefined) {
         if (guildName !== userData.guildName && userData.trackedPlayers.length > 0) {
@@ -174,7 +180,7 @@ module.exports = async (req, res) => {
         await redis.ltrim(eventsKey, 0, 99);
       }
 
-      return res.json({ success: true, trackedPlayers: userData.trackedPlayers });
+      return res.json({ success: true, isGuildAccount: Boolean(userData.isGuildAccount), trackedPlayers: userData.trackedPlayers });
     } catch (e) {
       console.error('Update data error:', e);
       return res.status(500).json({ error: 'Internal server error' });

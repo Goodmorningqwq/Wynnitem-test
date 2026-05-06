@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guild Dashboard - Wynncraft Database</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;400;500;600;700&family=Russo+One&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/output.css">
+
+  <style>
+    :root {
+      --bg-main: #07050d;
+      --panel-bg: rgba(20, 10, 34, 0.9);
+      --panel-bg-soft: rgba(18, 9, 30, 0.84);
+      --panel-border: rgba(211, 95, 255, 0.4);
+      --panel-border-soft: rgba(168, 85, 247, 0.24);
+      --text-main: #ede8ff;
+      --text-muted: #a39abf;
+      --pink: #ff4fd8;
+      --purple: #a855f7;
+      --violet: #7c3aed;
+    }
+
+    body {
+      background:
+        radial-gradient(circle at 14% 18%, rgba(255, 79, 216, 0.14), transparent 32%),
+        radial-gradient(circle at 82% 8%, rgba(168, 85, 247, 0.2), transparent 35%),
+        radial-gradient(circle at 72% 75%, rgba(124, 58, 237, 0.13), transparent 38%),
+        #07050d;
+      color: var(--text-main);
+      font-family: 'Chakra Petch', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    }
+
+    .top-glass {
+      background: linear-gradient(180deg, rgba(22, 10, 35, 0.72), rgba(10, 5, 18, 0.84));
+      border-color: rgba(174, 103, 231, 0.32);
+    }
+
+    .top-glass::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(circle at 12% 35%, rgba(255, 79, 216, 0.14), transparent 42%),
+        radial-gradient(circle at 82% -40%, rgba(168, 85, 247, 0.22), transparent 54%);
+      opacity: 0.9;
+    }
+
+    .top-glass::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,79,216,0.6), rgba(168,85,247,0.6), transparent);
+      box-shadow: 0 0 8px rgba(255,79,216,0.3), 0 0 16px rgba(168,85,247,0.2);
+      pointer-events: none;
+    }
+
+    .theme-btn {
+      background: linear-gradient(180deg, rgba(38, 21, 62, 0.94), rgba(28, 14, 46, 0.94));
+      border: 1px solid rgba(192, 132, 252, 0.35);
+      color: var(--text-main);
+      transition: border-color 180ms ease, transform 180ms ease;
+      touch-action: manipulation;
+      cursor: pointer;
+    }
+
+    .theme-btn:hover {
+      border-color: var(--pink);
+      transform: translateY(-2px);
+    }
+
+    .theme-btn-primary {
+      background: linear-gradient(160deg, rgba(255, 79, 216, 0.88), rgba(124, 58, 237, 0.92));
+      border: 1px solid rgba(232, 121, 249, 0.75);
+      color: #fff;
+      transition: transform 160ms ease, box-shadow 160ms ease;
+      touch-action: manipulation;
+      cursor: pointer;
+    }
+
+    .theme-btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 22px rgba(236, 72, 153, 0.35);
+    }
+
+    .panel {
+      background: linear-gradient(180deg, rgba(24, 12, 39, 0.96), rgba(14, 8, 26, 0.94));
+      border: 1px solid var(--panel-border);
+      box-shadow: inset 0 0 0 1px rgba(236, 72, 153, 0.08);
+    }
+
+    .loading-shimmer {
+      background: linear-gradient(90deg, rgba(168,85,247,0.05) 0%, rgba(255,79,216,0.08) 50%, rgba(168,85,247,0.05) 100%);
+      background-size: 200% 100%;
+      animation: shimmerLoad 1.8s ease-in-out infinite;
+    }
+
+    @keyframes shimmerLoad {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    .neon-line {
+      height: 3px;
+      border-radius: 9999px;
+      background: linear-gradient(90deg, var(--pink), var(--purple), var(--violet));
+      box-shadow: 0 0 10px rgba(255,79,216,0.4), 0 0 20px rgba(168,85,247,0.2);
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .loading-shimmer { animation: none; }
+    }
+  </style>
+</head>
+<body class="text-gray-100 min-h-screen flex flex-col">
+
+  <header class="top-glass border-b sticky top-0 z-50" style="backdrop-filter:blur(10px) saturate(130%);-webkit-backdrop-filter:blur(10px) saturate(130%)">
+    <div class="container mx-auto px-4 py-3 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <a href="/" class="flex items-center gap-3 cursor-pointer">
+          <svg class="w-8 h-8 text-pink-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="filter: drop-shadow(0 0 6px rgba(255,79,216,0.4));">
+            <path d="M14.5 17.5L3 6V3h3l11.5 11.5M13 19l6-6M15 21l6-6M19 3l2 2-9.5 9.5-2-2L19 3z"/>
+          </svg>
+          <div>
+            <h1 class="text-xl font-bold text-white tracking-tight" style="text-shadow: 0 0 12px rgba(255,79,216,0.3), 0 0 24px rgba(168,85,247,0.15);">Wynncraft Database</h1>
+            <p class="text-xs text-[var(--text-muted)] -mt-1">Guild Dashboard</p>
+          </div>
+        </a>
+      </div>
+      <nav class="flex items-center gap-4">
+        <a href="/item" class="text-[var(--text-muted)] hover:text-[var(--pink)] transition-colors text-sm font-medium">Items</a>
+        <a href="/guild" class="text-[var(--text-muted)] hover:text-[var(--pink)] transition-colors text-sm font-medium">Guilds</a>
+        <a href="/guild/dashboard" class="text-[var(--pink)] text-sm font-medium">Dashboard</a>
+        <a href="/player-stats" class="text-[var(--text-muted)] hover:text-[var(--pink)] transition-colors text-sm font-medium">Player Stats</a>
+      </nav>
+    </div>
+  </header>
+
+  <div id="userMenu" class="hidden top-glass border-b" style="backdrop-filter:blur(10px) saturate(130%);-webkit-backdrop-filter:blur(10px) saturate(130%)">
+    <div class="container mx-auto px-4 py-2 flex items-center justify-between">
+      <div class="flex items-center gap-4">
+        <span class="text-white font-medium" id="userDisplayName"></span>
+        <span class="text-[var(--text-muted)] text-sm">|</span>
+        <span class="text-[var(--text-muted)] text-sm">Guild Dashboard</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <a href="/guild" class="text-[var(--text-muted)] hover:text-[var(--pink)] text-sm">Back to Guilds</a>
+        <button type="button" id="logoutBtn" class="text-[var(--text-muted)] hover:text-[var(--pink)] text-sm py-2 px-2 rounded touch-manipulation">Logout</button>
+      </div>
+    </div>
+  </div>
+
+  <main class="flex-1">
+    <div id="loadingState" class="container mx-auto px-4 py-16">
+      <div class="max-w-lg mx-auto">
+        <div class="panel rounded-xl p-8 loading-shimmer h-48"></div>
+      </div>
+    </div>
+
+    <div id="notGuildAccount" class="hidden container mx-auto px-4 py-16">
+      <div class="max-w-lg mx-auto text-center">
+        <div class="panel rounded-xl p-10">
+          <div class="neon-line w-20 mx-auto mb-6"></div>
+          <h2 class="text-2xl font-bold text-white mb-3" style="font-family: 'Russo One', sans-serif;">Guild Account Required</h2>
+          <p class="text-[var(--text-muted)] text-sm mb-6 leading-relaxed">
+            You need a guild account to access the guild dashboard. Register one by selecting your guild below.
+          </p>
+          <a href="/login?mode=register-guild" class="theme-btn-primary inline-block px-6 py-3 rounded-lg text-sm font-semibold">Register Guild Account</a>
+        </div>
+      </div>
+    </div>
+
+    <div id="dashboardContent" class="hidden container mx-auto px-4 py-10">
+      <div class="max-w-4xl mx-auto">
+        <div class="panel rounded-xl p-8 mb-6">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 class="text-xl font-bold text-white" style="font-family: 'Russo One', sans-serif;">
+                <span id="dashboardGuildName"></span> Dashboard
+              </h2>
+              <p class="text-[var(--text-muted)] text-sm mt-1">Manage your guild from one place.</p>
+            </div>
+          </div>
+          <div class="neon-line w-full mb-6"></div>
+          <div class="text-center py-12">
+            <p class="text-[var(--text-muted)] text-sm">Guild management features coming soon.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="bg-[rgba(8,5,14,0.92)] border-t border-[rgba(130,86,188,0.35)] mt-auto" style="backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)">
+    <div class="container mx-auto px-4 py-8 text-center">
+      <p class="text-[var(--text-muted)] text-sm opacity-60">Not affiliated with Wynncraft Industries.</p>
+    </div>
+  </footer>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', async function() {
+      var currentUser = null;
+      try { currentUser = localStorage.getItem('currentUser'); } catch {}
+
+      if (!currentUser) {
+        window.location.href = '/login';
+        return;
+      }
+
+      var userMenu = document.getElementById('userMenu');
+      var userDisplayName = document.getElementById('userDisplayName');
+      var loadingState = document.getElementById('loadingState');
+      var notGuildAccount = document.getElementById('notGuildAccount');
+      var dashboardContent = document.getElementById('dashboardContent');
+      var dashboardGuildName = document.getElementById('dashboardGuildName');
+
+      userMenu.classList.remove('hidden');
+      userDisplayName.textContent = currentUser;
+
+      var logoutBtn = document.getElementById('logoutBtn');
+      logoutBtn.addEventListener('click', function() {
+        localStorage.removeItem('currentUser');
+        localStorage.removeItem('userHash');
+        window.location.href = '/';
+      });
+
+      try {
+        var response = await fetch('/api/user/data?username=' + encodeURIComponent(currentUser));
+        var data = await response.json();
+
+        loadingState.classList.add('hidden');
+
+        if (!data.isGuildAccount || !data.guildName) {
+          notGuildAccount.classList.remove('hidden');
+          return;
+        }
+
+        dashboardGuildName.textContent = data.guildName;
+        dashboardContent.classList.remove('hidden');
+      } catch (e) {
+        loadingState.classList.add('hidden');
+        notGuildAccount.classList.remove('hidden');
+      }
+    });
+  </script>
+</body>
+</html>

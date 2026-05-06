@@ -4,120 +4,294 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login - Wynncraft Database</title>
-  
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;400;500;600;700&family=Russo+One&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/output.css">
 
   <style>
     :root {
-      --game-border: rgba(120, 68, 190, 0.7);
-      --game-border-soft: rgba(120, 68, 190, 0.35);
-      --game-text: #e8e4ef;
-      --game-accent: #8f5fd8;
-      --game-accent-strong: #a774ff;
+      --bg-main: #07050d;
+      --panel-bg: rgba(20, 10, 34, 0.9);
+      --panel-border: rgba(211, 95, 255, 0.4);
+      --panel-border-soft: rgba(168, 85, 247, 0.24);
+      --text-main: #ede8ff;
+      --text-muted: #a39abf;
+      --pink: #ff4fd8;
+      --purple: #a855f7;
+      --violet: #7c3aed;
     }
 
     body {
       background:
-        radial-gradient(circle at 15% 15%, rgba(118, 63, 186, 0.14), transparent 36%),
-        radial-gradient(circle at 85% 10%, rgba(44, 232, 255, 0.1), transparent 30%),
-        linear-gradient(180deg, #1a1a1a 0%, #111 100%);
-      color: var(--game-text);
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+        radial-gradient(circle at 14% 18%, rgba(255, 79, 216, 0.14), transparent 32%),
+        radial-gradient(circle at 82% 8%, rgba(168, 85, 247, 0.2), transparent 35%),
+        radial-gradient(circle at 72% 75%, rgba(124, 58, 237, 0.13), transparent 38%),
+        #07050d;
+      color: var(--text-main);
+      font-family: 'Chakra Petch', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    }
+
+    .top-glass {
+      background: linear-gradient(180deg, rgba(22, 10, 35, 0.72), rgba(10, 5, 18, 0.84));
+      border-color: rgba(174, 103, 231, 0.32);
+      position: relative;
+    }
+
+    .top-glass::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,79,216,0.6), rgba(168,85,247,0.6), transparent);
+      box-shadow: 0 0 8px rgba(255,79,216,0.3), 0 0 16px rgba(168,85,247,0.2);
+      pointer-events: none;
+    }
+
+    .theme-panel {
+      background: linear-gradient(180deg, rgba(24, 12, 39, 0.96), rgba(14, 8, 26, 0.94));
+      border: 1px solid var(--panel-border);
+      box-shadow: inset 0 0 0 1px rgba(236, 72, 153, 0.08), 0 10px 28px rgba(0, 0, 0, 0.42);
+    }
+
+    .theme-btn-primary {
+      background: linear-gradient(160deg, rgba(255, 79, 216, 0.88), rgba(124, 58, 237, 0.92));
+      border: 1px solid rgba(232, 121, 249, 0.75);
+      color: #fff;
+      transition: transform 160ms ease, box-shadow 160ms ease;
+      cursor: pointer;
+    }
+
+    .theme-btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 22px rgba(236, 72, 153, 0.35);
+    }
+
+    .auth-input {
+      background: rgba(10, 6, 20, 0.92);
+      border: 1px solid rgba(192, 132, 252, 0.45);
+      color: #fff;
+      transition: border-color 180ms ease, box-shadow 180ms ease;
+    }
+
+    .auth-input:focus {
+      border-color: rgba(232, 121, 249, 0.9);
+      box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.2);
+      outline: none;
+    }
+
+    .auth-input::placeholder {
+      color: rgba(163, 154, 191, 0.5);
     }
 
     .hero-title {
-      font-size: 2.5rem;
-      font-weight: 800;
-      background: linear-gradient(135deg, #fff 0%, #a78bfa 50%, #818cf8 100%);
+      font-family: 'Russo One', sans-serif;
+      background: linear-gradient(130deg, #f5d0fe 0%, #f472b6 40%, #c084fc 74%, #a78bfa 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
     }
 
-    .theme-panel {
-      background: linear-gradient(180deg, rgba(39, 18, 57, 0.95), rgba(27, 12, 42, 0.95));
-      border: 1px solid var(--game-border-soft);
-      box-shadow: inset 0 0 0 1px rgba(73, 38, 102, 0.55);
+    .neon-line {
+      height: 3px;
+      border-radius: 9999px;
+      background: linear-gradient(90deg, var(--pink), var(--purple), var(--violet));
+      box-shadow: 0 0 10px rgba(255,79,216,0.4), 0 0 20px rgba(168,85,247,0.2);
     }
 
-    .theme-btn-primary {
-      background: linear-gradient(180deg, rgba(130, 75, 206, 0.95), rgba(96, 52, 165, 0.95));
-      border: 1px solid rgba(180, 132, 255, 0.6);
+    /* Guild search dropdown */
+    .guild-search-wrap {
+      position: relative;
+    }
+
+    .guild-search-dropdown {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: calc(100% + 4px);
+      z-index: 30;
+      border-radius: 0.6rem;
+      border: 1px solid rgba(192, 132, 252, 0.34);
+      background: linear-gradient(180deg, rgba(20, 10, 34, 0.96), rgba(13, 8, 23, 0.97));
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+      max-height: 220px;
+      overflow-y: auto;
+      scrollbar-width: none;
+      -ms-overflow-style: none;
+    }
+
+    .guild-search-dropdown::-webkit-scrollbar { width: 0; height: 0; }
+
+    .guild-search-item {
+      width: 100%;
+      text-align: left;
+      border: 0;
+      background: transparent;
+      color: var(--text-main);
+      padding: 0.55rem 0.8rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.6rem;
+      font-size: 0.82rem;
+      cursor: pointer;
+    }
+
+    .guild-search-item:hover,
+    .guild-search-item.is-active {
+      background: rgba(236, 72, 153, 0.15);
+    }
+
+    .guild-search-pill {
+      font-size: 0.62rem;
+      color: #f5d0fe;
+      border: 1px solid rgba(232, 121, 249, 0.44);
+      border-radius: 9999px;
+      padding: 0.08rem 0.45rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .selected-guild-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.35rem 0.7rem;
+      border-radius: 9999px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      background: rgba(255, 79, 216, 0.08);
+      border: 1px solid rgba(211, 95, 255, 0.3);
+      color: var(--pink);
+    }
+
+    .selected-guild-badge button {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      padding: 0;
+      font-size: 1rem;
+      line-height: 1;
+    }
+
+    .selected-guild-badge button:hover {
+      color: var(--pink);
+    }
+
+    .mode-tabs {
+      display: flex;
+      border-radius: 0.6rem;
+      overflow: hidden;
+      border: 1px solid var(--panel-border-soft);
+    }
+
+    .mode-tab {
+      flex: 1;
+      padding: 0.5rem 0.25rem;
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-align: center;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 180ms ease;
+      letter-spacing: 0.02em;
+    }
+
+    .mode-tab:hover {
+      color: var(--text-main);
+      background: rgba(255,79,216,0.05);
+    }
+
+    .mode-tab.active {
+      background: linear-gradient(160deg, rgba(255, 79, 216, 0.22), rgba(124, 58, 237, 0.28));
       color: #fff;
-    }
-
-    .theme-btn-primary:hover {
-      background: linear-gradient(180deg, rgba(147, 93, 224, 1), rgba(109, 62, 181, 1));
-      border-color: rgba(200, 160, 255, 0.8);
-      transform: translateY(-2px);
     }
   </style>
 </head>
 <body class="text-gray-100 min-h-screen flex flex-col">
-  
-  <!-- Header -->
-  <header class="bg-[rgba(22,22,22,0.98)] border-b border-[rgba(50,50,50,0.5)] sticky top-0 z-50">
+
+  <header class="top-glass border-b sticky top-0 z-50" style="backdrop-filter:blur(10px) saturate(130%);-webkit-backdrop-filter:blur(10px) saturate(130%)">
     <div class="container mx-auto px-4 py-3 flex items-center justify-between">
       <div class="flex items-center gap-3">
         <a href="/" class="flex items-center gap-3 cursor-pointer">
-          <svg class="w-8 h-8 text-violet-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg class="w-8 h-8 text-pink-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="filter: drop-shadow(0 0 6px rgba(255,79,216,0.4));">
             <path d="M14.5 17.5L3 6V3h3l11.5 11.5M13 19l6-6M15 21l6-6M19 3l2 2-9.5 9.5-2-2L19 3z"/>
           </svg>
-          <h1 class="text-xl font-bold text-white tracking-tight">Wynncraft Database</h1>
+          <div>
+            <h1 class="text-xl font-bold text-white tracking-tight" style="text-shadow: 0 0 12px rgba(255,79,216,0.3), 0 0 24px rgba(168,85,247,0.15);">Wynncraft Database</h1>
+          </div>
         </a>
       </div>
       <nav class="flex items-center gap-4">
-        <a href="/item" class="text-gray-400 hover:text-white transition-colors text-sm font-medium">Items</a>
-        <a href="/guild" class="text-gray-400 hover:text-white transition-colors text-sm font-medium">Guilds</a>
+        <a href="/item" class="text-[var(--text-muted)] hover:text-[var(--pink)] transition-colors text-sm font-medium">Items</a>
+        <a href="/guild" class="text-[var(--text-muted)] hover:text-[var(--pink)] transition-colors text-sm font-medium">Guilds</a>
       </nav>
     </div>
   </header>
 
-  <!-- Main Content -->
   <main class="flex-1 container mx-auto px-4 py-16">
     <div class="max-w-md mx-auto">
       <div class="theme-panel p-8 rounded-xl">
-        <h2 class="hero-title mb-6 text-center" id="authTitle">Login</h2>
-        
+        <h2 class="hero-title mb-6 text-center text-2xl font-extrabold" id="authTitle">Login</h2>
+
+        <div class="mode-tabs mb-6">
+          <button type="button" class="mode-tab active" data-mode="login">Login</button>
+          <button type="button" class="mode-tab" data-mode="register-player">Register</button>
+          <button type="button" class="mode-tab" data-mode="register-guild">Guild Account</button>
+        </div>
+
         <div class="space-y-4">
           <div>
-            <label class="text-gray-400 text-sm mb-1 block">Username</label>
-            <input type="text" id="authUsername" class="w-full bg-[rgba(26,12,40,0.95)] border border-[rgba(143,95,216,0.45)] rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-violet-500 focus:outline-none" placeholder="Username">
+            <label class="text-[var(--text-muted)] text-sm mb-1 block">Username</label>
+            <input type="text" id="authUsername" class="auth-input w-full rounded-lg px-4 py-3 text-sm" placeholder="Username">
           </div>
           <div>
-            <label class="text-gray-400 text-sm mb-1 block">Password</label>
-            <input type="password" id="authPassword" class="w-full bg-[rgba(26,12,40,0.95)] border border-[rgba(143,95,216,0.45)] rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-violet-500 focus:outline-none" placeholder="Password">
+            <label class="text-[var(--text-muted)] text-sm mb-1 block">Password</label>
+            <input type="password" id="authPassword" class="auth-input w-full rounded-lg px-4 py-3 text-sm" placeholder="Password">
           </div>
-          
-          <button id="authSubmitBtn" class="theme-btn-primary w-full py-3 rounded-lg font-medium">Login</button>
-          
-          <div class="text-center">
-            <span class="text-gray-500 text-sm" id="authSwitchText">Don't have an account?</span>
-            <button id="authSwitchBtn" class="text-violet-400 text-sm ml-1 hover:underline">Register</button>
+
+          <div id="guildSearchSection" class="hidden">
+            <label class="text-[var(--text-muted)] text-sm mb-1 block">Your Guild</label>
+            <div id="selectedGuildDisplay" class="hidden mb-2">
+              <span class="selected-guild-badge" id="selectedGuildBadge">
+                <span id="selectedGuildName"></span>
+                <button type="button" id="clearGuildBtn">&times;</button>
+              </span>
+            </div>
+            <div id="guildSearchWrap" class="guild-search-wrap">
+              <input type="text" id="guildSearchInput" class="auth-input w-full rounded-lg px-4 py-3 text-sm" placeholder="Search for your guild name..." autocomplete="off">
+              <div id="guildSearchDropdown" class="guild-search-dropdown hidden"></div>
+            </div>
           </div>
-          
+
+          <button id="authSubmitBtn" class="theme-btn-primary w-full py-3 rounded-lg text-sm font-semibold">Login</button>
+
           <p id="authError" class="text-red-400 text-sm text-center hidden"></p>
         </div>
       </div>
     </div>
   </main>
 
-  <!-- Footer -->
-  <footer class="bg-[rgba(22,22,22,0.98)] border-t border-[rgba(50,50,50,0.5)] mt-auto">
-    <div class="container mx-auto px-4 py-6 text-center">
-      <p class="text-gray-500 text-sm">Not affiliated with Wynncraft Industries.</p>
+  <footer class="bg-[rgba(8,5,14,0.92)] border-t border-[rgba(130,86,188,0.35)] mt-auto" style="backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)">
+    <div class="container mx-auto px-4 py-8 text-center">
+      <p class="text-[var(--text-muted)] text-sm opacity-60">Not affiliated with Wynncraft Industries.</p>
     </div>
   </footer>
 
   <script type="module">
     const USER_API = '/api/user';
+    const GUILD_API = '/api/guild';
 
     function getCurrentUser() {
-      try {
-        return localStorage.getItem('currentUser');
-      } catch {
-        return null;
-      }
+      try { return localStorage.getItem('currentUser'); } catch { return null; }
     }
 
     function setCurrentUser(username) {
@@ -125,66 +299,234 @@
     }
 
     async function registerUser(username, password) {
-      try {
-        const response = await fetch(`${USER_API}/register`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, password })
-        });
-        const result = await response.json();
-        if (!response.ok) {
-          throw new Error(result.error || 'Registration failed');
-        }
-        return result;
-      } catch (e) {
-        console.error('Register error:', e);
-        throw e;
-      }
+      const response = await fetch(`${USER_API}/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Registration failed');
+      return result;
     }
 
     async function loginUser(username, password) {
+      const response = await fetch(`${USER_API}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Login failed');
+      return result;
+    }
+
+    async function setGuildAccount(username, guildName) {
+      const response = await fetch(`${USER_API}/data?username=${encodeURIComponent(username)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ guildName, isGuildAccount: true })
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || 'Failed to set guild account');
+      return result;
+    }
+
+    async function checkIsGuildAccount(username) {
       try {
-        const response = await fetch(`${USER_API}/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, password })
-        });
-        const result = await response.json();
-        if (!response.ok) {
-          throw new Error(result.error || 'Login failed');
-        }
-        return result;
-      } catch (e) {
-        console.error('Login error:', e);
-        throw e;
+        const response = await fetch(`${USER_API}/data?username=${encodeURIComponent(username)}`);
+        const data = await response.json();
+        return Boolean(data.isGuildAccount && data.guildName);
+      } catch { return false; }
+    }
+
+    // -- Guild search autocomplete --
+    const DEBOUNCE_MS = 300;
+    let guildDebounce = null;
+    let guildSuggestions = [];
+    let guildActiveIndex = -1;
+    let selectedGuild = null;
+
+    function escapeHtml(v) {
+      return String(v == null ? '' : v).replace(/[&<>"']/g, ch => {
+        if (ch === '&') return '&amp;';
+        if (ch === '<') return '&lt;';
+        if (ch === '>') return '&gt;';
+        if (ch === '"') return '&quot;';
+        return '&#39;';
+      });
+    }
+
+    async function fetchGuildSuggestions(query) {
+      const url = `${GUILD_API}?query=${encodeURIComponent(query)}&mode=suggest`;
+      const res = await fetch(url, { cache: 'no-store' });
+      const payload = await res.json();
+      if (!payload || !Array.isArray(payload.suggestions)) return [];
+      return payload.suggestions.map(s => ({
+        name: s.name || '',
+        prefix: s.prefix || '',
+        uuid: s.uuid || ''
+      })).filter(s => s.name);
+    }
+
+    function renderGuildSuggestions(items) {
+      const dropdown = document.getElementById('guildSearchDropdown');
+      guildSuggestions = items;
+      guildActiveIndex = -1;
+      if (!items.length) {
+        dropdown.innerHTML = '';
+        dropdown.classList.add('hidden');
+        return;
       }
+      dropdown.innerHTML = items.map((s, i) =>
+        '<button type="button" class="guild-search-item" data-index="' + i + '">' +
+          '<span class="truncate">' + escapeHtml(s.name) + '</span>' +
+          (s.prefix ? '<span class="guild-search-pill">' + escapeHtml(s.prefix) + '</span>' : '') +
+        '</button>'
+      ).join('');
+      dropdown.classList.remove('hidden');
     }
 
-    // Already logged in, redirect
-    if (getCurrentUser()) {
-      window.location.href = '/guild';
+    function selectGuild(guild) {
+      selectedGuild = guild;
+      document.getElementById('guildSearchWrap').classList.add('hidden');
+      document.getElementById('selectedGuildDisplay').classList.remove('hidden');
+      document.getElementById('selectedGuildName').textContent = guild.name + (guild.prefix ? ' [' + guild.prefix + ']' : '');
+      const dropdown = document.getElementById('guildSearchDropdown');
+      dropdown.innerHTML = '';
+      dropdown.classList.add('hidden');
     }
 
-    let isRegisterMode = false;
+    function clearGuild() {
+      selectedGuild = null;
+      document.getElementById('guildSearchWrap').classList.remove('hidden');
+      document.getElementById('selectedGuildDisplay').classList.add('hidden');
+      document.getElementById('guildSearchInput').value = '';
+      document.getElementById('guildSearchInput').focus();
+    }
 
+    function setActiveGuildIndex(idx) {
+      if (!guildSuggestions.length) { guildActiveIndex = -1; return; }
+      if (idx < 0) idx = guildSuggestions.length - 1;
+      if (idx >= guildSuggestions.length) idx = 0;
+      guildActiveIndex = idx;
+      const items = document.querySelectorAll('#guildSearchDropdown .guild-search-item');
+      items.forEach((el, i) => el.classList.toggle('is-active', i === idx));
+    }
+
+    // -- Guild search event listeners --
+    const guildInput = document.getElementById('guildSearchInput');
+    const guildDropdown = document.getElementById('guildSearchDropdown');
+
+    guildInput.addEventListener('input', () => {
+      guildActiveIndex = -1;
+      if (guildDebounce) clearTimeout(guildDebounce);
+      const q = guildInput.value.trim();
+      if (q.length < 1) {
+        guildDropdown.innerHTML = '';
+        guildDropdown.classList.add('hidden');
+        return;
+      }
+      guildDebounce = setTimeout(async () => {
+        try {
+          const results = await fetchGuildSuggestions(q);
+          renderGuildSuggestions(results);
+        } catch { renderGuildSuggestions([]); }
+      }, DEBOUNCE_MS);
+    });
+
+    guildInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        guildDropdown.classList.add('hidden');
+        return;
+      }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setActiveGuildIndex(guildActiveIndex + 1);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setActiveGuildIndex(guildActiveIndex - 1);
+        return;
+      }
+      if (e.key === 'Enter' && guildActiveIndex >= 0 && guildSuggestions[guildActiveIndex]) {
+        e.preventDefault();
+        selectGuild(guildSuggestions[guildActiveIndex]);
+      }
+    });
+
+    guildDropdown.addEventListener('mousedown', (e) => {
+      const btn = e.target.closest('.guild-search-item');
+      if (!btn) return;
+      e.preventDefault();
+      const idx = Number(btn.getAttribute('data-index'));
+      if (Number.isFinite(idx) && guildSuggestions[idx]) {
+        selectGuild(guildSuggestions[idx]);
+      }
+    });
+
+    document.getElementById('clearGuildBtn').addEventListener('click', clearGuild);
+
+    document.addEventListener('click', (e) => {
+      const wrap = document.getElementById('guildSearchWrap');
+      if (!wrap.contains(e.target)) {
+        guildDropdown.classList.add('hidden');
+      }
+    });
+
+    // -- Auth mode management --
+    const MODES = {
+      login: { title: 'Login', btn: 'Login', switchText: '', switchBtn: '' },
+      'register-player': { title: 'Register', btn: 'Register', switchText: '', switchBtn: '' },
+      'register-guild': { title: 'Register Guild Account', btn: 'Create Guild Account', switchText: '', switchBtn: '' }
+    };
+
+    let currentMode = 'login';
     const authTitle = document.getElementById('authTitle');
     const authUsername = document.getElementById('authUsername');
     const authPassword = document.getElementById('authPassword');
     const authSubmitBtn = document.getElementById('authSubmitBtn');
-    const authSwitchBtn = document.getElementById('authSwitchBtn');
     const authError = document.getElementById('authError');
-    const authSwitchText = document.getElementById('authSwitchText');
+    const guildSearchSection = document.getElementById('guildSearchSection');
+    const modeTabs = document.querySelectorAll('.mode-tab');
 
-    function updateAuthUI() {
-      authTitle.textContent = isRegisterMode ? 'Register' : 'Login';
-      authSubmitBtn.textContent = isRegisterMode ? 'Register' : 'Login';
-      authSwitchText.textContent = isRegisterMode ? 'Already have an account?' : "Don't have an account?";
-      authSwitchBtn.textContent = isRegisterMode ? 'Login' : 'Register';
+    function setMode(mode) {
+      currentMode = mode;
+      const cfg = MODES[mode];
+      authTitle.textContent = cfg.title;
+      authSubmitBtn.textContent = cfg.btn;
       authError.classList.add('hidden');
-      authUsername.value = '';
-      authPassword.value = '';
+
+      modeTabs.forEach(tab => tab.classList.toggle('active', tab.getAttribute('data-mode') === mode));
+
+      if (mode === 'register-guild') {
+        guildSearchSection.classList.remove('hidden');
+      } else {
+        guildSearchSection.classList.add('hidden');
+        clearGuild();
+      }
     }
 
+    modeTabs.forEach(tab => {
+      tab.addEventListener('click', () => setMode(tab.getAttribute('data-mode')));
+    });
+
+    // -- Check URL params for initial mode --
+    const params = new URLSearchParams(window.location.search);
+    const urlMode = params.get('mode');
+    if (urlMode === 'register-guild') {
+      setMode('register-guild');
+    }
+
+    // -- Already logged in, redirect --
+    if (getCurrentUser()) {
+      (async () => {
+        const isGuild = await checkIsGuildAccount(getCurrentUser());
+        window.location.href = isGuild ? '/guild/dashboard' : '/guild';
+      })();
+    }
+
+    // -- Submit handler --
     authSubmitBtn.addEventListener('click', async () => {
       const username = authUsername.value.trim();
       const password = authPassword.value;
@@ -195,26 +537,31 @@
         return;
       }
 
+      if (currentMode === 'register-guild' && !selectedGuild) {
+        authError.textContent = 'Please search and select your guild';
+        authError.classList.remove('hidden');
+        return;
+      }
+
       try {
-        if (isRegisterMode) {
+        if (currentMode !== 'login') {
           await registerUser(username, password);
         }
+
         const result = await loginUser(username, password);
         setCurrentUser(result.username || username);
-        if (result.passwordHash) {
-          localStorage.setItem('userHash', result.passwordHash);
+
+        if (currentMode === 'register-guild') {
+          await setGuildAccount(username, selectedGuild.name);
+          window.location.href = '/guild/dashboard';
+        } else {
+          const isGuild = await checkIsGuildAccount(username);
+          window.location.href = isGuild ? '/guild/dashboard' : '/guild';
         }
-        // Redirect back to guild
-        window.location.href = '/guild';
       } catch (e) {
         authError.textContent = e.message;
         authError.classList.remove('hidden');
       }
-    });
-
-    authSwitchBtn.addEventListener('click', () => {
-      isRegisterMode = !isRegisterMode;
-      updateAuthUI();
     });
   </script>
 </body>

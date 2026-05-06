@@ -2431,6 +2431,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     headerUserBtn.textContent = currentUser;
     userMenu.classList.remove('hidden');
     userDisplayName.textContent = currentUser;
+
+    try {
+      const uRes = await fetch(`/api/user/data?username=${encodeURIComponent(currentUser)}`);
+      const uData = await uRes.json();
+      if (uData.isGuildAccount) {
+        const dashLink = document.getElementById('headerDashboardLink');
+        if (dashLink) dashLink.classList.remove('hidden');
+      }
+    } catch {}
   }
 
   document.getElementById('logoutBtn').addEventListener('click', logout);
