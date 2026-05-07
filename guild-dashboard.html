@@ -371,6 +371,9 @@
               lastSpan.style.color = '#4ade80';
             } else if (m.lastOnline) {
               lastSpan.textContent = formatRelativeTime(m.lastOnline);
+            } else if (m.unavailable) {
+              lastSpan.textContent = 'N/A';
+              lastSpan.style.opacity = '0.4';
             } else {
               lastSpan.textContent = '...';
             }
@@ -403,10 +406,10 @@
             renderMembers(members);
             memberListContainer.classList.remove('hidden');
 
-            if (pendingCount > 0 && memberRetryCount < 20) {
+            if (pendingCount > 0 && memberRetryCount < 40) {
               memberRetryCount++;
               memberRetryTimer = setTimeout(fetchMembers, 4000);
-              var fetched = members.filter(function(m) { return m.online || m.lastOnline; }).length;
+              var fetched = members.filter(function(m) { return m.online || m.lastOnline || m.unavailable; }).length;
               loadMembersBtn.textContent = fetched + '/' + members.length + ' loaded - fetching more...';
             } else {
               loadMembersBtn.textContent = 'Refresh Member Activity';

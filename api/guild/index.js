@@ -5,8 +5,9 @@ const redis = new Redis({
   token: process.env.UPSTASH_REDIS_REST_TOKEN_GUILD,
 });
 
-const MEMBER_LASTONLINE_TTL = 60 * 60; // 1 hour in seconds
-const MEMBER_BATCH_SIZE = 5;
+const MEMBER_LASTONLINE_TTL = 60 * 60;       // 1 hour in seconds for resolved players
+const MEMBER_UNAVAILABLE_TTL = 24 * 60 * 60; // 24 hours for private/hidden profiles
+const MEMBER_BATCH_SIZE = 3;                  // keep well under Vercel 10s timeout (3 × 800ms = 2.4s)
 
 let cachedGuildList = null;
 let cachedGuildListTime = 0;
@@ -228,18 +229,22 @@ async function fetchMembersLastOnline(members) {
       try {
         const parsed = JSON.parse(cached);
         members[i].lastOnline = parsed.lastOnline || null;
+        members[i].unavailable = parsed.unavailable === true; // private profile sentinel
         members[i].cached = true;
       } catch {
         members[i].lastOnline = null;
+        members[i].unavailable = false;
         members[i].cached = false;
       }
     } else {
       members[i].lastOnline = null;
+      members[i].unavailable = false;
       members[i].cached = false;
     }
   }
 
-  const uncached = members.filter(m => !m.cached && (m.uuid || m.username));
+  // Skip online members (no lookup needed) and already-cached members (including unavailable sentinels)
+  const uncached = members.filter(m => !m.cached && !m.online && (m.uuid || m.username));
   const batch = uncached.slice(0, MEMBER_BATCH_SIZE);
 
   if (batch.length) {
@@ -254,7 +259,7 @@ async function fetchMembersLastOnline(members) {
         const data = await r.json().catch(() => null);
         playerResults.push(data);
         if (i < batch.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 1200));
+          await new Promise(resolve => setTimeout(resolve, 800));
         }
       } catch {
         playerResults.push(null);
@@ -264,11 +269,19 @@ async function fetchMembersLastOnline(members) {
     const cacheSetPromises = [];
     for (let i = 0; i < batch.length; i++) {
       const data = playerResults[i];
+      const cacheKey = `guild:member:lastonline:${batch[i].uuid || batch[i].username}`;
       if (data && data.lastJoin) {
         batch[i].lastOnline = data.lastJoin;
-        const cacheKey = `guild:member:lastonline:${batch[i].uuid || batch[i].username}`;
+        batch[i].unavailable = false;
         cacheSetPromises.push(
           redis.setex(cacheKey, MEMBER_LASTONLINE_TTL, JSON.stringify({ lastOnline: data.lastJoin, username: batch[i].username })).catch(() => {})
+        );
+      } else {
+        // Player returned no lastJoin (private profile, new account, or API error).
+        // Cache as unavailable so we don't retry on every request.
+        batch[i].unavailable = true;
+        cacheSetPromises.push(
+          redis.setex(cacheKey, MEMBER_UNAVAILABLE_TTL, JSON.stringify({ lastOnline: null, unavailable: true, username: batch[i].username })).catch(() => {})
         );
       }
     }
@@ -277,10 +290,13 @@ async function fetchMembersLastOnline(members) {
     }
   }
 
-  const pendingCount = members.filter(m => !m.online && !m.lastOnline).length;
+  // Only count members that are neither online, resolved, nor confirmed unavailable.
+  // This allows pendingCount to reach 0 even when some profiles are private.
+  const pendingCount = members.filter(m => !m.online && !m.lastOnline && !m.unavailable).length;
 
   for (const m of members) {
     delete m.cached;
+    // Keep m.unavailable so the frontend can render 'N/A' instead of '...'
   }
 
   members.sort((a, b) => {
