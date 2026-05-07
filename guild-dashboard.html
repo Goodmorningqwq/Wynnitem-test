@@ -117,6 +117,56 @@
     @media (prefers-reduced-motion: reduce) {
       .loading-shimmer { animation: none; }
     }
+
+    .member-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.6rem 0.75rem;
+      border-bottom: 1px solid rgba(168, 85, 247, 0.1);
+      transition: background 150ms ease;
+    }
+    .member-row:last-child { border-bottom: none; }
+    .member-row:hover { background: rgba(255, 79, 216, 0.05); }
+
+    .online-dot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    }
+    .online-dot.online { background: #4ade80; box-shadow: 0 0 6px rgba(74, 222, 128, 0.5); }
+    .online-dot.offline { background: #6b7280; }
+
+    .member-username { font-weight: 600; font-size: 0.875rem; color: var(--text-main); min-width: 0; }
+    .member-rank {
+      font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+      padding: 0.1rem 0.4rem; border-radius: 9999px; white-space: nowrap; flex-shrink: 0;
+    }
+    .rank-owner { background: rgba(255, 79, 216, 0.15); color: #f472b6; border: 1px solid rgba(255, 79, 216, 0.3); }
+    .rank-chief { background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); }
+    .rank-strategist { background: rgba(124, 58, 237, 0.15); color: #a78bfa; border: 1px solid rgba(124, 58, 237, 0.3); }
+    .rank-captain { background: rgba(59, 130, 246, 0.15); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.3); }
+    .rank-recruiter { background: rgba(34, 197, 94, 0.15); color: #86efac; border: 1px solid rgba(34, 197, 94, 0.3); }
+    .rank-recruit { background: rgba(156, 163, 175, 0.1); color: #9ca3af; border: 1px solid rgba(156, 163, 175, 0.2); }
+
+    .member-lastonline { font-size: 0.75rem; color: var(--text-muted); white-space: nowrap; flex-shrink: 0; }
+    .member-contrib { font-size: 0.7rem; color: var(--text-muted); white-space: nowrap; flex-shrink: 0; }
+
+    .member-list-loading {
+      display: flex; align-items: center; justify-content: center; gap: 0.5rem;
+      padding: 2rem; color: var(--text-muted); font-size: 0.875rem;
+    }
+    .member-list-loading .spinner {
+      width: 18px; height: 18px; border: 2px solid rgba(168,85,247,0.2);
+      border-top-color: var(--purple); border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .member-header {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 0.5rem 0.75rem; font-size: 0.7rem; font-weight: 600;
+      color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em;
+      border-bottom: 1px solid rgba(168, 85, 247, 0.2);
+    }
   </style>
 </head>
 <body class="text-gray-100 min-h-screen flex flex-col">
@@ -189,8 +239,25 @@
             </div>
           </div>
           <div class="neon-line w-full mb-6"></div>
-          <div class="text-center py-12">
-            <p class="text-[var(--text-muted)] text-sm">Guild management features coming soon.</p>
+          <div id="memberSection">
+            <button type="button" id="loadMembersBtn" class="theme-btn-primary px-6 py-3 rounded-lg text-sm font-semibold w-full">
+              Member Activity
+            </button>
+            <div id="memberListContainer" class="hidden mt-4">
+              <div class="member-header">
+                <span style="width:8px"></span>
+                <span class="flex-1">Member</span>
+                <span>Rank</span>
+                <span>Last Online</span>
+                <span>XP</span>
+              </div>
+              <div id="memberList"></div>
+            </div>
+            <div id="memberLoading" class="hidden member-list-loading">
+              <div class="spinner"></div>
+              <span>Loading members...</span>
+            </div>
+            <p id="memberError" class="hidden text-red-400 text-sm text-center mt-4"></p>
           </div>
         </div>
       </div>
@@ -243,6 +310,122 @@
 
         dashboardGuildName.textContent = data.guildName;
         dashboardContent.classList.remove('hidden');
+
+        var guildName = data.guildName;
+        var loadMembersBtn = document.getElementById('loadMembersBtn');
+        var memberListContainer = document.getElementById('memberListContainer');
+        var memberList = document.getElementById('memberList');
+        var memberLoading = document.getElementById('memberLoading');
+        var memberError = document.getElementById('memberError');
+
+        function getRankClass(rank) {
+          var r = (rank || '').toLowerCase();
+          if (r === 'owner') return 'rank-owner';
+          if (r === 'chief') return 'rank-chief';
+          if (r === 'strategist') return 'rank-strategist';
+          if (r === 'captain') return 'rank-captain';
+          if (r === 'recruiter') return 'rank-recruiter';
+          return 'rank-recruit';
+        }
+
+        function formatRelativeTime(isoString) {
+          if (!isoString) return 'Unknown';
+          try {
+            var date = new Date(isoString);
+            var now = new Date();
+            var diffMs = now - date;
+            if (diffMs < 0) return 'Just now';
+            var diffMin = Math.floor(diffMs / 60000);
+            if (diffMin < 1) return 'Just now';
+            if (diffMin < 60) return diffMin + 'm ago';
+            var diffHr = Math.floor(diffMin / 60);
+            if (diffHr < 24) return diffHr + 'h ago';
+            var diffDay = Math.floor(diffHr / 24);
+            if (diffDay < 30) return diffDay + 'd ago';
+            var diffMo = Math.floor(diffDay / 30);
+            if (diffMo < 12) return diffMo + 'mo ago';
+            return Math.floor(diffMo / 12) + 'y ago';
+          } catch { return 'Unknown'; }
+        }
+
+        function formatXp(xp) {
+          if (!xp || xp <= 0) return '-';
+          if (xp >= 1000000000) return (xp / 1000000000).toFixed(1) + 'B';
+          if (xp >= 1000000) return (xp / 1000000).toFixed(1) + 'M';
+          if (xp >= 1000) return (xp / 1000).toFixed(1) + 'K';
+          return xp.toLocaleString();
+        }
+
+        loadMembersBtn.addEventListener('click', async function() {
+          memberListContainer.classList.add('hidden');
+          memberError.classList.add('hidden');
+          memberLoading.classList.remove('hidden');
+          loadMembersBtn.disabled = true;
+          loadMembersBtn.textContent = 'Loading...';
+          memberList.innerHTML = '';
+
+          try {
+            var res = await fetch('/api/guild?query=' + encodeURIComponent(guildName) + '&mode=members');
+            var result = await res.json();
+            if (!res.ok) throw new Error(result.error || 'Failed to fetch member activity');
+
+            var members = result.members || [];
+            memberList.innerHTML = '';
+
+            if (members.length === 0) {
+              memberList.innerHTML = '<div class="text-center py-6 text-[var(--text-muted)] text-sm">No members found.</div>';
+            }
+
+            members.forEach(function(m) {
+              var row = document.createElement('div');
+              row.className = 'member-row';
+
+              var dot = document.createElement('div');
+              dot.className = 'online-dot ' + (m.online ? 'online' : 'offline');
+              row.appendChild(dot);
+
+              var nameSpan = document.createElement('span');
+              nameSpan.className = 'member-username flex-1';
+              nameSpan.textContent = m.username || 'Unknown';
+              row.appendChild(nameSpan);
+
+              var rankEl = document.createElement('span');
+              rankEl.className = 'member-rank ' + getRankClass(m.rank);
+              rankEl.textContent = m.rank || '';
+              row.appendChild(rankEl);
+
+              var lastSpan = document.createElement('span');
+              lastSpan.className = 'member-lastonline';
+              if (m.online) {
+                lastSpan.textContent = 'Online';
+                lastSpan.style.color = '#4ade80';
+              } else if (m.lastOnline) {
+                lastSpan.textContent = formatRelativeTime(m.lastOnline);
+              } else {
+                lastSpan.textContent = '...';
+              }
+              row.appendChild(lastSpan);
+
+              var xpSpan = document.createElement('span');
+              xpSpan.className = 'member-contrib';
+              xpSpan.textContent = formatXp(m.contributed);
+              row.appendChild(xpSpan);
+
+              memberList.appendChild(row);
+            });
+
+            memberListContainer.classList.remove('hidden');
+            memberLoading.classList.add('hidden');
+            loadMembersBtn.textContent = 'Refresh Member Activity';
+          } catch (e) {
+            memberLoading.classList.add('hidden');
+            memberError.textContent = e.message || 'Failed to load member activity';
+            memberError.classList.remove('hidden');
+            loadMembersBtn.textContent = 'Retry Member Activity';
+          } finally {
+            loadMembersBtn.disabled = false;
+          }
+        });
       } catch (e) {
         loadingState.classList.add('hidden');
         notGuildAccount.classList.remove('hidden');

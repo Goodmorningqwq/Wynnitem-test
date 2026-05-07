@@ -1,3 +1,13 @@
+const { Redis } = require('@upstash/redis');
+
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL_GUILD,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN_GUILD,
+});
+
+const MEMBER_LASTONLINE_TTL = 15 * 60; // 15 minutes in seconds
+const MEMBER_BATCH_SIZE = 8;
+
 let cachedGuildList = null;
 let cachedGuildListTime = 0;
 
@@ -163,6 +173,116 @@ function applyCacheHeaders(res, forceFresh = false) {
   res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate');
 }
 
+function extractMembers(guildData) {
+  if (!guildData || !guildData.members) return [];
+  const rankOrder = ['OWNER', 'CHIEF', 'STRATEGIST', 'CAPTAIN', 'RECRUITER', 'RECRUIT'];
+  const members = [];
+  const ranks = guildData.members;
+  for (const rank of rankOrder) {
+    const rankMembers = ranks[rank];
+    if (!rankMembers || typeof rankMembers !== 'object') continue;
+    // ranks can be an object keyed by memberKey or an array
+    if (Array.isArray(rankMembers)) {
+      for (const m of rankMembers) {
+        if (!m) continue;
+        members.push({
+          username: m.username || m.legacyName || m.name || '',
+          uuid: m.uuid || m.id || '',
+          rank: rank.charAt(0).toUpperCase() + rank.slice(1).toLowerCase(),
+          online: Boolean(m.online),
+          contributed: Number(m.contributed || 0),
+          joined: m.joined || ''
+        });
+      }
+    } else {
+      for (const [memberKey, m] of Object.entries(rankMembers)) {
+        if (!m) continue;
+        members.push({
+          username: m.username || m.legacyName || memberKey || '',
+          uuid: m.uuid || m.id || '',
+          rank: rank.charAt(0).toUpperCase() + rank.slice(1).toLowerCase(),
+          online: Boolean(m.online),
+          contributed: Number(m.contributed || 0),
+          joined: m.joined || ''
+        });
+      }
+    }
+  }
+  return members;
+}
+
+async function fetchMembersLastOnline(members) {
+  if (!members.length) return members;
+
+  const cacheKeys = members.map(m => `guild:member:lastonline:${m.uuid || m.username}`);
+  let cachedResults = [];
+  try {
+    cachedResults = cacheKeys.length ? await redis.mget(...cacheKeys) : [];
+  } catch {
+    cachedResults = members.map(() => null);
+  }
+
+  for (let i = 0; i < members.length; i++) {
+    const cached = cachedResults[i];
+    if (cached && typeof cached === 'string') {
+      try {
+        const parsed = JSON.parse(cached);
+        members[i].lastOnline = parsed.lastOnline || null;
+        members[i].cached = true;
+      } catch {
+        members[i].lastOnline = null;
+        members[i].cached = false;
+      }
+    } else {
+      members[i].lastOnline = null;
+      members[i].cached = false;
+    }
+  }
+
+  const uncached = members.filter(m => !m.cached && (m.uuid || m.username));
+  const batch = uncached.slice(0, MEMBER_BATCH_SIZE);
+
+  if (batch.length) {
+    const playerPromises = batch.map(m => {
+      const identifier = m.uuid || m.username;
+      return fetch(`https://api.wynncraft.com/v3/player/${encodeURIComponent(identifier)}`, {
+        headers: { Accept: 'application/json' },
+        cache: 'no-store'
+      }).then(r => r.json().catch(() => null)).catch(() => null);
+    });
+
+    const playerResults = await Promise.all(playerPromises);
+
+    const cacheSetPromises = [];
+    for (let i = 0; i < batch.length; i++) {
+      const data = playerResults[i];
+      if (data && data.lastJoin) {
+        batch[i].lastOnline = data.lastJoin;
+        const cacheKey = `guild:member:lastonline:${batch[i].uuid || batch[i].username}`;
+        cacheSetPromises.push(
+          redis.setex(cacheKey, MEMBER_LASTONLINE_TTL, JSON.stringify({ lastOnline: data.lastJoin, username: batch[i].username })).catch(() => {})
+        );
+      }
+    }
+    if (cacheSetPromises.length) {
+      await Promise.all(cacheSetPromises);
+    }
+  }
+
+  for (const m of members) {
+    delete m.cached;
+  }
+
+  members.sort((a, b) => {
+    if (a.online !== b.online) return b.online ? 1 : -1;
+    const aTime = a.lastOnline ? new Date(a.lastOnline).getTime() : 0;
+    const bTime = b.lastOnline ? new Date(b.lastOnline).getTime() : 0;
+    return bTime - aTime;
+  });
+
+  return members;
+}
+
 module.exports = async (req, res) => {
   const rawQuery = req.query.query || req.query.name;
   const query = typeof rawQuery === 'string' ? rawQuery.trim() : '';
@@ -173,7 +293,7 @@ module.exports = async (req, res) => {
     return res.status(400).json({ error: 'Guild query required' });
   }
 
-  if (!['auto', 'name', 'prefix', 'uuid', 'suggest'].includes(mode)) {
+  if (!['auto', 'name', 'prefix', 'uuid', 'suggest', 'members'].includes(mode)) {
     return res.status(400).json({ error: 'Invalid search mode' });
   }
 
@@ -238,6 +358,30 @@ module.exports = async (req, res) => {
       return res.json({
         searchType: 'suggest',
         suggestions
+      });
+    }
+
+    if (mode === 'members') {
+      const { response, data } = await fetchGuildName(query, forceFresh);
+      if (!response.ok) {
+        if (response.status === 429) {
+          return res.status(429).json({ error: 'Rate limit exceeded' });
+        }
+        if (isNotFoundLike(response, data)) {
+          return res.status(404).json({ error: 'Guild not found' });
+        }
+        return res.status(response.status).json({ error: `API Error: ${response.status}` });
+      }
+
+      let members = extractMembers(data);
+      members = await fetchMembersLastOnline(members);
+
+      applyCacheHeaders(res, forceFresh);
+      return res.json({
+        guildName: data.name || query,
+        prefix: data.prefix || '',
+        members,
+        searchType: 'members'
       });
     }
 
