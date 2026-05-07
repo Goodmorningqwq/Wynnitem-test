@@ -175,20 +175,20 @@ function applyCacheHeaders(res, forceFresh = false) {
 
 function extractMembers(guildData) {
   if (!guildData || !guildData.members) return [];
-  const rankOrder = ['OWNER', 'CHIEF', 'STRATEGIST', 'CAPTAIN', 'RECRUITER', 'RECRUIT'];
+  const rankOrder = ['owner', 'chief', 'strategist', 'captain', 'recruiter', 'recruit'];
   const members = [];
   const ranks = guildData.members;
   for (const rank of rankOrder) {
     const rankMembers = ranks[rank];
     if (!rankMembers || typeof rankMembers !== 'object') continue;
-    // ranks can be an object keyed by memberKey or an array
+    const displayRank = rank.charAt(0).toUpperCase() + rank.slice(1).toLowerCase();
     if (Array.isArray(rankMembers)) {
       for (const m of rankMembers) {
         if (!m) continue;
         members.push({
           username: m.username || m.legacyName || m.name || '',
           uuid: m.uuid || m.id || '',
-          rank: rank.charAt(0).toUpperCase() + rank.slice(1).toLowerCase(),
+          rank: displayRank,
           online: Boolean(m.online),
           contributed: Number(m.contributed || 0),
           joined: m.joined || ''
@@ -200,7 +200,7 @@ function extractMembers(guildData) {
         members.push({
           username: m.username || m.legacyName || memberKey || '',
           uuid: m.uuid || m.id || '',
-          rank: rank.charAt(0).toUpperCase() + rank.slice(1).toLowerCase(),
+          rank: displayRank,
           online: Boolean(m.online),
           contributed: Number(m.contributed || 0),
           joined: m.joined || ''
