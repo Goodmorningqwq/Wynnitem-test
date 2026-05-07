@@ -150,17 +150,6 @@
     .member-lastonline { font-size: 0.75rem; color: var(--text-muted); white-space: nowrap; flex-shrink: 0; }
     .member-contrib { font-size: 0.7rem; color: var(--text-muted); white-space: nowrap; flex-shrink: 0; }
 
-    .member-list-loading {
-      display: flex; align-items: center; justify-content: center; gap: 0.5rem;
-      padding: 2rem; color: var(--text-muted); font-size: 0.875rem;
-    }
-    .member-list-loading .spinner {
-      width: 18px; height: 18px; border: 2px solid rgba(168,85,247,0.2);
-      border-top-color: var(--purple); border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
     .member-header {
       display: flex; align-items: center; gap: 0.75rem;
       padding: 0.5rem 0.75rem; font-size: 0.7rem; font-weight: 600;
@@ -253,10 +242,6 @@
               </div>
               <div id="memberList"></div>
             </div>
-            <div id="memberLoading" class="hidden member-list-loading">
-              <div class="spinner"></div>
-              <span>Loading members...</span>
-            </div>
             <p id="memberError" class="hidden text-red-400 text-sm text-center mt-4"></p>
           </div>
         </div>
@@ -315,7 +300,6 @@
         var loadMembersBtn = document.getElementById('loadMembersBtn');
         var memberListContainer = document.getElementById('memberListContainer');
         var memberList = document.getElementById('memberList');
-        var memberLoading = document.getElementById('memberLoading');
         var memberError = document.getElementById('memberError');
 
         function getRankClass(rank) {
@@ -356,13 +340,58 @@
           return xp.toLocaleString();
         }
 
-        loadMembersBtn.addEventListener('click', async function() {
-          memberListContainer.classList.add('hidden');
+        function renderMembers(members) {
+          memberList.innerHTML = '';
+          if (members.length === 0) {
+            memberList.innerHTML = '<div class="text-center py-6 text-[var(--text-muted)] text-sm">No members found.</div>';
+            return;
+          }
+          members.forEach(function(m) {
+            var row = document.createElement('div');
+            row.className = 'member-row';
+
+            var dot = document.createElement('div');
+            dot.className = 'online-dot ' + (m.online ? 'online' : 'offline');
+            row.appendChild(dot);
+
+            var nameSpan = document.createElement('span');
+            nameSpan.className = 'member-username flex-1';
+            nameSpan.textContent = m.username || 'Unknown';
+            row.appendChild(nameSpan);
+
+            var rankEl = document.createElement('span');
+            rankEl.className = 'member-rank ' + getRankClass(m.rank);
+            rankEl.textContent = m.rank || '';
+            row.appendChild(rankEl);
+
+            var lastSpan = document.createElement('span');
+            lastSpan.className = 'member-lastonline';
+            if (m.online) {
+              lastSpan.textContent = 'Online';
+              lastSpan.style.color = '#4ade80';
+            } else if (m.lastOnline) {
+              lastSpan.textContent = formatRelativeTime(m.lastOnline);
+            } else {
+              lastSpan.textContent = '...';
+            }
+            row.appendChild(lastSpan);
+
+            var xpSpan = document.createElement('span');
+            xpSpan.className = 'member-contrib';
+            xpSpan.textContent = formatXp(m.contributed);
+            row.appendChild(xpSpan);
+
+            memberList.appendChild(row);
+          });
+        }
+
+        var memberRetryTimer = null;
+        var memberRetryCount = 0;
+
+        async function fetchMembers() {
           memberError.classList.add('hidden');
-          memberLoading.classList.remove('hidden');
           loadMembersBtn.disabled = true;
           loadMembersBtn.textContent = 'Loading...';
-          memberList.innerHTML = '';
 
           try {
             var res = await fetch('/api/guild?query=' + encodeURIComponent(guildName) + '&mode=members');
@@ -370,61 +399,35 @@
             if (!res.ok) throw new Error(result.error || 'Failed to fetch member activity');
 
             var members = result.members || [];
-            memberList.innerHTML = '';
-
-            if (members.length === 0) {
-              memberList.innerHTML = '<div class="text-center py-6 text-[var(--text-muted)] text-sm">No members found.</div>';
-            }
-
-            members.forEach(function(m) {
-              var row = document.createElement('div');
-              row.className = 'member-row';
-
-              var dot = document.createElement('div');
-              dot.className = 'online-dot ' + (m.online ? 'online' : 'offline');
-              row.appendChild(dot);
-
-              var nameSpan = document.createElement('span');
-              nameSpan.className = 'member-username flex-1';
-              nameSpan.textContent = m.username || 'Unknown';
-              row.appendChild(nameSpan);
-
-              var rankEl = document.createElement('span');
-              rankEl.className = 'member-rank ' + getRankClass(m.rank);
-              rankEl.textContent = m.rank || '';
-              row.appendChild(rankEl);
-
-              var lastSpan = document.createElement('span');
-              lastSpan.className = 'member-lastonline';
-              if (m.online) {
-                lastSpan.textContent = 'Online';
-                lastSpan.style.color = '#4ade80';
-              } else if (m.lastOnline) {
-                lastSpan.textContent = formatRelativeTime(m.lastOnline);
-              } else {
-                lastSpan.textContent = '...';
-              }
-              row.appendChild(lastSpan);
-
-              var xpSpan = document.createElement('span');
-              xpSpan.className = 'member-contrib';
-              xpSpan.textContent = formatXp(m.contributed);
-              row.appendChild(xpSpan);
-
-              memberList.appendChild(row);
-            });
-
+            renderMembers(members);
             memberListContainer.classList.remove('hidden');
-            memberLoading.classList.add('hidden');
-            loadMembersBtn.textContent = 'Refresh Member Activity';
+
+            var hasPending = members.some(function(m) { return !m.online && !m.lastOnline; });
+            if (hasPending && memberRetryCount < 5) {
+              memberRetryCount++;
+              memberRetryTimer = setTimeout(fetchMembers, 3000);
+              loadMembersBtn.textContent = 'Refreshing... (' + memberRetryCount + '/5)';
+            } else {
+              loadMembersBtn.textContent = 'Refresh Member Activity';
+              memberRetryCount = 0;
+            }
           } catch (e) {
-            memberLoading.classList.add('hidden');
             memberError.textContent = e.message || 'Failed to load member activity';
             memberError.classList.remove('hidden');
             loadMembersBtn.textContent = 'Retry Member Activity';
+            memberRetryCount = 0;
           } finally {
             loadMembersBtn.disabled = false;
           }
+        }
+
+        loadMembersBtn.addEventListener('click', function() {
+          if (memberRetryTimer) {
+            clearTimeout(memberRetryTimer);
+            memberRetryTimer = null;
+          }
+          memberRetryCount = 0;
+          fetchMembers();
         });
       } catch (e) {
         loadingState.classList.add('hidden');

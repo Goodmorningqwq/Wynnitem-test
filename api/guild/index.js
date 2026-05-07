@@ -6,7 +6,7 @@ const redis = new Redis({
 });
 
 const MEMBER_LASTONLINE_TTL = 15 * 60; // 15 minutes in seconds
-const MEMBER_BATCH_SIZE = 8;
+const MEMBER_BATCH_SIZE = 50;
 
 let cachedGuildList = null;
 let cachedGuildListTime = 0;
