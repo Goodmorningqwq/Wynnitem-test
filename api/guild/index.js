@@ -5,8 +5,8 @@ const redis = new Redis({
   token: process.env.UPSTASH_REDIS_REST_TOKEN_GUILD,
 });
 
-const MEMBER_LASTONLINE_TTL = 15 * 60; // 15 minutes in seconds
-const MEMBER_BATCH_SIZE = 50;
+const MEMBER_LASTONLINE_TTL = 60 * 60; // 1 hour in seconds
+const MEMBER_BATCH_SIZE = 5;
 
 let cachedGuildList = null;
 let cachedGuildListTime = 0;
@@ -243,15 +243,23 @@ async function fetchMembersLastOnline(members) {
   const batch = uncached.slice(0, MEMBER_BATCH_SIZE);
 
   if (batch.length) {
-    const playerPromises = batch.map(m => {
-      const identifier = m.uuid || m.username;
-      return fetch(`https://api.wynncraft.com/v3/player/${encodeURIComponent(identifier)}`, {
-        headers: { Accept: 'application/json' },
-        cache: 'no-store'
-      }).then(r => r.json().catch(() => null)).catch(() => null);
-    });
-
-    const playerResults = await Promise.all(playerPromises);
+    const playerResults = [];
+    for (let i = 0; i < batch.length; i++) {
+      const identifier = batch[i].uuid || batch[i].username;
+      try {
+        const r = await fetch(`https://api.wynncraft.com/v3/player/${encodeURIComponent(identifier)}`, {
+          headers: { Accept: 'application/json' },
+          cache: 'no-store'
+        });
+        const data = await r.json().catch(() => null);
+        playerResults.push(data);
+        if (i < batch.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1200));
+        }
+      } catch {
+        playerResults.push(null);
+      }
+    }
 
     const cacheSetPromises = [];
     for (let i = 0; i < batch.length; i++) {
@@ -269,6 +277,8 @@ async function fetchMembersLastOnline(members) {
     }
   }
 
+  const pendingCount = members.filter(m => !m.online && !m.lastOnline).length;
+
   for (const m of members) {
     delete m.cached;
   }
@@ -280,7 +290,7 @@ async function fetchMembersLastOnline(members) {
     return bTime - aTime;
   });
 
-  return members;
+  return { members, pendingCount };
 }
 
 module.exports = async (req, res) => {
@@ -373,14 +383,15 @@ module.exports = async (req, res) => {
         return res.status(response.status).json({ error: `API Error: ${response.status}` });
       }
 
-      let members = extractMembers(data);
-      members = await fetchMembersLastOnline(members);
+      const memberList = extractMembers(data);
+      const { members, pendingCount } = await fetchMembersLastOnline(memberList);
 
-      applyCacheHeaders(res, forceFresh);
+      res.setHeader('Cache-Control', 'no-store');
       return res.json({
         guildName: data.name || query,
         prefix: data.prefix || '',
         members,
+        pendingCount,
         searchType: 'members'
       });
     }

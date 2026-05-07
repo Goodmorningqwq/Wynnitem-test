@@ -391,7 +391,7 @@
         async function fetchMembers() {
           memberError.classList.add('hidden');
           loadMembersBtn.disabled = true;
-          loadMembersBtn.textContent = 'Loading...';
+          loadMembersBtn.textContent = memberRetryCount > 0 ? 'Fetching data...' : 'Loading...';
 
           try {
             var res = await fetch('/api/guild?query=' + encodeURIComponent(guildName) + '&mode=members');
@@ -399,14 +399,15 @@
             if (!res.ok) throw new Error(result.error || 'Failed to fetch member activity');
 
             var members = result.members || [];
+            var pendingCount = result.pendingCount || 0;
             renderMembers(members);
             memberListContainer.classList.remove('hidden');
 
-            var hasPending = members.some(function(m) { return !m.online && !m.lastOnline; });
-            if (hasPending && memberRetryCount < 5) {
+            if (pendingCount > 0 && memberRetryCount < 20) {
               memberRetryCount++;
-              memberRetryTimer = setTimeout(fetchMembers, 3000);
-              loadMembersBtn.textContent = 'Refreshing... (' + memberRetryCount + '/5)';
+              memberRetryTimer = setTimeout(fetchMembers, 4000);
+              var fetched = members.filter(function(m) { return m.online || m.lastOnline; }).length;
+              loadMembersBtn.textContent = fetched + '/' + members.length + ' loaded - fetching more...';
             } else {
               loadMembersBtn.textContent = 'Refresh Member Activity';
               memberRetryCount = 0;
