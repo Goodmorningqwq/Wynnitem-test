@@ -1,13 +1,4 @@
-const { Redis } = require('@upstash/redis');
 
-const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_REST_URL_GUILD,
-  token: process.env.UPSTASH_REDIS_REST_TOKEN_GUILD,
-});
-
-const MEMBER_LASTONLINE_TTL = 60 * 60;       // 1 hour in seconds for resolved players
-const MEMBER_UNAVAILABLE_TTL = 24 * 60 * 60; // 24 hours for private/hidden profiles
-const MEMBER_BATCH_SIZE = 3;                  // keep well under Vercel 10s timeout (3 × 800ms = 2.4s)
 
 let cachedGuildList = null;
 let cachedGuildListTime = 0;
@@ -212,105 +203,6 @@ function extractMembers(guildData) {
   return members;
 }
 
-async function fetchMembersLastOnline(members) {
-  if (!members.length) return members;
-
-  const cacheKeys = members.map(m => `guild:member:lastonline:${m.uuid || m.username}`);
-  let cachedResults = [];
-  try {
-    cachedResults = cacheKeys.length ? await redis.mget(...cacheKeys) : [];
-  } catch {
-    cachedResults = members.map(() => null);
-  }
-
-  for (let i = 0; i < members.length; i++) {
-    const cached = cachedResults[i];
-    if (cached !== null && cached !== undefined) {
-      try {
-        // Upstash Redis client auto-parses JSON, so cached may already be an object.
-        // Handle both raw string (legacy) and pre-parsed object forms.
-        const parsed = typeof cached === 'string' ? JSON.parse(cached) : cached;
-        members[i].lastOnline = parsed.lastOnline || null;
-        members[i].unavailable = parsed.unavailable === true;
-        members[i].cached = true;
-      } catch {
-        members[i].lastOnline = null;
-        members[i].unavailable = false;
-        members[i].cached = false;
-      }
-    } else {
-      members[i].lastOnline = null;
-      members[i].unavailable = false;
-      members[i].cached = false;
-    }
-  }
-
-  // Skip online members (no lookup needed) and already-cached members (including unavailable sentinels)
-  const uncached = members.filter(m => !m.cached && !m.online && (m.uuid || m.username));
-  const batch = uncached.slice(0, MEMBER_BATCH_SIZE);
-
-  if (batch.length) {
-    const playerResults = [];
-    for (let i = 0; i < batch.length; i++) {
-      const identifier = batch[i].uuid || batch[i].username;
-      try {
-        const r = await fetch(`https://api.wynncraft.com/v3/player/${encodeURIComponent(identifier)}`, {
-          headers: { Accept: 'application/json' },
-          cache: 'no-store'
-        });
-        const data = await r.json().catch(() => null);
-        playerResults.push(data);
-        if (i < batch.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 800));
-        }
-      } catch {
-        playerResults.push(null);
-      }
-    }
-
-    const cacheSetPromises = [];
-    for (let i = 0; i < batch.length; i++) {
-      const data = playerResults[i];
-      const cacheKey = `guild:member:lastonline:${batch[i].uuid || batch[i].username}`;
-      if (data && data.lastJoin) {
-        batch[i].lastOnline = data.lastJoin;
-        batch[i].unavailable = false;
-        cacheSetPromises.push(
-          redis.setex(cacheKey, MEMBER_LASTONLINE_TTL, JSON.stringify({ lastOnline: data.lastJoin, username: batch[i].username })).catch(() => {})
-        );
-      } else if (data && !data.lastJoin) {
-        // Valid API response but no lastJoin = private/hidden profile. Cache to avoid retrying.
-        batch[i].unavailable = true;
-        cacheSetPromises.push(
-          redis.setex(cacheKey, MEMBER_UNAVAILABLE_TTL, JSON.stringify({ lastOnline: null, unavailable: true, username: batch[i].username })).catch(() => {})
-        );
-      }
-      // data === null means a network/fetch error — do NOT cache, will retry next round.
-    }
-    if (cacheSetPromises.length) {
-      await Promise.all(cacheSetPromises);
-    }
-  }
-
-  // Only count members that are neither online, resolved, nor confirmed unavailable.
-  // This allows pendingCount to reach 0 even when some profiles are private.
-  const pendingCount = members.filter(m => !m.online && !m.lastOnline && !m.unavailable).length;
-
-  for (const m of members) {
-    delete m.cached;
-    // Keep m.unavailable so the frontend can render 'N/A' instead of '...'
-  }
-
-  members.sort((a, b) => {
-    if (a.online !== b.online) return b.online ? 1 : -1;
-    const aTime = a.lastOnline ? new Date(a.lastOnline).getTime() : 0;
-    const bTime = b.lastOnline ? new Date(b.lastOnline).getTime() : 0;
-    return bTime - aTime;
-  });
-
-  return { members, pendingCount };
-}
-
 module.exports = async (req, res) => {
   const rawQuery = req.query.query || req.query.name;
   const query = typeof rawQuery === 'string' ? rawQuery.trim() : '';
@@ -401,15 +293,21 @@ module.exports = async (req, res) => {
         return res.status(response.status).json({ error: `API Error: ${response.status}` });
       }
 
-      const memberList = extractMembers(data);
-      const { members, pendingCount } = await fetchMembersLastOnline(memberList);
+      // Extract the member list from guild data and return it.
+      // lastJoin lookups are handled client-side via /api/profile to avoid server DB usage.
+      const members = extractMembers(data);
+
+      // Sort: online first, then by username alphabetically for a stable initial order.
+      members.sort((a, b) => {
+        if (a.online !== b.online) return b.online ? 1 : -1;
+        return (a.username || '').localeCompare(b.username || '');
+      });
 
       res.setHeader('Cache-Control', 'no-store');
       return res.json({
         guildName: data.name || query,
         prefix: data.prefix || '',
         members,
-        pendingCount,
         searchType: 'members'
       });
     }

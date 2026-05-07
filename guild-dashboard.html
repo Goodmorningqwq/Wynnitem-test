@@ -340,13 +340,57 @@
           return xp.toLocaleString();
         }
 
+
+
+        var BATCH_SIZE = 3;
+        var BATCH_DELAY_MS = 900;
+        var LASTONLINE_TTL_MS = 60 * 60 * 1000; // 1 hour
+        var UNAVAILABLE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+        var LS_PREFIX = 'wynn:player:lastonline:';
+
+        function lsGet(uuid) {
+          try {
+            var raw = localStorage.getItem(LS_PREFIX + uuid);
+            if (!raw) return null;
+            var parsed = JSON.parse(raw);
+            var ttl = parsed.unavailable ? UNAVAILABLE_TTL_MS : LASTONLINE_TTL_MS;
+            if (Date.now() - (parsed.fetchedAt || 0) > ttl) {
+              localStorage.removeItem(LS_PREFIX + uuid);
+              return null;
+            }
+            return parsed;
+          } catch { return null; }
+        }
+
+        function lsSet(uuid, payload) {
+          try {
+            localStorage.setItem(LS_PREFIX + uuid, JSON.stringify(Object.assign({ fetchedAt: Date.now() }, payload)));
+          } catch {}
+        }
+
+        var allMembers = [];
+        var fetchTimer = null;
+        var fetchingActive = false;
+
+        function sortMembers(list) {
+          return list.slice().sort(function(a, b) {
+            if (a.online !== b.online) return b.online ? 1 : -1;
+            if (a.lastOnline && b.lastOnline) return new Date(b.lastOnline) - new Date(a.lastOnline);
+            if (a.lastOnline) return -1;
+            if (b.lastOnline) return 1;
+            if (a.unavailable !== b.unavailable) return a.unavailable ? 1 : -1;
+            return (a.username || '').localeCompare(b.username || '');
+          });
+        }
+
         function renderMembers(members) {
           memberList.innerHTML = '';
-          if (members.length === 0) {
+          if (!members.length) {
             memberList.innerHTML = '<div class="text-center py-6 text-[var(--text-muted)] text-sm">No members found.</div>';
             return;
           }
-          members.forEach(function(m) {
+          var sorted = sortMembers(members);
+          sorted.forEach(function(m) {
             var row = document.createElement('div');
             row.className = 'member-row';
 
@@ -388,49 +432,107 @@
           });
         }
 
-        var memberRetryTimer = null;
-        var memberRetryCount = 0;
+        function countResolved(list) {
+          return list.filter(function(m) { return m.online || m.lastOnline || m.unavailable; }).length;
+        }
+
+        function getPendingMembers(list) {
+          return list.filter(function(m) { return !m.online && !m.lastOnline && !m.unavailable && (m.uuid || m.username); });
+        }
+
+        async function fetchNextBatch() {
+          var pending = getPendingMembers(allMembers);
+          if (!pending.length) {
+            loadMembersBtn.textContent = 'Refresh Member Activity';
+            loadMembersBtn.disabled = false;
+            fetchingActive = false;
+            return;
+          }
+
+          var batch = pending.slice(0, BATCH_SIZE);
+          for (var i = 0; i < batch.length; i++) {
+            var m = batch[i];
+            var id = m.uuid || m.username;
+            try {
+              var r = await fetch('/api/profile?player=' + encodeURIComponent(id));
+              var data = await r.json().catch(function() { return null; });
+              if (data && data.lastJoin) {
+                m.lastOnline = data.lastJoin;
+                m.unavailable = false;
+                lsSet(id, { lastOnline: data.lastJoin, username: m.username });
+              } else if (data && r.ok) {
+                // Valid response but no lastJoin = private profile
+                m.unavailable = true;
+                lsSet(id, { unavailable: true, username: m.username });
+              }
+              // non-ok or null = transient error, do not cache, will retry
+            } catch {}
+            if (i < batch.length - 1) {
+              await new Promise(function(res) { setTimeout(res, BATCH_DELAY_MS); });
+            }
+          }
+
+          renderMembers(allMembers);
+          var resolved = countResolved(allMembers);
+          var remaining = getPendingMembers(allMembers).length;
+          if (remaining > 0) {
+            loadMembersBtn.textContent = resolved + '/' + allMembers.length + ' loaded - fetching more...';
+            fetchTimer = setTimeout(fetchNextBatch, 200);
+          } else {
+            loadMembersBtn.textContent = 'Refresh Member Activity';
+            loadMembersBtn.disabled = false;
+            fetchingActive = false;
+          }
+        }
 
         async function fetchMembers() {
           memberError.classList.add('hidden');
           loadMembersBtn.disabled = true;
-          loadMembersBtn.textContent = memberRetryCount > 0 ? 'Fetching data...' : 'Loading...';
+          loadMembersBtn.textContent = 'Loading...';
+          fetchingActive = true;
 
           try {
             var res = await fetch('/api/guild?query=' + encodeURIComponent(guildName) + '&mode=members');
             var result = await res.json();
             if (!res.ok) throw new Error(result.error || 'Failed to fetch member activity');
 
-            var members = result.members || [];
-            var pendingCount = result.pendingCount || 0;
-            renderMembers(members);
-            memberListContainer.classList.remove('hidden');
+            // Hydrate member list from localStorage cache
+            allMembers = (result.members || []).map(function(m) {
+              if (m.online) return m; // online = already resolved
+              var id = m.uuid || m.username;
+              var cached = id ? lsGet(id) : null;
+              if (cached) {
+                m.lastOnline = cached.lastOnline || null;
+                m.unavailable = cached.unavailable === true;
+              }
+              return m;
+            });
 
-            if (pendingCount > 0 && memberRetryCount < 40) {
-              memberRetryCount++;
-              memberRetryTimer = setTimeout(fetchMembers, 4000);
-              var fetched = members.filter(function(m) { return m.online || m.lastOnline || m.unavailable; }).length;
-              loadMembersBtn.textContent = fetched + '/' + members.length + ' loaded - fetching more...';
+            memberListContainer.classList.remove('hidden');
+            renderMembers(allMembers);
+
+            var resolved = countResolved(allMembers);
+            var remaining = getPendingMembers(allMembers).length;
+
+            if (remaining > 0) {
+              loadMembersBtn.textContent = resolved + '/' + allMembers.length + ' loaded - fetching more...';
+              fetchTimer = setTimeout(fetchNextBatch, 0);
             } else {
               loadMembersBtn.textContent = 'Refresh Member Activity';
-              memberRetryCount = 0;
+              loadMembersBtn.disabled = false;
+              fetchingActive = false;
             }
-          } catch (e) {
+          } catch(e) {
             memberError.textContent = e.message || 'Failed to load member activity';
             memberError.classList.remove('hidden');
             loadMembersBtn.textContent = 'Retry Member Activity';
-            memberRetryCount = 0;
-          } finally {
             loadMembersBtn.disabled = false;
+            fetchingActive = false;
           }
         }
 
         loadMembersBtn.addEventListener('click', function() {
-          if (memberRetryTimer) {
-            clearTimeout(memberRetryTimer);
-            memberRetryTimer = null;
-          }
-          memberRetryCount = 0;
+          if (fetchTimer) { clearTimeout(fetchTimer); fetchTimer = null; }
           fetchMembers();
         });
       } catch (e) {
