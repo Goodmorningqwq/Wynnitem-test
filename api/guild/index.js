@@ -225,11 +225,13 @@ async function fetchMembersLastOnline(members) {
 
   for (let i = 0; i < members.length; i++) {
     const cached = cachedResults[i];
-    if (cached && typeof cached === 'string') {
+    if (cached !== null && cached !== undefined) {
       try {
-        const parsed = JSON.parse(cached);
+        // Upstash Redis client auto-parses JSON, so cached may already be an object.
+        // Handle both raw string (legacy) and pre-parsed object forms.
+        const parsed = typeof cached === 'string' ? JSON.parse(cached) : cached;
         members[i].lastOnline = parsed.lastOnline || null;
-        members[i].unavailable = parsed.unavailable === true; // private profile sentinel
+        members[i].unavailable = parsed.unavailable === true;
         members[i].cached = true;
       } catch {
         members[i].lastOnline = null;
@@ -276,14 +278,14 @@ async function fetchMembersLastOnline(members) {
         cacheSetPromises.push(
           redis.setex(cacheKey, MEMBER_LASTONLINE_TTL, JSON.stringify({ lastOnline: data.lastJoin, username: batch[i].username })).catch(() => {})
         );
-      } else {
-        // Player returned no lastJoin (private profile, new account, or API error).
-        // Cache as unavailable so we don't retry on every request.
+      } else if (data && !data.lastJoin) {
+        // Valid API response but no lastJoin = private/hidden profile. Cache to avoid retrying.
         batch[i].unavailable = true;
         cacheSetPromises.push(
           redis.setex(cacheKey, MEMBER_UNAVAILABLE_TTL, JSON.stringify({ lastOnline: null, unavailable: true, username: batch[i].username })).catch(() => {})
         );
       }
+      // data === null means a network/fetch error — do NOT cache, will retry next round.
     }
     if (cacheSetPromises.length) {
       await Promise.all(cacheSetPromises);
