@@ -156,6 +156,35 @@
       color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.08em;
       border-bottom: 1px solid rgba(168, 85, 247, 0.2);
     }
+
+    .stat-card {
+      background: linear-gradient(180deg, rgba(24, 12, 39, 0.96), rgba(14, 8, 26, 0.94));
+      border: 1px solid var(--panel-border);
+      border-radius: 0.75rem;
+      padding: 1.25rem 1rem;
+      text-align: center;
+    }
+    .stat-value {
+      font-family: 'Russo One', sans-serif;
+      font-size: 1.75rem;
+      color: var(--pink);
+      line-height: 1.2;
+    }
+    .stat-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-top: 0.35rem;
+    }
+    .nav-card {
+      display: flex; align-items: center; gap: 0.75rem;
+      width: 100%;
+      padding: 1rem 1.25rem;
+      border-radius: 0.75rem;
+      text-align: left;
+      text-decoration: none;
+    }
   </style>
 </head>
 <body class="text-gray-100 min-h-screen flex flex-col">
@@ -228,21 +257,61 @@
             </div>
           </div>
           <div class="neon-line w-full mb-6"></div>
-          <div id="memberSection">
-            <button type="button" id="loadMembersBtn" class="theme-btn-primary px-6 py-3 rounded-lg text-sm font-semibold w-full">
-              Member Activity
-            </button>
-            <div id="memberListContainer" class="hidden mt-4">
-              <div class="member-header">
-                <span style="width:8px"></span>
-                <span class="flex-1">Member</span>
-                <span>Rank</span>
-                <span>Last Online</span>
-                <span>XP</span>
+
+          <div id="dashboardOverview">
+            <div class="grid grid-cols-3 gap-4 mb-6">
+              <div class="stat-card">
+                <div class="stat-value" id="statMembers">--</div>
+                <div class="stat-label">Total Members</div>
               </div>
-              <div id="memberList"></div>
+              <div class="stat-card">
+                <div class="stat-value" id="statOnline">--</div>
+                <div class="stat-label">Online Now</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-value" id="statXp">--</div>
+                <div class="stat-label">Total Member XP</div>
+              </div>
             </div>
-            <p id="memberError" class="hidden text-red-400 text-sm text-center mt-4"></p>
+            <div class="space-y-3">
+              <button type="button" id="navToMembersBtn" class="nav-card theme-btn">
+                <svg class="w-5 h-5 text-[var(--pink)] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                <div>
+                  <div class="text-sm font-semibold text-white">Member Activity</div>
+                  <div class="text-xs text-[var(--text-muted)]">View online status and last seen times</div>
+                </div>
+              </button>
+              <a href="/guild-event-history.html" class="nav-card theme-btn">
+                <svg class="w-5 h-5 text-[var(--purple)] flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                <div>
+                  <div class="text-sm font-semibold text-white">Event History</div>
+                  <div class="text-xs text-[var(--text-muted)]">Browse past guild events</div>
+                </div>
+              </a>
+            </div>
+          </div>
+
+          <div id="memberActivityView" class="hidden">
+            <button type="button" id="backToOverviewBtn" class="theme-btn px-4 py-2 rounded-lg text-sm font-semibold mb-4 flex items-center gap-2">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+              Back to Dashboard
+            </button>
+            <div id="memberSection">
+              <button type="button" id="loadMembersBtn" class="theme-btn-primary px-6 py-3 rounded-lg text-sm font-semibold w-full">
+                Member Activity
+              </button>
+              <div id="memberListContainer" class="hidden mt-4">
+                <div class="member-header">
+                  <span style="width:8px"></span>
+                  <span class="flex-1">Member</span>
+                  <span>Rank</span>
+                  <span>Last Online</span>
+                  <span>XP</span>
+                </div>
+                <div id="memberList"></div>
+              </div>
+              <p id="memberError" class="hidden text-red-400 text-sm text-center mt-4"></p>
+            </div>
           </div>
         </div>
       </div>
@@ -297,6 +366,42 @@
         dashboardContent.classList.remove('hidden');
 
         var guildName = data.guildName;
+
+        // View navigation
+        var dashboardOverview = document.getElementById('dashboardOverview');
+        var memberActivityView = document.getElementById('memberActivityView');
+        var navToMembersBtn = document.getElementById('navToMembersBtn');
+        var backToOverviewBtn = document.getElementById('backToOverviewBtn');
+        var statMembers = document.getElementById('statMembers');
+        var statOnline = document.getElementById('statOnline');
+        var statXp = document.getElementById('statXp');
+
+        navToMembersBtn.addEventListener('click', function() {
+          dashboardOverview.classList.add('hidden');
+          memberActivityView.classList.remove('hidden');
+          if (!fetchingActive && allMembers.length === 0) fetchMembers();
+        });
+
+        backToOverviewBtn.addEventListener('click', function() {
+          memberActivityView.classList.add('hidden');
+          dashboardOverview.classList.remove('hidden');
+        });
+
+        // Background fetch for Quick Stats
+        fetch('/api/guild?query=' + encodeURIComponent(guildName) + '&mode=members')
+          .then(function(r) { return r.json(); })
+          .then(function(result) {
+            var members = result.members || [];
+            statMembers.textContent = members.length;
+            statOnline.textContent = members.filter(function(m) { return m.online; }).length;
+            var totalXp = members.reduce(function(sum, m) { return sum + (m.contributed || 0); }, 0);
+            statXp.textContent = formatXp(totalXp);
+          })
+          .catch(function() {
+            statMembers.textContent = '--';
+            statOnline.textContent = '--';
+            statXp.textContent = '--';
+          });
         var loadMembersBtn = document.getElementById('loadMembersBtn');
         var memberListContainer = document.getElementById('memberListContainer');
         var memberList = document.getElementById('memberList');
