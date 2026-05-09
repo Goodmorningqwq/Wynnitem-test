@@ -185,6 +185,99 @@
       text-align: left;
       text-decoration: none;
     }
+
+    /* ── Star of the Week ── */
+    .star-card {
+      background: linear-gradient(135deg, rgba(255,79,216,0.12), rgba(168,85,247,0.18), rgba(124,58,237,0.1));
+      border: 1px solid rgba(255,79,216,0.45);
+      border-radius: 0.75rem;
+      padding: 1.1rem 1.25rem;
+      cursor: pointer;
+      transition: border-color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
+      display: flex; align-items: center; gap: 1rem;
+      width: 100%;
+      text-align: left;
+    }
+    .star-card:hover {
+      border-color: var(--pink);
+      transform: translateY(-2px);
+      box-shadow: 0 0 24px rgba(255,79,216,0.2), 0 0 48px rgba(168,85,247,0.1);
+    }
+    .star-card-icon {
+      font-size: 2rem;
+      line-height: 1;
+      filter: drop-shadow(0 0 8px rgba(255,215,0,0.5));
+      animation: starPulse 2.4s ease-in-out infinite;
+    }
+    @keyframes starPulse {
+      0%, 100% { filter: drop-shadow(0 0 6px rgba(255,215,0,0.4)); }
+      50%       { filter: drop-shadow(0 0 14px rgba(255,215,0,0.75)); }
+    }
+
+    /* ── Star Modal ── */
+    .star-modal-overlay {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(4,2,10,0.82);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+      display: flex; align-items: flex-start; justify-content: center;
+      padding: 1.5rem 1rem 2rem;
+      overflow-y: auto;
+    }
+    .star-modal {
+      background: linear-gradient(180deg, rgba(22,10,36,0.98), rgba(12,6,22,0.98));
+      border: 1px solid rgba(211,95,255,0.45);
+      border-radius: 1rem;
+      width: 100%; max-width: 56rem;
+      box-shadow: 0 0 60px rgba(168,85,247,0.18), 0 0 120px rgba(255,79,216,0.08);
+      animation: modalSlideIn 220ms cubic-bezier(0.22,1,0.36,1);
+    }
+    @keyframes modalSlideIn {
+      from { opacity:0; transform: translateY(18px) scale(0.97); }
+      to   { opacity:1; transform: translateY(0) scale(1); }
+    }
+
+    /* ── Podium medals ── */
+    .medal-1 { background: linear-gradient(135deg,#ffd700,#b8860b); color:#1a1000; }
+    .medal-2 { background: linear-gradient(135deg,#c0c0c0,#808080); color:#111; }
+    .medal-3 { background: linear-gradient(135deg,#cd7f32,#7a4a14); color:#fff; }
+    .podium-card {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(168,85,247,0.18);
+      border-radius: 0.6rem;
+      padding: 0.65rem 0.75rem;
+      display: flex; align-items: center; gap: 0.65rem;
+      transition: background 150ms ease;
+    }
+    .podium-card:first-child {
+      border-color: rgba(255,215,0,0.35);
+      background: rgba(255,215,0,0.05);
+    }
+
+    /* ── Full member table inside modal ── */
+    .sotw-table-row {
+      display: grid;
+      grid-template-columns: 2rem 1fr 4.5rem 4.5rem 5rem 5.5rem;
+      gap: 0.5rem;
+      align-items: center;
+      padding: 0.5rem 0.75rem;
+      border-bottom: 1px solid rgba(168,85,247,0.08);
+      font-size: 0.78rem;
+      transition: background 120ms ease;
+    }
+    .sotw-table-row:hover { background: rgba(255,79,216,0.05); }
+    .sotw-table-header {
+      display: grid;
+      grid-template-columns: 2rem 1fr 4.5rem 4.5rem 5rem 5.5rem;
+      gap: 0.5rem;
+      padding: 0.4rem 0.75rem;
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      border-bottom: 1px solid rgba(168,85,247,0.25);
+    }
   </style>
 </head>
 <body class="text-gray-100 min-h-screen flex flex-col">
@@ -288,6 +381,16 @@
                   <div class="text-xs text-[var(--text-muted)]">Browse past guild events</div>
                 </div>
               </a>
+
+              <!-- ⭐ Star of the Week card -->
+              <button type="button" id="openStarModalBtn" class="star-card">
+                <span class="star-card-icon" aria-hidden="true">⭐</span>
+                <div class="flex-1 min-w-0">
+                  <div class="text-sm font-semibold text-white" style="font-family:'Russo One',sans-serif;">Star of the Week</div>
+                  <div id="starCardPreview" class="text-xs text-[var(--text-muted)] mt-0.5 truncate">Loading top performer…</div>
+                </div>
+                <svg class="w-4 h-4 text-[var(--pink)] flex-shrink-0 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
+              </button>
             </div>
           </div>
 
@@ -323,6 +426,109 @@
       <p class="text-[var(--text-muted)] text-sm opacity-60">Not affiliated with Wynncraft Industries.</p>
     </div>
   </footer>
+
+  <!-- ========== Star of the Week Modal ========== -->
+  <div id="starModalOverlay" class="star-modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="starModalTitle">
+    <div class="star-modal">
+
+      <!-- Modal header -->
+      <div class="flex items-center justify-between px-6 pt-6 pb-4 border-b border-[rgba(168,85,247,0.25)]">
+        <div class="flex items-center gap-3">
+          <span style="font-size:1.8rem;filter:drop-shadow(0 0 10px rgba(255,215,0,0.6))">⭐</span>
+          <div>
+            <h2 id="starModalTitle" class="text-xl font-bold text-white" style="font-family:'Russo One',sans-serif;">Star of the Week</h2>
+            <p id="starModalWeek" class="text-xs text-[var(--text-muted)] mt-0.5"></p>
+          </div>
+        </div>
+        <button type="button" id="closeStarModalBtn"
+          class="w-8 h-8 flex items-center justify-center rounded-lg border border-[rgba(168,85,247,0.3)] text-[var(--text-muted)] hover:text-white hover:border-[var(--pink)] transition-colors"
+          aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <!-- Loading / error states -->
+      <div id="starModalLoading" class="px-6 py-10 text-center">
+        <div class="inline-block w-8 h-8 rounded-full border-2 border-[var(--pink)] border-t-transparent animate-spin mb-3"></div>
+        <p class="text-[var(--text-muted)] text-sm">Fetching weekly stats…</p>
+      </div>
+      <div id="starModalError" class="hidden px-6 py-10 text-center">
+        <p class="text-red-400 text-sm" id="starModalErrorMsg"></p>
+        <button type="button" id="starModalRetryBtn" class="theme-btn-primary mt-4 px-5 py-2 rounded-lg text-sm font-semibold">Retry</button>
+      </div>
+
+      <!-- Content (hidden until loaded) -->
+      <div id="starModalContent" class="hidden">
+
+        <!-- Top 3 columns -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 px-6 py-5">
+
+          <!-- Top Raids -->
+          <div>
+            <div class="flex items-center gap-2 mb-3">
+              <span class="text-lg">🛡️</span>
+              <span class="text-xs font-bold uppercase tracking-widest text-[var(--purple)]">Top Raids</span>
+            </div>
+            <div id="podiumRaids" class="space-y-2"></div>
+          </div>
+
+          <!-- Top Wars -->
+          <div>
+            <div class="flex items-center gap-2 mb-3">
+              <span class="text-lg">⚔️</span>
+              <span class="text-xs font-bold uppercase tracking-widest text-[var(--pink)]">Top Wars</span>
+            </div>
+            <div id="podiumWars" class="space-y-2"></div>
+          </div>
+
+          <!-- Top XP -->
+          <div>
+            <div class="flex items-center gap-2 mb-3">
+              <span class="text-lg">✨</span>
+              <span class="text-xs font-bold uppercase tracking-widest" style="color:#34d399">Top XP</span>
+            </div>
+            <div id="podiumXP" class="space-y-2"></div>
+          </div>
+        </div>
+
+        <div class="neon-line mx-6 mb-5"></div>
+
+        <!-- Full leaderboard -->
+        <div class="px-6 pb-6">
+          <div class="flex items-center justify-between mb-3 gap-3">
+            <span class="text-xs font-bold uppercase tracking-widest text-[var(--text-muted)]">All Members</span>
+            <div class="relative flex-1 max-w-xs">
+              <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[var(--text-muted)] pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              <input id="starTableSearch" type="search" placeholder="Search member…"
+                class="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg bg-[rgba(255,255,255,0.04)] border border-[rgba(168,85,247,0.3)] text-white placeholder-[var(--text-muted)] focus:outline-none focus:border-[var(--pink)] transition-colors">
+            </div>
+            <select id="starTableSort" class="text-xs rounded-lg bg-[rgba(255,255,255,0.04)] border border-[rgba(168,85,247,0.3)] text-white px-2 py-1.5 focus:outline-none focus:border-[var(--pink)] transition-colors cursor-pointer">
+              <option value="totalScore">Sort: Score</option>
+              <option value="raids">Sort: Raids</option>
+              <option value="wars">Sort: Wars</option>
+              <option value="xpContributed">Sort: XP</option>
+            </select>
+          </div>
+
+          <!-- Table -->
+          <div class="rounded-lg overflow-hidden border border-[rgba(168,85,247,0.2)]">
+            <div class="sotw-table-header">
+              <span>#</span>
+              <span>Player</span>
+              <span class="text-right">Raids</span>
+              <span class="text-right">Wars</span>
+              <span class="text-right">XP</span>
+              <span class="text-right">Score</span>
+            </div>
+            <div id="starTableBody" class="max-h-72 overflow-y-auto"></div>
+          </div>
+          <p class="text-[10px] text-[var(--text-muted)] mt-2 opacity-60">
+            Score = Raids×3 + Wars×2 + XP÷100 000. Refreshes from live guild data.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script>
     document.addEventListener('DOMContentLoaded', async function() {
@@ -640,11 +846,260 @@
           if (fetchTimer) { clearTimeout(fetchTimer); fetchTimer = null; }
           fetchMembers();
         });
+
+        // ── Star of the Week ──────────────────────────────────────────
+        initStarOfTheWeek(guildName);
+
       } catch (e) {
         loadingState.classList.add('hidden');
         notGuildAccount.classList.remove('hidden');
       }
     });
+
+    // =================================================================
+    // Star of the Week feature
+    // =================================================================
+
+    /**
+     * Format a large XP number compactly (e.g. 1 500 000 → "1.5M").
+     * @param {number} n
+     * @returns {string}
+     */
+    function formatXpCompact(n) {
+      if (n >= 1_000_000_000) return (n / 1_000_000_000).toFixed(1) + 'B';
+      if (n >= 1_000_000)     return (n / 1_000_000).toFixed(1) + 'M';
+      if (n >= 1_000)         return (n / 1_000).toFixed(1) + 'k';
+      return String(n || 0);
+    }
+
+    /**
+     * Escape a plain string for safe insertion as HTML text.
+     * @param {string} val
+     * @returns {string}
+     */
+    function escHtml(val) {
+      const d = document.createElement('div');
+      d.textContent = String(val ?? '');
+      return d.innerHTML;
+    }
+
+    /**
+     * Build the HTML for a single podium entry (1st / 2nd / 3rd).
+     * @param {{username:string, value:number}} entry
+     * @param {number} rank  1-indexed
+     * @param {string} valueLabel  e.g. 'raids' | 'wars' | 'XP'
+     * @returns {string}
+     */
+    function renderPodiumEntry(entry, rank, valueLabel) {
+      const medalClass = ['', 'medal-1', 'medal-2', 'medal-3'][rank] || 'medal-3';
+      const label = valueLabel === 'XP' ? formatXpCompact(entry.value) : entry.value.toLocaleString();
+      return `
+        <div class="podium-card">
+          <span class="${escHtml(medalClass)} w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">${rank}</span>
+          <span class="flex-1 text-sm font-semibold text-white truncate">${escHtml(entry.username)}</span>
+          <span class="text-xs font-mono text-[var(--text-muted)] flex-shrink-0">${escHtml(label)} ${escHtml(valueLabel)}</span>
+        </div>`;
+    }
+
+    /**
+     * Render the three podium columns from fetched stats.
+     * @param {object} stats  Full weekly-stats API response
+     */
+    function renderStarPodiums(stats) {
+      const columns = [
+        { id: 'podiumRaids', list: stats.topRaids,  label: 'raids' },
+        { id: 'podiumWars',  list: stats.topWars,   label: 'wars'  },
+        { id: 'podiumXP',    list: stats.topXP,     label: 'XP'    }
+      ];
+      columns.forEach(function(col) {
+        const el = document.getElementById(col.id);
+        if (!el) return;
+        if (!col.list || !col.list.length) {
+          el.innerHTML = '<p class="text-xs text-[var(--text-muted)]">No data</p>';
+          return;
+        }
+        el.innerHTML = col.list
+          .slice(0, 3)
+          .map(function(entry, i) { return renderPodiumEntry(entry, i + 1, col.label); })
+          .join('');
+      });
+    }
+
+    // Module-level state for the full member list (so search/sort can filter live)
+    var sotwFullList = [];
+
+    /**
+     * Render rows of the full member table, respecting current search + sort.
+     */
+    function renderStarTable() {
+      const searchVal = (document.getElementById('starTableSearch')?.value || '').toLowerCase().trim();
+      const sortKey   = document.getElementById('starTableSort')?.value || 'totalScore';
+      const tbody     = document.getElementById('starTableBody');
+      if (!tbody) return;
+
+      // Filter
+      let rows = sotwFullList.filter(function(m) {
+        return !searchVal || m.username.toLowerCase().includes(searchVal);
+      });
+
+      // Sort descending
+      rows = rows.slice().sort(function(a, b) { return (b[sortKey] || 0) - (a[sortKey] || 0); });
+
+      if (!rows.length) {
+        tbody.innerHTML = '<div class="py-4 text-center text-xs text-[var(--text-muted)]">No members match.</div>';
+        return;
+      }
+
+      tbody.innerHTML = rows.map(function(m, i) {
+        const rank = i + 1;
+        // Use pre-defined strings — never pass these through escHtml (it would break the style attribute)
+        const rankStyle = rank === 1
+          ? 'color:#ffd700;font-weight:700'
+          : rank === 2 ? 'color:#c0c0c0;font-weight:600'
+          : rank === 3 ? 'color:#cd7f32;font-weight:600'
+          : 'color:var(--text-muted)';
+        return `<div class="sotw-table-row">
+          <span style="${rankStyle}">${rank}</span>
+          <span class="text-white font-medium truncate">${escHtml(m.username)}</span>
+          <span class="text-right font-mono text-[var(--purple)]">${escHtml(String(m.raids || 0))}</span>
+          <span class="text-right font-mono text-[var(--pink)]">${escHtml(String(m.wars || 0))}</span>
+          <span class="text-right font-mono" style="color:#34d399">${escHtml(formatXpCompact(m.xpContributed || 0))}</span>
+          <span class="text-right font-mono text-white opacity-80">${escHtml(String(m.totalScore || 0))}</span>
+        </div>`;
+      }).join('');
+    }
+
+    // Cached stats so we don't re-fetch on every modal open
+    var sotwCache = null;
+    var sotwFetchInFlight = false;
+
+    /**
+     * Fetch weekly stats from the API and populate the modal.
+     * @param {string} guild
+     */
+    async function fetchAndRenderStarStats(guild) {
+      // Prevent concurrent fetches
+      if (sotwFetchInFlight) return;
+      sotwFetchInFlight = true;
+
+      const loading = document.getElementById('starModalLoading');
+      const error   = document.getElementById('starModalError');
+      const content = document.getElementById('starModalContent');
+
+      loading.classList.remove('hidden');
+      error.classList.add('hidden');
+      content.classList.add('hidden');
+
+      try {
+        const res = await fetch('/api/guild/weekly-stats?guild=' + encodeURIComponent(guild));
+        if (!res.ok) {
+          const body = await res.json().catch(function() { return {}; });
+          throw new Error(body.error || ('API error ' + res.status));
+        }
+        const stats = await res.json();
+        sotwCache = stats;
+        sotwCache._fetchedAt = Date.now(); // stamp here so all callers benefit
+        sotwFullList = Array.isArray(stats.fullList) ? stats.fullList : [];
+
+        // Week label — use textContent (already safe, no need for escHtml)
+        const weekEl = document.getElementById('starModalWeek');
+        if (weekEl && stats.weekStart) {
+          weekEl.textContent = 'Week of ' + stats.weekStart + ' · ' + (stats.guildName || guild);
+        }
+
+        renderStarPodiums(stats);
+        renderStarTable();
+
+        // Update card preview with #1 overall scorer
+        const top = sotwFullList[0];
+        const previewEl = document.getElementById('starCardPreview');
+        if (previewEl && top) {
+          previewEl.textContent = '★ ' + top.username + ' · Score ' + top.totalScore;
+        }
+
+        loading.classList.add('hidden');
+        content.classList.remove('hidden');
+      } catch (e) {
+        loading.classList.add('hidden');
+        const msgEl = document.getElementById('starModalErrorMsg');
+        if (msgEl) msgEl.textContent = e.message || 'Failed to load weekly stats.';
+        error.classList.remove('hidden');
+      } finally {
+        sotwFetchInFlight = false;
+      }
+    }
+
+    /**
+     * Open the Star of the Week modal.
+     * @param {string} guild
+     */
+    function openStarModal(guild) {
+      const overlay = document.getElementById('starModalOverlay');
+      overlay.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+
+      // Use cache if fresh (< 5 min); if a fetch is already in-flight just wait
+      const CACHE_TTL_MS = 5 * 60 * 1000;
+      if (sotwFetchInFlight) {
+        // fetch is in progress — loading state is already shown, nothing to do
+        return;
+      }
+      if (sotwCache && sotwCache._fetchedAt && Date.now() - sotwCache._fetchedAt < CACHE_TTL_MS) {
+        const loading = document.getElementById('starModalLoading');
+        const content = document.getElementById('starModalContent');
+        loading.classList.add('hidden');
+        content.classList.remove('hidden');
+        renderStarTable();
+      } else {
+        fetchAndRenderStarStats(guild);
+      }
+    }
+
+    /** Close the Star of the Week modal. */
+    function closeStarModal() {
+      const overlay = document.getElementById('starModalOverlay');
+      overlay.classList.add('hidden');
+      document.body.style.overflow = '';
+    }
+
+    /**
+     * Wire up all Star of the Week interactivity.
+     * @param {string} guild
+     */
+    function initStarOfTheWeek(guild) {
+      const openBtn   = document.getElementById('openStarModalBtn');
+      const closeBtn  = document.getElementById('closeStarModalBtn');
+      const retryBtn  = document.getElementById('starModalRetryBtn');
+      const overlay   = document.getElementById('starModalOverlay');
+      const searchEl  = document.getElementById('starTableSearch');
+      const sortEl    = document.getElementById('starTableSort');
+
+      if (openBtn)  openBtn.addEventListener('click', function() { openStarModal(guild); });
+      if (closeBtn) closeBtn.addEventListener('click', closeStarModal);
+      if (retryBtn) retryBtn.addEventListener('click', function() { fetchAndRenderStarStats(guild); });
+
+      // Close on backdrop click (but not on modal itself)
+      if (overlay) {
+        overlay.addEventListener('click', function(e) {
+          if (e.target === overlay) closeStarModal();
+        });
+      }
+
+      // Escape key closes modal
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && overlay && !overlay.classList.contains('hidden')) {
+          closeStarModal();
+        }
+      });
+
+      // Live search + sort
+      if (searchEl) searchEl.addEventListener('input', renderStarTable);
+      if (sortEl)   sortEl.addEventListener('change', renderStarTable);
+
+      // Background-load stats so the card preview populates without needing the modal open
+      fetchAndRenderStarStats(guild);
+    }
+
   </script>
 </body>
 </html>

@@ -12,6 +12,7 @@
     { "source": "/player-stats", "destination": "/player-stats.html" },
     { "source": "/login", "destination": "/login.html" },
     { "source": "/api/item(.*)", "destination": "/api/item$1" },
+    { "source": "/api/guild/weekly-stats", "destination": "/api/guild/weekly-stats" },
     { "source": "/api/guild(.*)", "destination": "/api/guild$1" },
     { "source": "/api/user/login", "destination": "/api/user/auth?action=login" },
     { "source": "/api/user/register", "destination": "/api/user/auth?action=register" },
