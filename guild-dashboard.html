@@ -1132,6 +1132,16 @@
      * @param {string} guild
      */
     async function refreshWeeklyData(guild) {
+      // ── Confirmation guard ────────────────────────────────────────────
+      var confirmed = window.confirm(
+        'Reset the weekly baseline for ' + guild + '?\n\n' +
+        'This will set today\'s stats as the new "week start".\n' +
+        'All weekly counts (raids, wars, XP) will show 0 until members earn new activity.\n\n' +
+        'The automatic weekly reset already runs every Sunday at 23:55 UTC — ' +
+        'only use this if you want to start the week from a different date.'
+      );
+      if (!confirmed) return;
+
       var btnEl    = document.getElementById('refreshWeeklyBtn');
       var btnText  = document.getElementById('refreshWeeklyBtnText');
       var successEl  = document.getElementById('starRefreshSuccess');
