@@ -1,4 +1,12 @@
+const { Redis } = require('@upstash/redis');
 
+const redis = new Redis({
+  url: process.env.UPSTASH_REDIS_REST_URL_GUILD,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN_GUILD,
+});
+
+// TTL for the weekly baseline in Redis: 8 days (covers the full week + 1-day grace)
+const WEEKLY_BASELINE_TTL_SECS = 8 * 24 * 60 * 60;
 
 let cachedGuildList = null;
 let cachedGuildListTime = 0;
@@ -206,21 +214,67 @@ function extractMembers(guildData) {
 // ── Weekly Stats helpers (mode=weekly-stats) ──────────────────────────────
 
 /**
- * Returns YYYY-MM-DD of the most recent Monday (week start).
+ * Returns YYYY-MM-DD of the most recent Monday (week start, UTC).
  * @returns {string}
  */
 function getWeekStartDate() {
   const now = new Date();
-  const day = now.getDay(); // 0=Sun
+  const day = now.getUTCDay(); // 0=Sun
   const diff = day === 0 ? -6 : 1 - day;
-  const monday = new Date(now);
-  monday.setDate(now.getDate() + diff);
+  const monday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + diff));
   return monday.toISOString().slice(0, 10);
 }
 
+/** Redis key for a guild's weekly baseline snapshot. */
+function weeklyBaselineKey(guildName) {
+  return `guild:weekly-baseline:${String(guildName).toLowerCase().trim()}`;
+}
+
 /**
- * Flatten all rank buckets into a stats member list.
- * Scoring: raids*3 + wars*2 + xpContributed/100_000
+ * Load the stored weekly baseline for a guild from Redis.
+ * Returns null if none exists.
+ * @param {string} guildName
+ * @returns {Promise<object|null>}
+ */
+async function loadWeeklyBaseline(guildName) {
+  try {
+    const raw = await redis.get(weeklyBaselineKey(guildName));
+    if (!raw) return null;
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch (e) {
+    console.error('[weekly-stats] loadWeeklyBaseline error:', e.message);
+    return null;
+  }
+}
+
+/**
+ * Save the current member stats as the new weekly baseline.
+ * @param {string} guildName
+ * @param {Array<object>} members  Output of collectWeeklyMembers()
+ * @param {string} weekStart  YYYY-MM-DD
+ */
+async function saveWeeklyBaseline(guildName, members, weekStart) {
+  const snapshot = {
+    weekStart,
+    savedAt: new Date().toISOString(),
+    members: {} // keyed by lowercase username for fast lookup
+  };
+  for (const m of members) {
+    snapshot.members[m.username.toLowerCase()] = {
+      raids: m.raids,
+      wars: m.wars,
+      xpContributed: m.xpContributed
+    };
+  }
+  await redis.set(weeklyBaselineKey(guildName), JSON.stringify(snapshot), {
+    ex: WEEKLY_BASELINE_TTL_SECS
+  });
+  return snapshot;
+}
+
+/**
+ * Flatten all rank buckets into a stats member list (raw lifetime totals).
  * @param {object} guildData
  * @returns {Array<object>}
  */
@@ -244,17 +298,44 @@ function collectWeeklyMembers(guildData) {
       );
       const wars = Number(m.globalData?.wars ?? 0);
       const xpContributed = Number(m.contributed ?? 0);
-      const totalScore = Math.round((raids * 3 + wars * 2 + xpContributed / 100000) * 100) / 100;
       members.push({
         username: m.username || m.legacyName || memberKey || 'Unknown',
         raids,
         wars,
-        xpContributed,
-        totalScore
+        xpContributed
       });
     }
   }
   return members;
+}
+
+/**
+ * Apply a stored baseline snapshot to compute weekly deltas.
+ * Members not in the baseline get their full totals as the delta (new members this week).
+ * @param {Array<object>} members  Live member list
+ * @param {object|null} baseline   Stored snapshot (or null = first week, use full totals)
+ * @returns {Array<object>}  Members with delta fields + totalScore
+ */
+function applyBaseline(members, baseline) {
+  return members.map((m) => {
+    let base = null;
+    if (baseline?.members) {
+      base = baseline.members[m.username.toLowerCase()] || null;
+    }
+    // If no baseline exists yet, weekly delta = full lifetime total
+    const deltaRaids = base ? Math.max(0, m.raids - (base.raids || 0)) : m.raids;
+    const deltaWars  = base ? Math.max(0, m.wars  - (base.wars  || 0)) : m.wars;
+    const deltaXP    = base ? Math.max(0, m.xpContributed - (base.xpContributed || 0)) : m.xpContributed;
+    // Scoring: raids*3 + wars*2 + XP/100_000
+    const totalScore = Math.round((deltaRaids * 3 + deltaWars * 2 + deltaXP / 100000) * 100) / 100;
+    return {
+      username: m.username,
+      raids:   deltaRaids,
+      wars:    deltaWars,
+      xpContributed: deltaXP,
+      totalScore
+    };
+  });
 }
 
 /**
@@ -276,11 +357,39 @@ module.exports = async (req, res) => {
   const mode = (req.query.mode || 'auto').toLowerCase();
   const forceFresh = req.query.fresh === '1' || req.query.fresh === 'true';
 
+  // Cron path: /api/guild/weekly-reset hits this handler with x-vercel-cron header
+  // We need a guild name to snapshot. When triggered by cron (no query), it checks
+  // the well-known cron guild list stored in env or skips gracefully.
+  const isCronRequest = req.headers['x-vercel-cron'] === '1';
+  const isWeeklyResetPath = (req.url || '').includes('weekly-reset') || mode === 'weekly-reset';
+  if (isCronRequest && isWeeklyResetPath) {
+    // Cron resets all guilds stored in WEEKLY_RESET_GUILDS env var (comma-separated)
+    const guildList = String(process.env.WEEKLY_RESET_GUILDS || '').split(',').map(s => s.trim()).filter(Boolean);
+    if (!guildList.length) {
+      return res.status(200).json({ success: true, note: 'No guilds configured in WEEKLY_RESET_GUILDS' });
+    }
+    const weekStart = getWeekStartDate();
+    const results = [];
+    for (const guildName of guildList) {
+      try {
+        const { response, data } = await fetchGuildName(guildName, true);
+        if (!response.ok) { results.push({ guild: guildName, ok: false, error: response.status }); continue; }
+        const liveMembers = collectWeeklyMembers(data);
+        await saveWeeklyBaseline(data.name || guildName, liveMembers, weekStart);
+        results.push({ guild: data.name || guildName, ok: true, members: liveMembers.length });
+      } catch (e) {
+        results.push({ guild: guildName, ok: false, error: e.message });
+      }
+    }
+    res.setHeader('Cache-Control', 'no-store');
+    return res.json({ success: true, weekStart, results });
+  }
+
   if (!query) {
     return res.status(400).json({ error: 'Guild query required' });
   }
 
-  if (!['auto', 'name', 'prefix', 'uuid', 'suggest', 'members', 'weekly-stats'].includes(mode)) {
+  if (!['auto', 'name', 'prefix', 'uuid', 'suggest', 'members', 'weekly-stats', 'weekly-reset'].includes(mode)) {
     return res.status(400).json({ error: 'Invalid search mode' });
   }
 
@@ -380,24 +489,54 @@ module.exports = async (req, res) => {
     }
 
     if (mode === 'weekly-stats') {
-      const { response, data } = await fetchGuildName(query, forceFresh);
+      const { response, data } = await fetchGuildName(query, true); // always fresh for live deltas
       if (!response.ok) {
         if (response.status === 429) return res.status(429).json({ error: 'Rate limit exceeded' });
         if (isNotFoundLike(response, data)) return res.status(404).json({ error: 'Guild not found' });
         return res.status(response.status).json({ error: `API Error: ${response.status}` });
       }
-      const members = collectWeeklyMembers(data);
-      if (!members.length) return res.status(404).json({ error: 'Guild has no members' });
-      const fullList = members.slice().sort((a, b) => b.totalScore - a.totalScore);
-      res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
+      const guildName = data.name || query;
+      const liveMembers = collectWeeklyMembers(data);
+      if (!liveMembers.length) return res.status(404).json({ error: 'Guild has no members' });
+
+      const baseline = await loadWeeklyBaseline(guildName);
+      const weekStart = baseline?.weekStart || getWeekStartDate();
+      const deltaMembers = applyBaseline(liveMembers, baseline);
+      const fullList = deltaMembers.slice().sort((a, b) => b.totalScore - a.totalScore);
+
+      res.setHeader('Cache-Control', 's-maxage=120, stale-while-revalidate=60');
       return res.json({
-        weekStart: getWeekStartDate(),
-        guildName: data.name || query,
-        topRaids: buildTop3(members, 'raids'),
-        topWars:  buildTop3(members, 'wars'),
-        topXP:    buildTop3(members, 'xpContributed'),
+        weekStart,
+        guildName,
+        hasBaseline: Boolean(baseline),
+        topRaids: buildTop3(deltaMembers, 'raids'),
+        topWars:  buildTop3(deltaMembers, 'wars'),
+        topXP:    buildTop3(deltaMembers, 'xpContributed'),
         fullList
       });
+    }
+
+    // weekly-reset: save current stats as the new baseline (called by cron or admin)
+    if (mode === 'weekly-reset') {
+      const isCron = req.headers['x-vercel-cron'] === '1';
+      const adminToken = String(req.headers['x-cache-admin-token'] || req.query.token || '');
+      const expectedToken = String(process.env.CACHE_ADMIN_TOKEN || '');
+      const isAdmin = Boolean(expectedToken) && adminToken === expectedToken;
+      if (!isCron && !isAdmin) {
+        return res.status(403).json({ error: 'Forbidden - requires cron header or admin token' });
+      }
+      const { response, data } = await fetchGuildName(query, true);
+      if (!response.ok) {
+        if (response.status === 429) return res.status(429).json({ error: 'Rate limit exceeded' });
+        if (isNotFoundLike(response, data)) return res.status(404).json({ error: 'Guild not found' });
+        return res.status(response.status).json({ error: `API Error: ${response.status}` });
+      }
+      const guildName = data.name || query;
+      const liveMembers = collectWeeklyMembers(data);
+      const weekStart = getWeekStartDate();
+      await saveWeeklyBaseline(guildName, liveMembers, weekStart);
+      res.setHeader('Cache-Control', 'no-store');
+      return res.json({ success: true, guildName, weekStart, memberCount: liveMembers.length });
     }
 
     // Auto mode: detect UUID format first

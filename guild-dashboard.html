@@ -1004,7 +1004,8 @@
         // Week label — use textContent (already safe, no need for escHtml)
         const weekEl = document.getElementById('starModalWeek');
         if (weekEl && stats.weekStart) {
-          weekEl.textContent = 'Week of ' + stats.weekStart + ' · ' + (stats.guildName || guild);
+          const baselineNote = stats.hasBaseline ? '' : ' · showing all-time (no baseline yet)';
+          weekEl.textContent = 'Week of ' + stats.weekStart + ' · ' + (stats.guildName || guild) + baselineNote;
         }
 
         renderStarPodiums(stats);
@@ -1014,7 +1015,8 @@
         const top = sotwFullList[0];
         const previewEl = document.getElementById('starCardPreview');
         if (previewEl && top) {
-          previewEl.textContent = '★ ' + top.username + ' · Score ' + top.totalScore;
+          const raidText = top.raids > 0 ? top.raids + ' raids' : top.wars > 0 ? top.wars + ' wars' : 'Score ' + top.totalScore;
+          previewEl.textContent = '★ ' + top.username + ' · ' + raidText + ' this week';
         }
 
         loading.classList.add('hidden');
