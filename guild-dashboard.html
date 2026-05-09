@@ -428,7 +428,7 @@
   </footer>
 
   <!-- ========== Star of the Week Modal ========== -->
-  <div id="starModalOverlay" class="star-modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="starModalTitle">
+  <div id="starModalOverlay" class="star-modal-overlay" style="display:none" role="dialog" aria-modal="true" aria-labelledby="starModalTitle">
     <div class="star-modal">
 
       <!-- Modal header -->
@@ -987,7 +987,7 @@
       // Helper: is the modal overlay currently visible?
       function isModalOpen() {
         var ov = document.getElementById('starModalOverlay');
-        return ov && !ov.classList.contains('hidden');
+        return ov && ov.style.display !== 'none';
       }
 
       const loading = document.getElementById('starModalLoading');
@@ -1051,7 +1051,7 @@
      */
     function openStarModal(guild) {
       var overlay = document.getElementById('starModalOverlay');
-      overlay.classList.remove('hidden');
+      overlay.style.display = 'flex';
       document.body.style.overflow = 'hidden';
 
       // If a fetch is in-flight, just show loading — it will auto-update modal when done
@@ -1084,8 +1084,8 @@
 
     /** Close the Star of the Week modal. */
     function closeStarModal() {
-      const overlay = document.getElementById('starModalOverlay');
-      if (overlay) overlay.classList.add('hidden');
+      var overlay = document.getElementById('starModalOverlay');
+      if (overlay) overlay.style.display = 'none';
       document.body.style.overflow = '';
     }
     // Expose globally so onclick attribute on the button works as a fallback
@@ -1129,6 +1129,15 @@
       fetchAndRenderStarStats(guild);
     }
 
+  </script>
+
+  <!-- Standalone close helper — must be reachable from onclick on the X button -->
+  <script>
+    function closeStarModal() {
+      var el = document.getElementById('starModalOverlay');
+      if (el) el.style.display = 'none';
+      document.body.style.overflow = '';
+    }
   </script>
 </body>
 </html>
