@@ -979,18 +979,23 @@
      * @param {string} guild
      * @param {boolean} [showUI=true]  When false (background load), never touch modal states.
      */
-    async function fetchAndRenderStarStats(guild, showUI) {
-      if (showUI === undefined) showUI = true;
+    async function fetchAndRenderStarStats(guild) {
       // Prevent concurrent fetches
       if (sotwFetchInFlight) return;
       sotwFetchInFlight = true;
+
+      // Helper: is the modal overlay currently visible?
+      function isModalOpen() {
+        var ov = document.getElementById('starModalOverlay');
+        return ov && !ov.classList.contains('hidden');
+      }
 
       const loading = document.getElementById('starModalLoading');
       const error   = document.getElementById('starModalError');
       const content = document.getElementById('starModalContent');
 
-      // Only touch modal states when the modal is actually open
-      if (showUI) {
+      // Show loading state only if the modal is already open
+      if (isModalOpen()) {
         if (loading) loading.classList.remove('hidden');
         if (error)   error.classList.add('hidden');
         if (content) content.classList.add('hidden');
@@ -1007,8 +1012,8 @@
         sotwCache._fetchedAt = Date.now();
         sotwFullList = Array.isArray(stats.fullList) ? stats.fullList : [];
 
-        if (showUI) {
-          // Week label
+        // Update modal UI if it's open (works for both background-load and explicit open)
+        if (isModalOpen()) {
           const weekEl = document.getElementById('starModalWeek');
           if (weekEl && stats.weekStart) {
             const baselineNote = stats.hasBaseline ? '' : ' · showing all-time (no baseline yet)';
@@ -1020,18 +1025,18 @@
           if (content) content.classList.remove('hidden');
         }
 
-        // Always update the card preview
-        const top = sotwFullList[0];
-        const previewEl = document.getElementById('starCardPreview');
+        // Always update the card preview text
+        var top = sotwFullList[0];
+        var previewEl = document.getElementById('starCardPreview');
         if (previewEl && top) {
-          const raidText = top.raids > 0 ? top.raids + ' raids' : top.wars > 0 ? top.wars + ' wars' : 'Score ' + top.totalScore;
+          var raidText = top.raids > 0 ? top.raids + ' raids' : top.wars > 0 ? top.wars + ' wars' : 'Score ' + top.totalScore;
           previewEl.textContent = '★ ' + top.username + ' · ' + raidText + ' this week';
         }
 
       } catch (e) {
-        if (showUI) {
+        if (isModalOpen()) {
           if (loading) loading.classList.add('hidden');
-          const msgEl = document.getElementById('starModalErrorMsg');
+          var msgEl = document.getElementById('starModalErrorMsg');
           if (msgEl) msgEl.textContent = e.message || 'Failed to load weekly stats.';
           if (error) error.classList.remove('hidden');
         }
@@ -1045,35 +1050,35 @@
      * @param {string} guild
      */
     function openStarModal(guild) {
-      const overlay = document.getElementById('starModalOverlay');
+      var overlay = document.getElementById('starModalOverlay');
       overlay.classList.remove('hidden');
       document.body.style.overflow = 'hidden';
 
-      // If a fetch is already in-flight (background load), show loading state and wait
+      // If a fetch is in-flight, just show loading — it will auto-update modal when done
       if (sotwFetchInFlight) {
-        const loading = document.getElementById('starModalLoading');
-        const content = document.getElementById('starModalContent');
+        var loading = document.getElementById('starModalLoading');
+        var content = document.getElementById('starModalContent');
         if (loading) loading.classList.remove('hidden');
         if (content) content.classList.add('hidden');
         return;
       }
 
-      const CACHE_TTL_MS = 5 * 60 * 1000;
+      var CACHE_TTL_MS = 5 * 60 * 1000;
       if (sotwCache && sotwCache._fetchedAt && Date.now() - sotwCache._fetchedAt < CACHE_TTL_MS) {
         // Fresh cache — render straight from it
-        const weekEl = document.getElementById('starModalWeek');
+        var weekEl = document.getElementById('starModalWeek');
         if (weekEl && sotwCache.weekStart) {
-          const baselineNote = sotwCache.hasBaseline ? '' : ' · showing all-time (no baseline yet)';
+          var baselineNote = sotwCache.hasBaseline ? '' : ' · showing all-time (no baseline yet)';
           weekEl.textContent = 'Week of ' + sotwCache.weekStart + ' · ' + (sotwCache.guildName || guild) + baselineNote;
         }
         renderStarPodiums(sotwCache);
         renderStarTable();
-        const loading = document.getElementById('starModalLoading');
-        const content = document.getElementById('starModalContent');
-        if (loading) loading.classList.add('hidden');
-        if (content) content.classList.remove('hidden');
+        var loadingEl = document.getElementById('starModalLoading');
+        var contentEl = document.getElementById('starModalContent');
+        if (loadingEl) loadingEl.classList.add('hidden');
+        if (contentEl) contentEl.classList.remove('hidden');
       } else {
-        fetchAndRenderStarStats(guild, true);
+        fetchAndRenderStarStats(guild);
       }
     }
 
@@ -1120,9 +1125,8 @@
       if (searchEl) searchEl.addEventListener('input', renderStarTable);
       if (sortEl)   sortEl.addEventListener('change', renderStarTable);
 
-      // Background-load stats silently so the card preview populates on page load
-      // showUI=false ensures the modal overlay is never touched during background fetch
-      fetchAndRenderStarStats(guild, false);
+      // Background-load so the card preview populates on page load
+      fetchAndRenderStarStats(guild);
     }
 
   </script>
