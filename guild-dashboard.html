@@ -991,7 +991,7 @@
       content.classList.add('hidden');
 
       try {
-        const res = await fetch('/api/guild/weekly-stats?guild=' + encodeURIComponent(guild));
+        const res = await fetch('/api/guild?query=' + encodeURIComponent(guild) + '&mode=weekly-stats');
         if (!res.ok) {
           const body = await res.json().catch(function() { return {}; });
           throw new Error(body.error || ('API error ' + res.status));

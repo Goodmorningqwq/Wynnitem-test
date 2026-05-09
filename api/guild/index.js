@@ -203,6 +203,73 @@ function extractMembers(guildData) {
   return members;
 }
 
+// ── Weekly Stats helpers (mode=weekly-stats) ──────────────────────────────
+
+/**
+ * Returns YYYY-MM-DD of the most recent Monday (week start).
+ * @returns {string}
+ */
+function getWeekStartDate() {
+  const now = new Date();
+  const day = now.getDay(); // 0=Sun
+  const diff = day === 0 ? -6 : 1 - day;
+  const monday = new Date(now);
+  monday.setDate(now.getDate() + diff);
+  return monday.toISOString().slice(0, 10);
+}
+
+/**
+ * Flatten all rank buckets into a stats member list.
+ * Scoring: raids*3 + wars*2 + xpContributed/100_000
+ * @param {object} guildData
+ * @returns {Array<object>}
+ */
+function collectWeeklyMembers(guildData) {
+  if (!guildData?.members) return [];
+  const ranks = ['owner', 'chief', 'strategist', 'captain', 'recruiter', 'recruit'];
+  const members = [];
+  for (const rank of ranks) {
+    const bucket = guildData.members[rank];
+    if (!bucket || typeof bucket !== 'object') continue;
+    const entries = Array.isArray(bucket)
+      ? bucket.map((m) => [m?.username || '', m])
+      : Object.entries(bucket);
+    for (const [memberKey, m] of entries) {
+      if (!m) continue;
+      const raids = Number(
+        m.globalData?.guildRaids?.total
+        ?? m.guildRaids?.total
+        ?? m.globalData?.raids?.total
+        ?? 0
+      );
+      const wars = Number(m.globalData?.wars ?? 0);
+      const xpContributed = Number(m.contributed ?? 0);
+      const totalScore = Math.round((raids * 3 + wars * 2 + xpContributed / 100000) * 100) / 100;
+      members.push({
+        username: m.username || m.legacyName || memberKey || 'Unknown',
+        raids,
+        wars,
+        xpContributed,
+        totalScore
+      });
+    }
+  }
+  return members;
+}
+
+/**
+ * Build a top-3 array sorted by a numeric key.
+ * @param {Array<object>} members
+ * @param {string} key
+ * @returns {Array<{username:string, value:number}>}
+ */
+function buildTop3(members, key) {
+  return members
+    .map((m) => ({ username: m.username, value: Number(m[key] || 0) }))
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 3);
+}
+
 module.exports = async (req, res) => {
   const rawQuery = req.query.query || req.query.name;
   const query = typeof rawQuery === 'string' ? rawQuery.trim() : '';
@@ -213,7 +280,7 @@ module.exports = async (req, res) => {
     return res.status(400).json({ error: 'Guild query required' });
   }
 
-  if (!['auto', 'name', 'prefix', 'uuid', 'suggest', 'members'].includes(mode)) {
+  if (!['auto', 'name', 'prefix', 'uuid', 'suggest', 'members', 'weekly-stats'].includes(mode)) {
     return res.status(400).json({ error: 'Invalid search mode' });
   }
 
@@ -309,6 +376,27 @@ module.exports = async (req, res) => {
         prefix: data.prefix || '',
         members,
         searchType: 'members'
+      });
+    }
+
+    if (mode === 'weekly-stats') {
+      const { response, data } = await fetchGuildName(query, forceFresh);
+      if (!response.ok) {
+        if (response.status === 429) return res.status(429).json({ error: 'Rate limit exceeded' });
+        if (isNotFoundLike(response, data)) return res.status(404).json({ error: 'Guild not found' });
+        return res.status(response.status).json({ error: `API Error: ${response.status}` });
+      }
+      const members = collectWeeklyMembers(data);
+      if (!members.length) return res.status(404).json({ error: 'Guild has no members' });
+      const fullList = members.slice().sort((a, b) => b.totalScore - a.totalScore);
+      res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
+      return res.json({
+        weekStart: getWeekStartDate(),
+        guildName: data.name || query,
+        topRaids: buildTop3(members, 'raids'),
+        topWars:  buildTop3(members, 'wars'),
+        topXP:    buildTop3(members, 'xpContributed'),
+        fullList
       });
     }
 
