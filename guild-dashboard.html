@@ -442,7 +442,8 @@
         </div>
         <button type="button" id="closeStarModalBtn"
           class="w-8 h-8 flex items-center justify-center rounded-lg border border-[rgba(168,85,247,0.3)] text-[var(--text-muted)] hover:text-white hover:border-[var(--pink)] transition-colors"
-          aria-label="Close">
+          aria-label="Close"
+          onclick="closeStarModal()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4"><path d="M18 6 6 18M6 6l12 12"/></svg>
         </button>
       </div>
@@ -974,10 +975,12 @@
     var sotwFetchInFlight = false;
 
     /**
-     * Fetch weekly stats from the API and populate the modal.
+     * Fetch weekly stats from the API.
      * @param {string} guild
+     * @param {boolean} [showUI=true]  When false (background load), never touch modal states.
      */
-    async function fetchAndRenderStarStats(guild) {
+    async function fetchAndRenderStarStats(guild, showUI) {
+      if (showUI === undefined) showUI = true;
       // Prevent concurrent fetches
       if (sotwFetchInFlight) return;
       sotwFetchInFlight = true;
@@ -986,9 +989,12 @@
       const error   = document.getElementById('starModalError');
       const content = document.getElementById('starModalContent');
 
-      loading.classList.remove('hidden');
-      error.classList.add('hidden');
-      content.classList.add('hidden');
+      // Only touch modal states when the modal is actually open
+      if (showUI) {
+        if (loading) loading.classList.remove('hidden');
+        if (error)   error.classList.add('hidden');
+        if (content) content.classList.add('hidden');
+      }
 
       try {
         const res = await fetch('/api/guild?query=' + encodeURIComponent(guild) + '&mode=weekly-stats');
@@ -998,20 +1004,23 @@
         }
         const stats = await res.json();
         sotwCache = stats;
-        sotwCache._fetchedAt = Date.now(); // stamp here so all callers benefit
+        sotwCache._fetchedAt = Date.now();
         sotwFullList = Array.isArray(stats.fullList) ? stats.fullList : [];
 
-        // Week label — use textContent (already safe, no need for escHtml)
-        const weekEl = document.getElementById('starModalWeek');
-        if (weekEl && stats.weekStart) {
-          const baselineNote = stats.hasBaseline ? '' : ' · showing all-time (no baseline yet)';
-          weekEl.textContent = 'Week of ' + stats.weekStart + ' · ' + (stats.guildName || guild) + baselineNote;
+        if (showUI) {
+          // Week label
+          const weekEl = document.getElementById('starModalWeek');
+          if (weekEl && stats.weekStart) {
+            const baselineNote = stats.hasBaseline ? '' : ' · showing all-time (no baseline yet)';
+            weekEl.textContent = 'Week of ' + stats.weekStart + ' · ' + (stats.guildName || guild) + baselineNote;
+          }
+          renderStarPodiums(stats);
+          renderStarTable();
+          if (loading) loading.classList.add('hidden');
+          if (content) content.classList.remove('hidden');
         }
 
-        renderStarPodiums(stats);
-        renderStarTable();
-
-        // Update card preview with #1 overall scorer
+        // Always update the card preview
         const top = sotwFullList[0];
         const previewEl = document.getElementById('starCardPreview');
         if (previewEl && top) {
@@ -1019,13 +1028,13 @@
           previewEl.textContent = '★ ' + top.username + ' · ' + raidText + ' this week';
         }
 
-        loading.classList.add('hidden');
-        content.classList.remove('hidden');
       } catch (e) {
-        loading.classList.add('hidden');
-        const msgEl = document.getElementById('starModalErrorMsg');
-        if (msgEl) msgEl.textContent = e.message || 'Failed to load weekly stats.';
-        error.classList.remove('hidden');
+        if (showUI) {
+          if (loading) loading.classList.add('hidden');
+          const msgEl = document.getElementById('starModalErrorMsg');
+          if (msgEl) msgEl.textContent = e.message || 'Failed to load weekly stats.';
+          if (error) error.classList.remove('hidden');
+        }
       } finally {
         sotwFetchInFlight = false;
       }
@@ -1040,29 +1049,42 @@
       overlay.classList.remove('hidden');
       document.body.style.overflow = 'hidden';
 
-      // Use cache if fresh (< 5 min); if a fetch is already in-flight just wait
-      const CACHE_TTL_MS = 5 * 60 * 1000;
+      // If a fetch is already in-flight (background load), show loading state and wait
       if (sotwFetchInFlight) {
-        // fetch is in progress — loading state is already shown, nothing to do
-        return;
-      }
-      if (sotwCache && sotwCache._fetchedAt && Date.now() - sotwCache._fetchedAt < CACHE_TTL_MS) {
         const loading = document.getElementById('starModalLoading');
         const content = document.getElementById('starModalContent');
-        loading.classList.add('hidden');
-        content.classList.remove('hidden');
+        if (loading) loading.classList.remove('hidden');
+        if (content) content.classList.add('hidden');
+        return;
+      }
+
+      const CACHE_TTL_MS = 5 * 60 * 1000;
+      if (sotwCache && sotwCache._fetchedAt && Date.now() - sotwCache._fetchedAt < CACHE_TTL_MS) {
+        // Fresh cache — render straight from it
+        const weekEl = document.getElementById('starModalWeek');
+        if (weekEl && sotwCache.weekStart) {
+          const baselineNote = sotwCache.hasBaseline ? '' : ' · showing all-time (no baseline yet)';
+          weekEl.textContent = 'Week of ' + sotwCache.weekStart + ' · ' + (sotwCache.guildName || guild) + baselineNote;
+        }
+        renderStarPodiums(sotwCache);
         renderStarTable();
+        const loading = document.getElementById('starModalLoading');
+        const content = document.getElementById('starModalContent');
+        if (loading) loading.classList.add('hidden');
+        if (content) content.classList.remove('hidden');
       } else {
-        fetchAndRenderStarStats(guild);
+        fetchAndRenderStarStats(guild, true);
       }
     }
 
     /** Close the Star of the Week modal. */
     function closeStarModal() {
       const overlay = document.getElementById('starModalOverlay');
-      overlay.classList.add('hidden');
+      if (overlay) overlay.classList.add('hidden');
       document.body.style.overflow = '';
     }
+    // Expose globally so onclick attribute on the button works as a fallback
+    window.closeStarModal = closeStarModal;
 
     /**
      * Wire up all Star of the Week interactivity.
@@ -1098,8 +1120,9 @@
       if (searchEl) searchEl.addEventListener('input', renderStarTable);
       if (sortEl)   sortEl.addEventListener('change', renderStarTable);
 
-      // Background-load stats so the card preview populates without needing the modal open
-      fetchAndRenderStarStats(guild);
+      // Background-load stats silently so the card preview populates on page load
+      // showUI=false ensures the modal overlay is never touched during background fetch
+      fetchAndRenderStarStats(guild, false);
     }
 
   </script>
