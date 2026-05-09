@@ -515,7 +515,13 @@ module.exports = async (req, res) => {
       const deltaMembers = applyBaseline(liveMembers, baseline);
       const fullList = deltaMembers.slice().sort((a, b) => b.totalScore - a.totalScore);
 
-      res.setHeader('Cache-Control', 's-maxage=120, stale-while-revalidate=60');
+      // When forceFresh is set (e.g. right after a manual reset) bypass the CDN cache
+      // so the client immediately sees the new 0-delta baseline instead of stale data.
+      if (forceFresh) {
+        res.setHeader('Cache-Control', 'no-store, max-age=0');
+      } else {
+        res.setHeader('Cache-Control', 's-maxage=120, stale-while-revalidate=60');
+      }
       return res.json({
         weekStart,
         guildName,

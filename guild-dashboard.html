@@ -1021,7 +1021,12 @@
       }
 
       try {
-        const res = await fetch('/api/guild?query=' + encodeURIComponent(guild) + '&mode=weekly-stats');
+        // When forceRefresh=true (right after a manual reset): add fresh=1 so the backend
+        // skips its CDN cache header, and add a timestamp buster so the browser/CDN
+        // doesn't serve a stale response from its own cache.
+        var statsUrl = '/api/guild?query=' + encodeURIComponent(guild) + '&mode=weekly-stats';
+        if (forceRefresh) statsUrl += '&fresh=1&_t=' + Date.now();
+        const res = await fetch(statsUrl, { cache: forceRefresh ? 'no-store' : 'default' });
         if (!res.ok) {
           const body = await res.json().catch(function() { return {}; });
           throw new Error(body.error || ('API error ' + res.status));
