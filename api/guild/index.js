@@ -5,6 +5,17 @@ const redis = new Redis({
   token: process.env.UPSTASH_REDIS_REST_TOKEN_GUILD,
 });
 
+/**
+ * Parse a JSON value from Redis safely.
+ * @param {*} raw
+ * @returns {object|null}
+ */
+function parseJsonSafe(raw) {
+  if (!raw) return null;
+  if (typeof raw !== 'string') return raw;
+  try { return JSON.parse(raw); } catch { return null; }
+}
+
 // TTL for the weekly baseline in Redis: 8 days (covers the full week + 1-day grace)
 const WEEKLY_BASELINE_TTL_SECS = 8 * 24 * 60 * 60;
 
@@ -516,14 +527,36 @@ module.exports = async (req, res) => {
       });
     }
 
-    // weekly-reset: save current stats as the new baseline (called by cron or admin)
+    // weekly-reset: save current stats as the new baseline (called by cron, admin token, or guild account owner)
     if (mode === 'weekly-reset') {
       const isCron = req.headers['x-vercel-cron'] === '1';
       const adminToken = String(req.headers['x-cache-admin-token'] || req.query.token || '');
       const expectedToken = String(process.env.CACHE_ADMIN_TOKEN || '');
       const isAdmin = Boolean(expectedToken) && adminToken === expectedToken;
-      if (!isCron && !isAdmin) {
-        return res.status(403).json({ error: 'Forbidden - requires cron header or admin token' });
+
+      // Guild account owners may trigger a manual reset for their own guild.
+      // Verify: redis key guild:<username>:data exists and its guildName matches query (case-insensitive).
+      let isGuildOwner = false;
+      const callerUsername = String(req.query.username || req.headers['x-caller-username'] || '').trim().toLowerCase();
+      if (!isCron && !isAdmin && callerUsername) {
+        try {
+          const guildDataRaw = await redis.get(`guild:${callerUsername}:data`);
+          const guildData = parseJsonSafe(guildDataRaw);
+          if (
+            guildData &&
+            guildData.isGuildAccount === true &&
+            typeof guildData.guildName === 'string' &&
+            guildData.guildName.toLowerCase() === query.toLowerCase()
+          ) {
+            isGuildOwner = true;
+          }
+        } catch (e) {
+          console.error('[weekly-reset] guild owner check failed:', e.message);
+        }
+      }
+
+      if (!isCron && !isAdmin && !isGuildOwner) {
+        return res.status(403).json({ error: 'Forbidden - requires cron header, admin token, or guild account' });
       }
       const { response, data } = await fetchGuildName(query, true);
       if (!response.ok) {
@@ -534,9 +567,10 @@ module.exports = async (req, res) => {
       const guildName = data.name || query;
       const liveMembers = collectWeeklyMembers(data);
       const weekStart = getWeekStartDate();
+      const savedAt = new Date().toISOString();
       await saveWeeklyBaseline(guildName, liveMembers, weekStart);
       res.setHeader('Cache-Control', 'no-store');
-      return res.json({ success: true, guildName, weekStart, memberCount: liveMembers.length });
+      return res.json({ success: true, guildName, weekStart, savedAt, memberCount: liveMembers.length });
     }
 
     // Auto mode: detect UUID format first

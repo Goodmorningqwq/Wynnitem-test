@@ -440,12 +440,27 @@
             <p id="starModalWeek" class="text-xs text-[var(--text-muted)] mt-0.5"></p>
           </div>
         </div>
-        <button type="button" id="closeStarModalBtn"
-          class="w-8 h-8 flex items-center justify-center rounded-lg border border-[rgba(168,85,247,0.3)] text-[var(--text-muted)] hover:text-white hover:border-[var(--pink)] transition-colors"
-          aria-label="Close"
-          onclick="closeStarModal()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4"><path d="M18 6 6 18M6 6l12 12"/></svg>
-        </button>
+        <div class="flex items-center gap-2">
+          <!-- Refresh Weekly Data button -->
+          <button type="button" id="refreshWeeklyBtn"
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[rgba(168,85,247,0.3)] text-[var(--text-muted)] hover:text-white hover:border-[var(--pink)] transition-colors text-xs font-semibold"
+            title="Force a new weekly baseline from current stats">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-3.5 h-3.5 flex-shrink-0"><path d="M23 4v6h-6"/><path d="M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+            <span id="refreshWeeklyBtnText">Refresh Weekly Data</span>
+          </button>
+          <button type="button" id="closeStarModalBtn"
+            class="w-8 h-8 flex items-center justify-center rounded-lg border border-[rgba(168,85,247,0.3)] text-[var(--text-muted)] hover:text-white hover:border-[var(--pink)] transition-colors"
+            aria-label="Close"
+            onclick="closeStarModal()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-4 h-4"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Success banner (hidden until after a successful refresh) -->
+      <div id="starRefreshSuccess" class="hidden mx-6 mt-4 px-4 py-3 rounded-lg border border-[rgba(74,222,128,0.4)] bg-[rgba(74,222,128,0.08)] text-sm text-green-300 flex items-start gap-2">
+        <span class="text-base flex-shrink-0">✅</span>
+        <span id="starRefreshSuccessMsg"></span>
       </div>
 
       <!-- Loading / error states -->
@@ -977,11 +992,15 @@
     /**
      * Fetch weekly stats from the API.
      * @param {string} guild
-     * @param {boolean} [showUI=true]  When false (background load), never touch modal states.
+     * @param {boolean} [forceRefresh=false]  When true, bypasses the in-flight guard and cache.
      */
-    async function fetchAndRenderStarStats(guild) {
-      // Prevent concurrent fetches
-      if (sotwFetchInFlight) return;
+    async function fetchAndRenderStarStats(guild, forceRefresh) {
+      // Prevent concurrent fetches (bypass when caller explicitly requests a forced refresh)
+      if (sotwFetchInFlight && !forceRefresh) return;
+      if (forceRefresh && sotwFetchInFlight) {
+        // Wait briefly for any in-flight fetch to settle before forcing a new one
+        await new Promise(function(r) { setTimeout(r, 300); });
+      }
       sotwFetchInFlight = true;
 
       // Helper: is the modal overlay currently visible?
@@ -1092,6 +1111,112 @@
     window.closeStarModal = closeStarModal;
 
     /**
+     * Format a week-start date string as a human-readable label.
+     * @param {string} weekStart  YYYY-MM-DD
+     * @param {boolean} [justStarted=false]  Append "(just started)" hint
+     * @returns {string}
+     */
+    function formatWeekLabel(weekStart, justStarted) {
+      var suffix = justStarted ? ' · (just started)' : '';
+      return 'Week of ' + weekStart + suffix;
+    }
+
+    /**
+     * Force a new weekly baseline for the guild, then re-fetch and re-render stats.
+     * Authorised by the logged-in guild account username stored in localStorage.
+     * @param {string} guild
+     */
+    async function refreshWeeklyData(guild) {
+      var btnEl    = document.getElementById('refreshWeeklyBtn');
+      var btnText  = document.getElementById('refreshWeeklyBtnText');
+      var successEl  = document.getElementById('starRefreshSuccess');
+      var successMsg = document.getElementById('starRefreshSuccessMsg');
+      var weekEl   = document.getElementById('starModalWeek');
+
+      // Hide any previous success banner
+      if (successEl) successEl.classList.add('hidden');
+
+      // Loading state on the button
+      if (btnEl)   btnEl.disabled = true;
+      if (btnText) {
+        btnText.textContent = 'Resetting…';
+      }
+
+      // Rotate the refresh icon via inline animation
+      var iconEl = btnEl ? btnEl.querySelector('svg') : null;
+      if (iconEl) {
+        iconEl.style.transition = 'transform 0.6s linear';
+        iconEl.style.transform  = 'rotate(360deg)';
+      }
+
+      // ── Step 1: Call weekly-reset ────────────────────────────────────
+      var username = '';
+      try { username = localStorage.getItem('currentUser') || ''; } catch {}
+
+      var resetUrl = '/api/guild?query=' + encodeURIComponent(guild)
+        + '&mode=weekly-reset'
+        + (username ? '&username=' + encodeURIComponent(username) : '');
+
+      try {
+        var resetRes = await fetch(resetUrl, { method: 'GET' });
+        var resetBody = await resetRes.json().catch(function() { return {}; });
+
+        if (!resetRes.ok) {
+          throw new Error(resetBody.error || ('Reset failed: HTTP ' + resetRes.status));
+        }
+
+        // ── Step 2: Re-fetch weekly stats (force bypass of sotwCache) ──
+        sotwCache = null; // Invalidate client cache so fetchAndRenderStarStats fetches fresh
+        if (btnText) btnText.textContent = 'Fetching stats…';
+        await fetchAndRenderStarStats(guild, true);
+
+        // ── Step 3: Update week label to "Week of … (just started)" ───
+        var newWeekStart = (resetBody.weekStart) || (sotwCache && sotwCache.weekStart) || '';
+        if (weekEl && newWeekStart) {
+          var guildLabel = (resetBody.guildName || sotwCache && sotwCache.guildName || guild);
+          weekEl.textContent = 'Week of ' + newWeekStart + ' · ' + guildLabel + ' (just started)';
+        }
+
+        // ── Step 4: Update the star card preview ──────────────────────
+        var previewEl = document.getElementById('starCardPreview');
+        if (previewEl) {
+          previewEl.textContent = '⭐ Weekly baseline reset — counting from now';
+        }
+
+        // ── Step 5: Show success banner ───────────────────────────────
+        if (successMsg) {
+          successMsg.textContent = 'Weekly baseline updated! Stats are now counting from now. All weekly numbers will show 0 until members earn new raids, wars or XP.';
+        }
+        if (successEl) {
+          successEl.classList.remove('hidden');
+          // Auto-hide after 12 seconds
+          setTimeout(function() {
+            if (successEl) successEl.classList.add('hidden');
+          }, 12000);
+        }
+
+      } catch (e) {
+        // Show error in the existing modal error region
+        var errorEl  = document.getElementById('starModalError');
+        var errorMsg = document.getElementById('starModalErrorMsg');
+        var loadingEl = document.getElementById('starModalLoading');
+        var contentEl = document.getElementById('starModalContent');
+        if (loadingEl) loadingEl.classList.add('hidden');
+        if (contentEl) contentEl.classList.add('hidden');
+        if (errorMsg) errorMsg.textContent = e.message || 'Failed to refresh weekly data.';
+        if (errorEl)  errorEl.classList.remove('hidden');
+      } finally {
+        // Restore button state
+        if (btnEl)   btnEl.disabled = false;
+        if (btnText) btnText.textContent = 'Refresh Weekly Data';
+        if (iconEl) {
+          iconEl.style.transition = '';
+          iconEl.style.transform  = '';
+        }
+      }
+    }
+
+    /**
      * Wire up all Star of the Week interactivity.
      * @param {string} guild
      */
@@ -1106,6 +1231,9 @@
       if (openBtn)  openBtn.addEventListener('click', function() { openStarModal(guild); });
       if (closeBtn) closeBtn.addEventListener('click', closeStarModal);
       if (retryBtn) retryBtn.addEventListener('click', function() { fetchAndRenderStarStats(guild); });
+
+      var refreshBtn = document.getElementById('refreshWeeklyBtn');
+      if (refreshBtn) refreshBtn.addEventListener('click', function() { refreshWeeklyData(guild); });
 
       // Close on backdrop click (but not on modal itself)
       if (overlay) {
