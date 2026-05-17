@@ -135,12 +135,12 @@ function buildEmbed({ event, kind, snapshot }) {
   };
 }
 
-async function sendDiscordWebhook(webhookUrl, payload, messageId = null) {
+async function sendDiscordWebhook(webhookUrl, payload, messageId = null, retries = 3) {
   const url = String(webhookUrl || '').trim();
   const method = messageId ? 'PATCH' : 'POST';
   const endpoint = messageId
     ? `${url}/messages/${messageId}`
-    : url;
+    : `${url}?wait=true`;
   const response = await fetch(endpoint, {
     method,
     headers: {
@@ -149,10 +149,13 @@ async function sendDiscordWebhook(webhookUrl, payload, messageId = null) {
     body: JSON.stringify(payload)
   });
   if (response.status === 429) {
+    if (retries <= 0) {
+      return { ok: false, status: 429, error: 'Rate limit exceeded, max retries reached' };
+    }
     const body = await response.json().catch(() => ({}));
     const retryMs = Number(body?.retry_after || 1) * 1000;
     await new Promise((resolve) => setTimeout(resolve, Math.max(300, retryMs)));
-    return sendDiscordWebhook(url, payload, messageId);
+    return sendDiscordWebhook(url, payload, messageId, retries - 1);
   }
   if (!response.ok) {
     const text = await response.text();
