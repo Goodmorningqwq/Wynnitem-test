@@ -77,10 +77,14 @@ function buildEmbed({ event, kind, snapshot }) {
   };
 }
 
-async function sendDiscordWebhook(webhookUrl, payload) {
+async function sendDiscordWebhook(webhookUrl, payload, messageId = null) {
   const url = String(webhookUrl || '').trim();
-  const response = await fetch(url, {
-    method: 'POST',
+  const method = messageId ? 'PATCH' : 'POST';
+  const endpoint = messageId
+    ? `${url}/messages/${messageId}`
+    : url;
+  const response = await fetch(endpoint, {
+    method,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload)
   });
@@ -88,13 +92,14 @@ async function sendDiscordWebhook(webhookUrl, payload) {
     const body = await response.json().catch(() => ({}));
     const retryMs = Number(body?.retry_after || 1) * 1000;
     await new Promise((resolve) => setTimeout(resolve, Math.max(300, retryMs)));
-    return sendDiscordWebhook(url, payload);
+    return sendDiscordWebhook(url, payload, messageId);
   }
   if (!response.ok) {
     const text = await response.text();
     return { ok: false, status: response.status, error: text };
   }
-  return { ok: true };
+  const data = await response.json().catch(() => ({}));
+  return { ok: true, messageId: data?.id || messageId };
 }
 
 module.exports = async (req, res) => {
@@ -193,7 +198,7 @@ module.exports = async (req, res) => {
         return res.json({ ok: true, sent: 0, skipped: 0, reason: 'No linked webhook' });
       }
 
-      const digest = buildDigest({
+const digest = buildDigest({
         kind,
         metricValue: snapshot?.metricValue ?? event?.current?.metricValue ?? 0,
         playerValues: snapshot?.playerValues ?? event?.current?.playerValues ?? {}
@@ -201,9 +206,23 @@ module.exports = async (req, res) => {
       const now = Date.now();
 
       const embed = buildEmbed({ event, kind, snapshot });
-      const sendResult = await sendDiscordWebhook(link.webhookUrl, { embeds: [embed] });
+      const payload = {
+        username: 'WynnEvents',
+        embeds: [embed]
+      };
+
+      const existingMessageId = link.messageId || null;
+      const sendResult = await sendDiscordWebhook(link.webhookUrl, payload, existingMessageId);
       if (!sendResult.ok) {
         return res.status(500).json({ ok: false, sent: 0, failed: 1, skipped: 0, error: sendResult.error });
+      }
+
+      // Store the messageId for future edits
+      if (sendResult.messageId && sendResult.messageId !== existingMessageId) {
+        await redis.set(getWebhookKey(eventCode), JSON.stringify({
+          ...link,
+          messageId: sendResult.messageId
+        }));
       }
 
       const stateKey = getNotifyStateKey(eventCode);

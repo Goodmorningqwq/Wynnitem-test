@@ -82,11 +82,13 @@ async function upsertWebhookLink(code, row) {
     return { ok: false, error: 'Invalid Discord webhook URL' };
   }
   const now = Date.now();
+  const existingLink = await getWebhookLink(eventCode);
   const record = {
     webhookUrl: String(row.webhookUrl || '').trim(),
     linkedBy: String(row.username || ''),
     linkedByDisplay: String(row.linkedByDisplay || ''),
-    linkedAt: now
+    linkedAt: now,
+    messageId: existingLink?.messageId || null
   };
   await redis.set(getWebhookKey(eventCode), JSON.stringify(record));
   return { ok: true, event, link: record };
@@ -133,10 +135,14 @@ function buildEmbed({ event, kind, snapshot }) {
   };
 }
 
-async function sendDiscordWebhook(webhookUrl, payload) {
+async function sendDiscordWebhook(webhookUrl, payload, messageId = null) {
   const url = String(webhookUrl || '').trim();
-  const response = await fetch(url, {
-    method: 'POST',
+  const method = messageId ? 'PATCH' : 'POST';
+  const endpoint = messageId
+    ? `${url}/messages/${messageId}`
+    : url;
+  const response = await fetch(endpoint, {
+    method,
     headers: {
       'Content-Type': 'application/json'
     },
@@ -146,13 +152,14 @@ async function sendDiscordWebhook(webhookUrl, payload) {
     const body = await response.json().catch(() => ({}));
     const retryMs = Number(body?.retry_after || 1) * 1000;
     await new Promise((resolve) => setTimeout(resolve, Math.max(300, retryMs)));
-    return sendDiscordWebhook(url, payload);
+    return sendDiscordWebhook(url, payload, messageId);
   }
   if (!response.ok) {
     const text = await response.text();
     return { ok: false, status: response.status, error: text };
   }
-  return { ok: true };
+  const data = await response.json().catch(() => ({}));
+  return { ok: true, messageId: data?.id || messageId };
 }
 
 async function notifyLinkedChannels({ eventCode, kind, event, snapshot }) {
@@ -173,12 +180,24 @@ async function notifyLinkedChannels({ eventCode, kind, event, snapshot }) {
   const now = Date.now();
 
   const embed = buildEmbed({ event, kind, snapshot });
-  const result = await sendDiscordWebhook(link.webhookUrl, {
+  const payload = {
+    username: 'WynnEvents',
     embeds: [embed]
-  });
+  };
+
+  const existingMessageId = link.messageId || null;
+  const result = await sendDiscordWebhook(link.webhookUrl, payload, existingMessageId);
   if (!result.ok) {
     console.error('Discord webhook send failed:', result.status || 0, result.error || '');
     return { ok: false, sent: 0, failed: 1, skipped: 0, error: result.error };
+  }
+
+  // Store the messageId for future edits
+  if (result.messageId && result.messageId !== existingMessageId) {
+    await redis.set(getWebhookKey(code), JSON.stringify({
+      ...link,
+      messageId: result.messageId
+    }));
   }
 
   const stateKey = getNotifyStateKey(code);
