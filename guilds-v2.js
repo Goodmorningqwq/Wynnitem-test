@@ -247,6 +247,7 @@ function preSeedMemberWars(guild) {
 
 function resolveMemberGuildRaids(member) {
   const candidates = [
+    member?.globalData?.currentGuildRaids?.total,
     member?.globalData?.guildRaids?.total,
     member?.globalData?.raids?.total,
     member?.guildRaids?.total,
@@ -276,7 +277,7 @@ function resolveMemberGuildRaids(member) {
 
 /** Guild raid event totals only — never use globalData.raids (different stat). */
 function resolveMemberGuildRaidsStrict(member) {
-  const candidates = [member?.globalData?.guildRaids?.total, member?.guildRaids?.total];
+  const candidates = [member?.globalData?.currentGuildRaids?.total, member?.globalData?.guildRaids?.total, member?.guildRaids?.total];
   let firstFinite = null;
   for (let i = 0; i < candidates.length; i += 1) {
     const raw = candidates[i];
@@ -708,10 +709,11 @@ async function fetchMemberRaids(uuid) {
       if (!response.ok) return null;
       const payload = await response.json().catch(() => null);
       const raids = Number(
-        payload?.globalData?.raids?.total
+        payload?.globalData?.currentGuildRaids?.total
         ?? payload?.globalData?.guildRaids?.total
-        ?? payload?.raids?.total
+        ?? payload?.globalData?.raids?.total
         ?? payload?.guildRaids?.total
+        ?? payload?.raids?.total
       );
       if (!Number.isFinite(raids)) return null;
       memberRaidsCache.set(uuid, raids);
