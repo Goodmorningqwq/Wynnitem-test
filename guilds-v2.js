@@ -246,53 +246,60 @@ function preSeedMemberWars(guild) {
 }
 
 function resolveMemberGuildRaids(member) {
-  const candidates = [
-    member?.globalData?.currentGuildRaids?.total,
+  // v3.7.2+: currentGuildRaids = raids in current guild (what we want).
+  // guildRaids = cross-guild lifetime total (do NOT use as positive fallback).
+  // Only fall back to guildRaids when currentGuildRaids is entirely absent (pre-v3.7.2 data).
+  const currentGuildRaidsTotal = member?.globalData?.currentGuildRaids?.total;
+  if (currentGuildRaidsTotal !== undefined && currentGuildRaidsTotal !== null && currentGuildRaidsTotal !== '') {
+    const parsed = Number(currentGuildRaidsTotal);
+    if (Number.isFinite(parsed)) return { value: parsed, known: true };
+  }
+
+  // Legacy fallback candidates when currentGuildRaids is absent from the API response.
+  const legacyCandidates = [
     member?.globalData?.guildRaids?.total,
     member?.globalData?.raids?.total,
     member?.guildRaids?.total,
     member?.raids?.total
   ];
   let firstFinite = null;
-  for (let i = 0; i < candidates.length; i += 1) {
-    const raw = candidates[i];
-    if (raw === null || raw === undefined || raw === '') continue;
-    const parsed = Number(raw);
-    if (Number.isFinite(parsed)) {
-      if (firstFinite === null) {
-        firstFinite = parsed;
-      }
-      // Prefer first positive value in priority order to avoid stale zero fields,
-      // while also avoiding cross-field "max" jumps that can spike event totals.
-      if (parsed > 0) {
-        return { value: parsed, known: true };
-      }
-    }
-  }
-  if (firstFinite !== null) {
-    return { value: firstFinite, known: true };
-  }
-  return { value: 0, known: false };
-}
-
-/** Guild raid event totals only — never use globalData.raids (different stat). */
-function resolveMemberGuildRaidsStrict(member) {
-  const candidates = [member?.globalData?.currentGuildRaids?.total, member?.globalData?.guildRaids?.total, member?.guildRaids?.total];
-  let firstFinite = null;
-  for (let i = 0; i < candidates.length; i += 1) {
-    const raw = candidates[i];
+  for (let i = 0; i < legacyCandidates.length; i += 1) {
+    const raw = legacyCandidates[i];
     if (raw === null || raw === undefined || raw === '') continue;
     const parsed = Number(raw);
     if (Number.isFinite(parsed)) {
       if (firstFinite === null) firstFinite = parsed;
-      if (parsed > 0) {
-        return { value: parsed, known: true };
-      }
+      if (parsed > 0) return { value: parsed, known: true };
     }
   }
-  if (firstFinite !== null) {
-    return { value: firstFinite, known: true };
+  if (firstFinite !== null) return { value: firstFinite, known: true };
+  return { value: 0, known: false };
+}
+
+/** Guild raid event totals only — never use globalData.raids (different stat).
+ * v3.7.2+: currentGuildRaids = per-current-guild; guildRaids = cross-guild lifetime.
+ * Only use guildRaids as a legacy fallback when currentGuildRaids is absent. */
+function resolveMemberGuildRaidsStrict(member) {
+  // Prefer currentGuildRaids — use its value as-is, even if 0.
+  const currentGuildRaidsTotal = member?.globalData?.currentGuildRaids?.total;
+  if (currentGuildRaidsTotal !== undefined && currentGuildRaidsTotal !== null && currentGuildRaidsTotal !== '') {
+    const parsed = Number(currentGuildRaidsTotal);
+    if (Number.isFinite(parsed)) return { value: parsed, known: true };
   }
+
+  // Legacy fallback: guildRaids was per-guild before v3.7.2.
+  const legacyCandidates = [member?.globalData?.guildRaids?.total, member?.guildRaids?.total];
+  let firstFinite = null;
+  for (let i = 0; i < legacyCandidates.length; i += 1) {
+    const raw = legacyCandidates[i];
+    if (raw === null || raw === undefined || raw === '') continue;
+    const parsed = Number(raw);
+    if (Number.isFinite(parsed)) {
+      if (firstFinite === null) firstFinite = parsed;
+      if (parsed > 0) return { value: parsed, known: true };
+    }
+  }
+  if (firstFinite !== null) return { value: firstFinite, known: true };
   return { value: 0, known: false };
 }
 
