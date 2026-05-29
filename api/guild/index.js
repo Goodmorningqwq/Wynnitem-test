@@ -303,25 +303,34 @@ function collectWeeklyMembers(guildData) {
       if (!m) continue;
       const username = m.username || m.legacyName || memberKey || 'Unknown';
 
+      // v3.7.2 changed guildRaids to be cross-guild total.
+      // currentGuildRaids is per-guild — use it first. Fall back to guildRaids
+      // (total across all guilds) for older data or when currentGuildRaids is absent.
+      const currentGuildRaids = m.globalData?.currentGuildRaids ?? m.guildRaids;
+      const guildRaidsTotal = currentGuildRaids?.total;
+
       // Detect API data quality issues that corrupt the baseline snapshot.
-      // When guildRaids is absent entirely, we fall back to globalData.raids.total
-      // which may differ from guildRaids in future calls → wrong weekly delta.
-      const guildRaidsField = m.globalData?.guildRaids ?? m.guildRaids;
-      if (guildRaidsField === undefined || guildRaidsField === null) {
+      // If currentGuildRaids exists but guildRaids (cross-guild) is also present,
+      // they may differ for members who moved guilds.
+      if (m.globalData?.currentGuildRaids && m.globalData?.guildRaids) {
+        const currentTotal = m.globalData.currentGuildRaids.total ?? 0;
+        const crossTotal = m.globalData.guildRaids.total ?? 0;
+        if (currentTotal !== crossTotal) {
+          console.info(
+            `[collectWeeklyMembers] currentGuildRaids=${currentTotal} vs guildRaids=${crossTotal} for "${username}".` +
+            ' Member may have moved guilds.'
+          );
+        }
+      } else if (!m.globalData?.currentGuildRaids && !m.globalData?.guildRaids) {
         console.warn(
-          `[collectWeeklyMembers] WARNING: guildRaids field ABSENT for "${username}" (rank: ${rank}).` +
-          ` Falling back to globalData.raids.total=${m.globalData?.raids?.total ?? 0}.` +
-          ' Baseline may be inaccurate for this member — check Wynncraft API response.'
-        );
-      } else if ((guildRaidsField.total ?? 0) === 0 && (m.globalData?.raids?.total ?? 0) > 0) {
-        console.info(
-          `[collectWeeklyMembers] INFO: guildRaids.total=0 but raids.total=${m.globalData.raids.total} for "${username}".` +
-          ' Member may be new to the guild or API data not yet synced.'
+          `[collectWeeklyMembers] currentGuildRaids/guildRaids field ABSENT for "${username}" (rank: ${rank}).` +
+          ' Baseline may be inaccurate — check Wynncraft API response.'
         );
       }
 
       const raids = Number(
-        m.globalData?.guildRaids?.total
+        m.globalData?.currentGuildRaids?.total
+        ?? m.globalData?.guildRaids?.total
         ?? m.guildRaids?.total
         ?? m.globalData?.raids?.total
         ?? 0
