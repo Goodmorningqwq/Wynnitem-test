@@ -872,10 +872,10 @@ function getSnapshot(metric, guild, trackedPlayers, scope = 'selected', previous
     if (metric === 'guildRaids' && hasPrev) {
       const unknownOrMissing = !entry || entry.guildRaidsKnown === false;
       if (unknownOrMissing) {
-        // Privacy-mode member: no globalData at all. Use prev only if it is 0 or absent.
-        // Do NOT keep a large prevValue — it may be an inflated cross-guild total from before
-        // the v3.7.2 fix. These members contribute 0 to the event until their data is visible.
-        snapshotPlayers[username] = 0;
+        // Privacy-mode member: globalData is absent — we have no current data.
+        // Keep prevValue so the delta stays 0 (no visible change) rather than dropping to 0
+        // and creating false negatives. This member's contribution is frozen until data returns.
+        snapshotPlayers[username] = prevValue;
       } else {
         // v3.7.2+: liveValue comes from currentGuildRaids (per-current-guild).
         // A live value of 0 is legitimate — never replace it with prevValue.
